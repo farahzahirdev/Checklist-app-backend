@@ -63,3 +63,27 @@ cp .env.example .env
 
 Current settings are loaded by `app/core/config.py`.
 
+## Database and migrations
+
+This API now includes a PostgreSQL ORM layer (SQLAlchemy 2.0) and Alembic migrations.
+
+Development defaults (already in `.env.example`):
+
+- `DB_HOST=localhost`
+- `DB_PORT=5432`
+- `DB_NAME=ckecklist`
+- `DB_USER=postgres`
+- `DB_PASSWORD=password`
+
+Run migrations from `apps/api`:
+
+```bash
+./venv/bin/alembic upgrade head
+```
+
+Create a new migration after model changes:
+
+```bash
+./venv/bin/alembic revision --autogenerate -m "describe_change"
+```
+
