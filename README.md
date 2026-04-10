@@ -1,18 +1,27 @@
 # Checklist App API
 
-FastAPI backend boilerplate for milestone 1.
+FastAPI backend for the Checklist App platform.
 
-## What is included
+## What this app is about
 
-- Modular FastAPI app structure under `app/`
-- Config and logging bootstrap in `app/core/`
-- API router composition in `app/api/router.py`
-- Placeholder routes for milestone 1 seams:
-	- `GET /api/v1/health`
-	- `POST /api/v1/auth/login` (501 placeholder)
-	- `POST /api/v1/payments/stripe/webhook` (501 placeholder)
-- Test scaffold in `tests/`
-- Access window helper in `app/services/access.py`
+This service provides the backend API for authentication, payments, access lifecycle, and checklist workflows. It is designed as a modular REST API so public pages and the authenticated frontend can integrate through a single API boundary.
+
+## How it works
+
+- `app/main.py` boots FastAPI and mounts the versioned API router.
+- `app/api/router.py` combines route modules into `/api/v1`.
+- Route handlers validate data through schemas and delegate logic to services.
+- Services hold business rules such as access-window calculation.
+- Tests call the API with `TestClient` to verify endpoint behavior.
+
+## Backend structure
+
+- `app/main.py`: app startup and router wiring.
+- `app/api/`: route modules and API composition.
+- `app/core/`: settings and logging configuration.
+- `app/schemas/`: request and response models.
+- `app/services/`: domain logic helpers.
+- `tests/`: API and service tests.
 
 ## Prerequisites
 
