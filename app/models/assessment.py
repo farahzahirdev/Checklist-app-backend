@@ -30,6 +30,24 @@ class MalwareScanStatus(StrEnum):
     failed = "failed"
 
 
+class AnswerChoice(StrEnum):
+    yes = "yes"
+    partially = "partially"
+    dont_know = "dont_know"
+    no = "no"
+
+    @classmethod
+    def to_id(cls, choice: "AnswerChoice | str") -> int:
+        value = cls(choice)
+        mapping = {cls.yes: 1, cls.partially: 2, cls.dont_know: 3, cls.no: 4}
+        return mapping[value]
+
+    @classmethod
+    def from_id(cls, answer_option_code_id: int | None) -> "AnswerChoice | None":
+        mapping = {1: cls.yes, 2: cls.partially, 3: cls.dont_know, 4: cls.no}
+        return mapping.get(answer_option_code_id)
+
+
 class Assessment(Base):
     __tablename__ = "assessments"
 
@@ -84,6 +102,14 @@ class AssessmentAnswer(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def answer(self) -> AnswerChoice | None:
+        return AnswerChoice.from_id(self.answer_option_code_id)
+
+    @answer.setter
+    def answer(self, value: AnswerChoice | str | None) -> None:
+        self.answer_option_code_id = None if value is None else AnswerChoice.to_id(value)
 
 
 class AssessmentEvidenceFile(Base):

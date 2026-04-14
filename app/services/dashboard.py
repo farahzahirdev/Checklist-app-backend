@@ -20,13 +20,19 @@ def _now() -> datetime:
 
 def get_admin_dashboard(db: Session) -> AdminDashboardResponse:
     users_total = db.scalar(select(func.count(User.id))) or 0
-    customers_total = db.scalar(select(func.count(User.id)).where(User.role == UserRole.customer)) or 0
-    checklists_published = db.scalar(select(func.count(Checklist.id)).where(Checklist.status == ChecklistStatus.published)) or 0
+    customers_total = db.scalar(
+        select(func.count(User.id)).where(User.role_code_id == UserRole.to_id(UserRole.customer))
+    ) or 0
+    checklists_published = db.scalar(
+        select(func.count(Checklist.id)).where(Checklist.status_code_id == ChecklistStatus.to_id(ChecklistStatus.published))
+    ) or 0
     assessments_submitted = (
         db.scalar(select(func.count(Assessment.id)).where(Assessment.status == AssessmentStatus.submitted)) or 0
     )
     reports_published = db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.published)) or 0
-    payments_succeeded = db.scalar(select(func.count(Payment.id)).where(Payment.status == PaymentStatus.succeeded)) or 0
+    payments_succeeded = db.scalar(
+        select(func.count(Payment.id)).where(Payment.status_code_id == PaymentStatus.to_id(PaymentStatus.succeeded))
+    ) or 0
 
     return AdminDashboardResponse(
         users_total=users_total,
@@ -61,7 +67,7 @@ def get_customer_dashboard(db: Session, *, user_id: UUID) -> CustomerDashboardRe
         db.scalar(
             select(func.count(distinct(Payment.checklist_id))).where(
                 Payment.user_id == user_id,
-                Payment.status == PaymentStatus.succeeded,
+                Payment.status_code_id == PaymentStatus.to_id(PaymentStatus.succeeded),
                 Payment.checklist_id.is_not(None),
             )
         )

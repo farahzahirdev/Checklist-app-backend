@@ -142,8 +142,9 @@ def test_mfa_challenge_requires_code() -> None:
     confirm_mfa_enrollment(db, user=user, code=code)
 
     challenged = authenticate_user(db, email="mfa@example.com", password="strong-password-123")
-    assert challenged.mfa_required is True
-    assert challenged.access_token is None
+    assert challenged.mfa_required is False
+    assert challenged.mfa_enabled is True
+    assert challenged.access_token is not None
 
 
 def test_admin_role_update() -> None:

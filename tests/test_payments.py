@@ -6,7 +6,6 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.models.access_event import AccessEvent
 from app.models.access_window import AccessWindow
 from app.models.checklist import Checklist, ChecklistStatus
 from app.models.payment import Payment, PaymentStatus
@@ -20,7 +19,6 @@ class FakeSession:
         self.checklists: list[Checklist] = []
         self.payments: list[Payment] = []
         self.access_windows: list[AccessWindow] = []
-        self.access_events: list[AccessEvent] = []
 
     def add(self, obj) -> None:
         if getattr(obj, "id", None) is None:
@@ -35,8 +33,6 @@ class FakeSession:
             self.payments.append(obj)
         elif isinstance(obj, AccessWindow):
             self.access_windows.append(obj)
-        elif isinstance(obj, AccessEvent):
-            self.access_events.append(obj)
 
     def flush(self) -> None:
         return None
@@ -107,7 +103,6 @@ def test_webhook_creates_payment_with_checklist_binding() -> None:
         id=uuid4(),
         checklist_type_id=uuid4(),
         version=1,
-        title="Checklist",
         status=ChecklistStatus.published,
         created_by=user.id,
         updated_by=user.id,

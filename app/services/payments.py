@@ -9,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models.access_event import AccessEvent, AccessEventType
 from app.models.access_window import AccessWindow
 from app.models.checklist import Checklist
 from app.models.payment import Payment, PaymentStatus
@@ -120,14 +119,6 @@ def _ensure_access_window(db: Session, payment: Payment, paid_at: datetime) -> A
     )
     db.add(access_window)
     db.flush()
-
-    access_event = AccessEvent(
-        user_id=payment.user_id,
-        access_window_id=access_window.id,
-        event_type=AccessEventType.unlocked_after_payment,
-        event_metadata={"stripe_payment_intent_id": payment.stripe_payment_intent_id},
-    )
-    db.add(access_event)
     return access_window
 
 

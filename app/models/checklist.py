@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from enum import StrEnum
 import uuid
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
@@ -6,6 +7,40 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+
+
+class ChecklistStatus(StrEnum):
+    draft = "draft"
+    published = "published"
+    archived = "archived"
+
+    @classmethod
+    def to_id(cls, status: "ChecklistStatus | str") -> int:
+        value = cls(status)
+        mapping = {cls.draft: 1, cls.published: 2, cls.archived: 3}
+        return mapping[value]
+
+    @classmethod
+    def from_id(cls, status_code_id: int | None) -> "ChecklistStatus | None":
+        mapping = {1: cls.draft, 2: cls.published, 3: cls.archived}
+        return mapping.get(status_code_id)
+
+
+class SeverityLevel(StrEnum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+    @classmethod
+    def to_id(cls, severity: "SeverityLevel | str") -> int:
+        value = cls(severity)
+        mapping = {cls.low: 1, cls.medium: 2, cls.high: 3}
+        return mapping[value]
+
+    @classmethod
+    def from_id(cls, severity_code_id: int | None) -> "SeverityLevel | None":
+        mapping = {1: cls.low, 2: cls.medium, 3: cls.high}
+        return mapping.get(severity_code_id)
 
 
 class ChecklistType(Base):
@@ -45,6 +80,14 @@ class Checklist(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+    @property
+    def status(self) -> ChecklistStatus | None:
+        return ChecklistStatus.from_id(self.status_code_id)
+
+    @status.setter
+    def status(self, value: ChecklistStatus | str | None) -> None:
+        self.status_code_id = None if value is None else ChecklistStatus.to_id(value)
+
 
 class ChecklistSection(Base):
     __tablename__ = "checklist_sections"
@@ -82,11 +125,6 @@ class ChecklistQuestion(Base):
         ForeignKey("severity_codes.id", ondelete="RESTRICT"),
         nullable=True,
     )
-    expected_implementation_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("expected_implementations.id", ondelete="SET NULL"),
-        nullable=True,
-    )
     report_domain: Mapped[str | None] = mapped_column(String(120), nullable=True)
     report_chapter: Mapped[str | None] = mapped_column(String(120), nullable=True)
     illustrative_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -98,6 +136,14 @@ class ChecklistQuestion(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
+    @property
+    def severity(self) -> SeverityLevel | None:
+        return SeverityLevel.from_id(self.severity_code_id)
+
+    @severity.setter
+    def severity(self, value: SeverityLevel | str | None) -> None:
+        self.severity_code_id = None if value is None else SeverityLevel.to_id(value)
 
 
 class ChecklistTranslation(Base):

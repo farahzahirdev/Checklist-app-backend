@@ -8,7 +8,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentStatus, PriorityLevel
-from app.models.checklist import ChecklistQuestion
+from app.models.checklist import ChecklistQuestion, ChecklistQuestionTranslation
 from app.models.report import (
     Report,
     ReportEventType,
@@ -45,6 +45,19 @@ def _report_counts(db: Session, report_id: UUID) -> tuple[int, int]:
     findings = db.scalar(select(func.count(ReportFinding.id)).where(ReportFinding.report_id == report_id)) or 0
     summaries = db.scalar(select(func.count(ReportSectionSummary.id)).where(ReportSectionSummary.report_id == report_id)) or 0
     return findings, summaries
+
+
+def _question_content(db: Session, question_id: UUID) -> tuple[str, str | None]:
+    translation = db.scalar(
+        select(ChecklistQuestionTranslation)
+        .where(ChecklistQuestionTranslation.question_id == question_id)
+        .order_by(desc(ChecklistQuestionTranslation.created_at))
+        .limit(1)
+    )
+    if translation is None:
+        return "", None
+    recommendation = translation.recommendation_template or translation.expected_implementation
+    return translation.question_text, recommendation
 
 
 def _serialize_report(db: Session, report: Report) -> ReportResponse:
@@ -98,14 +111,15 @@ def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User) -> R
             question = db.get(ChecklistQuestion, answer.question_id)
             if question is None:
                 continue
+            finding_text, recommendation_text = _question_content(db, answer.question_id)
             db.add(
                 ReportFinding(
                     report_id=report.id,
                     question_id=answer.question_id,
                     answer_id=answer.id,
                     priority=_priority_from_answer(answer),
-                    finding_text=question.legal_requirement,
-                    recommendation_text=question.recommendation_template or question.expected_implementation,
+                    finding_text=finding_text,
+                    recommendation_text=recommendation_text,
                 )
             )
 

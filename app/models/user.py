@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import StrEnum
 import uuid
 
 from sqlalchemy import DateTime, ForeignKey, SmallInteger, String, func
@@ -6,6 +7,24 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+
+class UserRole(StrEnum):
+    """User role codes - references role_codes table. Not a database enum column."""
+    admin = "admin"
+    auditor = "auditor"
+    customer = "customer"
+
+    @classmethod
+    def to_id(cls, role: "UserRole | str") -> int:
+        value = cls(role)
+        mapping = {cls.admin: 1, cls.auditor: 2, cls.customer: 3}
+        return mapping[value]
+
+    @classmethod
+    def from_id(cls, role_code_id: int | None) -> "UserRole | None":
+        mapping = {1: cls.admin, 2: cls.auditor, 3: cls.customer}
+        return mapping.get(role_code_id)
 
 
 class User(Base):
@@ -27,6 +46,14 @@ class User(Base):
         onupdate=func.now(),
         nullable=False,
     )
+
+    @property
+    def role(self) -> UserRole | None:
+        return UserRole.from_id(self.role_code_id)
+
+    @role.setter
+    def role(self, value: UserRole | str | None) -> None:
+        self.role_code_id = None if value is None else UserRole.to_id(value)
 
     payments = relationship("Payment", back_populates="user", cascade="all, delete-orphan")
     access_windows = relationship("AccessWindow", back_populates="user", cascade="all, delete-orphan")
