@@ -1,11 +1,136 @@
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.schemas.access import AccessWindowResponse
+from app.schemas.admin_checklist import (
+	AdminChecklistCreateRequest,
+	AdminChecklistResponse,
+	AdminChecklistUpdateRequest,
+	AdminQuestionCreateRequest,
+	AdminQuestionResponse,
+	AdminSectionCreateRequest,
+	AdminSectionResponse,
+	EvidenceRuleResponse,
+)
+from app.schemas.assessment import (
+	AssessmentAnswerResponse,
+	AssessmentAnswerUpsertRequest,
+	AssessmentSessionResponse,
+	AssessmentSubmitResponse,
+	StartAssessmentRequest,
+)
+from app.schemas.auth import (
+	AuthResponse,
+	AuthUserResponse,
+	LoginRequest,
+	MfaVerifyRequest,
+	MfaVerifyResponse,
+	MfaSetupDetailsResponse,
+	RegistrationRequest,
+	RoleAssignment,
+)
+from app.schemas.common import MessageResponse
+from app.schemas.db import AccessWindowCreate, AccessWindowRead, PaymentCreate, PaymentRead, UserCreate, UserRead
+from app.schemas.health import HealthResponse
+from app.schemas.payment import PaymentSetupRequest, PaymentSetupResponse, PaymentState, StripeWebhookAck
+from app.schemas.report import (
+	GenerateDraftReportRequest,
+	PublishReportRequest,
+	ReportFindingItem,
+	ReportResponse,
+	ReportSummaryItem,
+	ReviewActionRequest,
+	UpsertReportSummaryRequest,
+)
 
 settings = get_settings()
 configure_logging(settings.app_name)
 
-app = FastAPI(title=settings.app_name)
+app = FastAPI(
+	title=settings.app_name,
+	description=(
+		"Backend API for checklist management, customer assessments, payments, "
+		"and report review/publish workflow."
+	),
+	openapi_tags=[
+		{"name": "health", "description": "Service health and uptime endpoints."},
+		{"name": "auth", "description": "Account registration, login, MFA, and role assignment APIs."},
+		{"name": "payments", "description": "Stripe payment setup and webhook processing APIs."},
+		{"name": "assessment", "description": "Assessment session start, answer save, and submit APIs."},
+		{"name": "admin-checklists", "description": "Admin APIs for checklist, section, and question lifecycle management."},
+		{"name": "reports", "description": "Admin report generation, review, approval, and publish workflow APIs."},
+	],
+)
 app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+
+def custom_openapi() -> dict:
+	if app.openapi_schema:
+		return app.openapi_schema
+
+	openapi_schema = get_openapi(
+		title=app.title,
+		version="0.1.0",
+		description="Checklist App API",
+		routes=app.routes,
+	)
+
+	components = openapi_schema.setdefault("components", {}).setdefault("schemas", {})
+	models = [
+		MessageResponse,
+		HealthResponse,
+		AuthUserResponse,
+		AuthResponse,
+		LoginRequest,
+		RegistrationRequest,
+		RoleAssignment,
+		MfaVerifyRequest,
+		MfaVerifyResponse,
+		MfaSetupDetailsResponse,
+		StartAssessmentRequest,
+		AssessmentSessionResponse,
+		AssessmentAnswerUpsertRequest,
+		AssessmentAnswerResponse,
+		AssessmentSubmitResponse,
+		AdminChecklistCreateRequest,
+		AdminChecklistUpdateRequest,
+		AdminChecklistResponse,
+		AdminSectionCreateRequest,
+		AdminSectionResponse,
+		AdminQuestionCreateRequest,
+		EvidenceRuleResponse,
+		AdminQuestionResponse,
+		PaymentState,
+		PaymentSetupRequest,
+		PaymentSetupResponse,
+		StripeWebhookAck,
+		GenerateDraftReportRequest,
+		ReviewActionRequest,
+		PublishReportRequest,
+		UpsertReportSummaryRequest,
+		ReportSummaryItem,
+		ReportFindingItem,
+		ReportResponse,
+		AccessWindowResponse,
+		UserCreate,
+		UserRead,
+		PaymentCreate,
+		PaymentRead,
+		AccessWindowCreate,
+		AccessWindowRead,
+	]
+
+	for model in models:
+		schema = model.model_json_schema(ref_template="#/components/schemas/{model}")
+		for def_name, def_schema in schema.pop("$defs", {}).items():
+			components.setdefault(def_name, def_schema)
+		components.setdefault(model.__name__, schema)
+
+	app.openapi_schema = openapi_schema
+	return app.openapi_schema
+
+
+app.openapi = custom_openapi
