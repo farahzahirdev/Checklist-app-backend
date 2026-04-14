@@ -1,4 +1,3 @@
-from app.models.access_event import AccessEvent, AccessEventType
 from app.models.access_window import AccessWindow
 from app.models.assessment import (
     AnswerChoice,
@@ -14,9 +13,6 @@ from app.models.assessment import (
 from app.models.audit_log import (
     AuditAction,
     AuditLog,
-    OperationalEvent,
-    OperationalEventType,
-    OperationalSeverity,
 )
 from app.models.checklist import (
     Checklist,
@@ -36,8 +32,6 @@ from app.models.reference import (
     AnswerOptionCode,
     AnswerOptionTranslation,
     ChecklistStatusCode,
-    ExpectedImplementation,
-    ExpectedImplementationTranslation,
     Language,
     PaymentStatusCode,
     RoleCode,
@@ -77,18 +71,11 @@ __all__ = [
     "ChecklistType",
     "MalwareScanStatus",
     "MfaTotp",
-    "OperationalEvent",
-    "OperationalEventType",
-    "OperationalSeverity",
     "Payment",
     "PaymentStatus",
     "AnswerOptionCode",
     "AnswerOptionTranslation",
-    "ChecklistStatusCode",
-    "ExpectedImplementation",
-    "ExpectedImplementationTranslation",
-    "Language",
-    "PaymentStatusCode",
+    "ChecklistStatusCode
     "PriorityLevel",
     "QuestionScoreMode",
     "Report",
