@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models.access_event import AccessEvent, AccessEventType
 from app.models.access_window import AccessWindow
+from app.models.checklist import Checklist
 from app.models.payment import Payment, PaymentStatus
 from app.models.user import User
 from app.schemas.payment import PaymentState
@@ -51,6 +52,7 @@ def create_payment_intent_for_user(
     db: Session,
     *,
     user_id: UUID,
+    checklist_id: UUID,
     amount_cents: int | None,
     currency: str | None,
 ) -> tuple[Payment, str]:
@@ -61,6 +63,10 @@ def create_payment_intent_for_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
 
+    checklist = db.get(Checklist, checklist_id)
+    if checklist is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_not_found")
+
     request_amount = amount_cents or settings.stripe_default_amount_cents
     request_currency = (currency or settings.stripe_currency).upper()
 
@@ -68,11 +74,12 @@ def create_payment_intent_for_user(
         amount=request_amount,
         currency=request_currency.lower(),
         automatic_payment_methods={"enabled": True},
-        metadata={"user_id": str(user.id)},
+        metadata={"user_id": str(user.id), "checklist_id": str(checklist.id)},
     )
 
     payment = Payment(
         user_id=user.id,
+        checklist_id=checklist.id,
         stripe_payment_intent_id=intent["id"],
         amount_cents=request_amount,
         currency=request_currency,
@@ -141,14 +148,17 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
     if payment is None:
         metadata = data.get("metadata") or {}
         user_id_raw = metadata.get("user_id")
-        if user_id_raw is None:
+        checklist_id_raw = metadata.get("checklist_id")
+        if user_id_raw is None or checklist_id_raw is None:
             return None
         try:
             user_id = UUID(user_id_raw)
+            checklist_id = UUID(checklist_id_raw)
         except ValueError:
             return None
         payment = Payment(
             user_id=user_id,
+            checklist_id=checklist_id,
             stripe_payment_intent_id=intent_id,
             amount_cents=int(data.get("amount") or 0),
             currency=str(data.get("currency") or "USD").upper(),
@@ -172,6 +182,7 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
 
     return PaymentState(
         payment_id=payment.id,
+        checklist_id=payment.checklist_id,
         stripe_payment_intent_id=payment.stripe_payment_intent_id,
         payment_status=payment.status,
         paid_at=payment.paid_at,

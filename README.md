@@ -119,9 +119,12 @@ Create a new migration after model changes:
 ### Payments
 
 - `POST /api/v1/payments/stripe/setup-intent`
-- Purpose: create payment intent and internal payment record.
+- Purpose: create payment intent and internal payment record bound to a specific checklist.
+- Request notes: `checklist_id` is required and determines which checklist access is granted after payment success.
+- Response notes: returns `client_secret`, `stripe_payment_intent_id`, and the linked `checklist_id`.
 - `POST /api/v1/payments/stripe/webhook`
 - Purpose: Stripe webhook receiver that updates payment/access state.
+- Webhook notes: on `payment_intent.succeeded`, backend creates access window for the same checklist linked in payment metadata.
 
 ### Assessment
 

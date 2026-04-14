@@ -39,10 +39,14 @@ def _serialize_assessment(assessment: Assessment, *, is_new: bool) -> Assessment
     )
 
 
-def _latest_succeeded_payment(db: Session, *, user_id: UUID) -> Payment | None:
+def _latest_succeeded_payment(db: Session, *, user_id: UUID, checklist_id: UUID) -> Payment | None:
     return db.scalar(
         select(Payment)
-        .where(Payment.user_id == user_id, Payment.status == PaymentStatus.succeeded)
+        .where(
+            Payment.user_id == user_id,
+            Payment.checklist_id == checklist_id,
+            Payment.status == PaymentStatus.succeeded,
+        )
         .order_by(desc(Payment.paid_at), desc(Payment.created_at))
     )
 
@@ -120,7 +124,7 @@ def start_assessment(db: Session, *, user: User, checklist_id: UUID) -> Assessme
     if existing is not None:
         return _serialize_assessment(existing, is_new=False)
 
-    payment = _latest_succeeded_payment(db, user_id=user.id)
+    payment = _latest_succeeded_payment(db, user_id=user.id, checklist_id=checklist_id)
     if payment is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="payment_required")
 
