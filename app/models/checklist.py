@@ -115,15 +115,14 @@ class ChecklistQuestion(Base):
 
 class ChecklistTranslation(Base):
     __tablename__ = "checklist_translations"
-    __table_args__ = (UniqueConstraint("checklist_id", "lang_code", name="uq_checklist_translations"),)
+    __table_args__ = (UniqueConstraint("checklist_id", "language_id", name="uq_checklist_translations"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     checklist_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("checklists.id", ondelete="CASCADE"), nullable=False)
-    lang_code: Mapped[str] = mapped_column(String(10), nullable=False)
-    language_id: Mapped[uuid.UUID | None] = mapped_column(
+    language_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("languages.id", ondelete="RESTRICT"),
-        nullable=True,
+        nullable=False,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -132,17 +131,16 @@ class ChecklistTranslation(Base):
 
 class ChecklistSectionTranslation(Base):
     __tablename__ = "checklist_section_translations"
-    __table_args__ = (UniqueConstraint("section_id", "lang_code", name="uq_section_translations"),)
+    __table_args__ = (UniqueConstraint("section_id", "language_id", name="uq_section_translations"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     section_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("checklist_sections.id", ondelete="CASCADE"), nullable=False
     )
-    lang_code: Mapped[str] = mapped_column(String(10), nullable=False)
-    language_id: Mapped[uuid.UUID | None] = mapped_column(
+    language_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("languages.id", ondelete="RESTRICT"),
-        nullable=True,
+        nullable=False,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -150,17 +148,16 @@ class ChecklistSectionTranslation(Base):
 
 class ChecklistQuestionTranslation(Base):
     __tablename__ = "checklist_question_translations"
-    __table_args__ = (UniqueConstraint("question_id", "lang_code", name="uq_question_translations"),)
+    __table_args__ = (UniqueConstraint("question_id", "language_id", name="uq_question_translations"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     question_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("checklist_questions.id", ondelete="CASCADE"), nullable=False
     )
-    lang_code: Mapped[str] = mapped_column(String(10), nullable=False)
-    language_id: Mapped[uuid.UUID | None] = mapped_column(
+    language_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("languages.id", ondelete="RESTRICT"),
-        nullable=True,
+        nullable=False,
     )
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
