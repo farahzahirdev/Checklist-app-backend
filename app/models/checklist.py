@@ -1,24 +1,11 @@
 from datetime import date, datetime
-from enum import StrEnum
 import uuid
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-
-
-class ChecklistStatus(StrEnum):
-    draft = "draft"
-    published = "published"
-    archived = "archived"
-
-
-class SeverityLevel(StrEnum):
-    low = "low"
-    medium = "medium"
-    high = "high"
 
 
 class ChecklistType(Base):
@@ -50,9 +37,6 @@ class Checklist(Base):
         SmallInteger,
         ForeignKey("checklist_status_codes.id", ondelete="RESTRICT"),
         nullable=True,
-    )
-    status: Mapped[ChecklistStatus] = mapped_column(
-        Enum(ChecklistStatus, name="checklist_status", native_enum=True), nullable=False, default=ChecklistStatus.draft
     )
     effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -115,9 +99,6 @@ class ChecklistQuestion(Base):
         UUID(as_uuid=True),
         ForeignKey("expected_implementations.id", ondelete="SET NULL"),
         nullable=True,
-    )
-    severity: Mapped[SeverityLevel] = mapped_column(
-        Enum(SeverityLevel, name="severity_level", native_enum=True), nullable=False
     )
     report_domain: Mapped[str | None] = mapped_column(String(120), nullable=True)
     report_chapter: Mapped[str | None] = mapped_column(String(120), nullable=True)

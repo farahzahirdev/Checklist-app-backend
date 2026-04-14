@@ -1,6 +1,5 @@
 from app.models.access_window import AccessWindow
 from app.models.assessment import (
-    AnswerChoice,
     Assessment,
     AssessmentAnswer,
     AssessmentEvidenceFile,
@@ -20,13 +19,11 @@ from app.models.checklist import (
     ChecklistQuestionTranslation,
     ChecklistSection,
     ChecklistSectionTranslation,
-    ChecklistStatus,
     ChecklistTranslation,
     ChecklistType,
-    SeverityLevel,
 )
 from app.models.mfa_totp import MfaTotp
-from app.models.payment import Payment, PaymentStatus
+from app.models.payment import Payment
 from app.models.reference import (
     AnswerOptionCode,
     AnswerOptionTranslation,
@@ -45,13 +42,10 @@ from app.models.report import (
     ReportSectionSummary,
     ReportStatus,
 )
-from app.models.user import User, UserRole
+from app.models.user import User
 
 __all__ = [
-    "AccessEvent",
-    "AccessEventType",
     "AccessWindow",
-    "AnswerChoice",
     "Assessment",
     "AssessmentAnswer",
     "AssessmentEvidenceFile",
@@ -65,13 +59,11 @@ __all__ = [
     "ChecklistQuestionTranslation",
     "ChecklistSection",
     "ChecklistSectionTranslation",
-    "ChecklistStatus",
     "ChecklistTranslation",
     "ChecklistType",
     "MalwareScanStatus",
     "MfaTotp",
     "Payment",
-    "PaymentStatus",
     "AnswerOptionCode",
     "AnswerOptionTranslation",
     "ChecklistStatusCode",
@@ -84,10 +76,8 @@ __all__ = [
     "ReportReviewEvent",
     "ReportSectionSummary",
     "ReportStatus",
-    "SeverityLevel",
     "SeverityCode",
     "SeverityTranslation",
     "User",
-    "UserRole",
     "RoleCode",
 ]
