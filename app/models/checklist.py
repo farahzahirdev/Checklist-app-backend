@@ -31,8 +31,6 @@ class Checklist(Base):
         UUID(as_uuid=True), ForeignKey("checklist_types.id", ondelete="RESTRICT"), nullable=False
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status_code_id: Mapped[int | None] = mapped_column(
         SmallInteger,
         ForeignKey("checklist_status_codes.id", ondelete="RESTRICT"),
@@ -58,7 +56,6 @@ class ChecklistSection(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     checklist_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("checklists.id", ondelete="CASCADE"), nullable=False)
     section_code: Mapped[str] = mapped_column(String(100), nullable=False)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
     source_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_order: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -80,16 +77,6 @@ class ChecklistQuestion(Base):
         UUID(as_uuid=True), ForeignKey("checklist_sections.id", ondelete="CASCADE"), nullable=False
     )
     question_code: Mapped[str] = mapped_column(String(120), nullable=False)
-    paragraph_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    legal_requirement: Mapped[str] = mapped_column(Text, nullable=False)
-    question_text: Mapped[str] = mapped_column(Text, nullable=False)
-    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
-    expected_implementation: Mapped[str | None] = mapped_column(Text, nullable=True)
-    guidance_score_4: Mapped[str | None] = mapped_column(Text, nullable=True)
-    guidance_score_3: Mapped[str | None] = mapped_column(Text, nullable=True)
-    guidance_score_2: Mapped[str | None] = mapped_column(Text, nullable=True)
-    guidance_score_1: Mapped[str | None] = mapped_column(Text, nullable=True)
-    recommendation_template: Mapped[str | None] = mapped_column(Text, nullable=True)
     severity_code_id: Mapped[int | None] = mapped_column(
         SmallInteger,
         ForeignKey("severity_codes.id", ondelete="RESTRICT"),
