@@ -21,11 +21,6 @@ class SeverityLevel(StrEnum):
     high = "high"
 
 
-class QuestionScoreMode(StrEnum):
-    answer_only = "answer_only"
-    answer_with_adjustment = "answer_with_adjustment"
-
-
 class ChecklistType(Base):
     __tablename__ = "checklist_types"
 
@@ -129,11 +124,6 @@ class ChecklistQuestion(Base):
     illustrative_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     note_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     evidence_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    final_score_mode: Mapped[QuestionScoreMode] = mapped_column(
-        Enum(QuestionScoreMode, name="question_score_mode", native_enum=True),
-        nullable=False,
-        default=QuestionScoreMode.answer_only,
-    )
     display_order: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

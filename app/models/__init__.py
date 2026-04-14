@@ -23,7 +23,6 @@ from app.models.checklist import (
     ChecklistStatus,
     ChecklistTranslation,
     ChecklistType,
-    QuestionScoreMode,
     SeverityLevel,
 )
 from app.models.mfa_totp import MfaTotp
@@ -75,9 +74,10 @@ __all__ = [
     "PaymentStatus",
     "AnswerOptionCode",
     "AnswerOptionTranslation",
-    "ChecklistStatusCode
+    "ChecklistStatusCode",
+    "Language",
+    "PaymentStatusCode",
     "PriorityLevel",
-    "QuestionScoreMode",
     "Report",
     "ReportEventType",
     "ReportFinding",

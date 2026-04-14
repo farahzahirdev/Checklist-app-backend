@@ -47,7 +47,6 @@ class Assessment(Base):
     access_window_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("access_windows.id", ondelete="RESTRICT"), nullable=False
     )
-    unlocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     auditor_note: Mapped[str | None] = mapped_column(Text, nullable=True)
