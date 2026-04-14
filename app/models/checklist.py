@@ -2,7 +2,7 @@ from datetime import date, datetime
 from enum import StrEnum
 import uuid
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -51,6 +51,11 @@ class Checklist(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status_code_id: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        ForeignKey("checklist_status_codes.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     status: Mapped[ChecklistStatus] = mapped_column(
         Enum(ChecklistStatus, name="checklist_status", native_enum=True), nullable=False, default=ChecklistStatus.draft
     )
@@ -106,6 +111,16 @@ class ChecklistQuestion(Base):
     guidance_score_2: Mapped[str | None] = mapped_column(Text, nullable=True)
     guidance_score_1: Mapped[str | None] = mapped_column(Text, nullable=True)
     recommendation_template: Mapped[str | None] = mapped_column(Text, nullable=True)
+    severity_code_id: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        ForeignKey("severity_codes.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    expected_implementation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("expected_implementations.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     severity: Mapped[SeverityLevel] = mapped_column(
         Enum(SeverityLevel, name="severity_level", native_enum=True), nullable=False
     )
@@ -134,6 +149,11 @@ class ChecklistTranslation(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     checklist_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("checklists.id", ondelete="CASCADE"), nullable=False)
     lang_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    language_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("languages.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -148,6 +168,11 @@ class ChecklistSectionTranslation(Base):
         UUID(as_uuid=True), ForeignKey("checklist_sections.id", ondelete="CASCADE"), nullable=False
     )
     lang_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    language_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("languages.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -161,6 +186,11 @@ class ChecklistQuestionTranslation(Base):
         UUID(as_uuid=True), ForeignKey("checklist_questions.id", ondelete="CASCADE"), nullable=False
     )
     lang_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    language_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("languages.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     expected_implementation: Mapped[str | None] = mapped_column(Text, nullable=True)

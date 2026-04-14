@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 import uuid
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, SmallInteger, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -28,6 +28,11 @@ class Payment(Base):
     stripe_payment_intent_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
+    status_code_id: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        ForeignKey("payment_status_codes.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     status: Mapped[PaymentStatus] = mapped_column(
         Enum(PaymentStatus, name="payment_status", native_enum=True),
         default=PaymentStatus.pending,

@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 import uuid
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,8 +47,11 @@ class Assessment(Base):
     access_window_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("access_windows.id", ondelete="RESTRICT"), nullable=False
     )
+    unlocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    auditor_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    final_maturity_score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     status: Mapped[AssessmentStatus] = mapped_column(
         Enum(AssessmentStatus, name="assessment_status", native_enum=True),
         nullable=False,
@@ -74,6 +77,11 @@ class AssessmentAnswer(Base):
     )
     question_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("checklist_questions.id", ondelete="RESTRICT"), nullable=False
+    )
+    answer_option_code_id: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        ForeignKey("answer_option_codes.id", ondelete="RESTRICT"),
+        nullable=True,
     )
     answer: Mapped[AnswerChoice] = mapped_column(Enum(AnswerChoice, name="answer_choice", native_enum=True), nullable=False)
     answer_score: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -132,3 +140,25 @@ class AssessmentSectionScore(Base):
     answered_count: Mapped[int] = mapped_column(Integer, nullable=False)
     total_count: Mapped[int] = mapped_column(Integer, nullable=False)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class AssessmentSectionEvaluation(Base):
+    __tablename__ = "assessment_section_evaluations"
+    __table_args__ = (UniqueConstraint("assessment_id", "section_id", name="uq_assessment_section_evaluation"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    assessment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("assessments.id", ondelete="CASCADE"), nullable=False
+    )
+    section_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("checklist_sections.id", ondelete="CASCADE"), nullable=False
+    )
+    evaluator_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    maturity_score: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
+    auditor_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )

@@ -137,6 +137,15 @@ Create a new migration after model changes:
 - `POST /api/v1/assessment/{assessment_id}/submit`
 - Purpose: finalize assessment and lock for report generation.
 
+### Dashboards
+
+- `GET /api/v1/dashboard/admin`
+- Purpose: admin KPI summary for users, checklist publication, submitted assessments, payments, and published reports.
+- `GET /api/v1/dashboard/auditor`
+- Purpose: auditor queue summary for report review states and finding totals.
+- `GET /api/v1/dashboard/customer`
+- Purpose: customer-specific summary for paid checklist coverage, assessment activity, and latest report status.
+
 ### Admin checklists
 
 - Prefix: ` /api/v1/admin/checklists`

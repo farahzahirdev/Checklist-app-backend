@@ -5,6 +5,7 @@ from app.models.assessment import (
     Assessment,
     AssessmentAnswer,
     AssessmentEvidenceFile,
+    AssessmentSectionEvaluation,
     AssessmentSectionScore,
     AssessmentStatus,
     MalwareScanStatus,
@@ -31,6 +32,18 @@ from app.models.checklist import (
 )
 from app.models.mfa_totp import MfaTotp
 from app.models.payment import Payment, PaymentStatus
+from app.models.reference import (
+    AnswerOptionCode,
+    AnswerOptionTranslation,
+    ChecklistStatusCode,
+    ExpectedImplementation,
+    ExpectedImplementationTranslation,
+    Language,
+    PaymentStatusCode,
+    RoleCode,
+    SeverityCode,
+    SeverityTranslation,
+)
 from app.models.report import (
     Report,
     ReportEventType,
@@ -49,6 +62,7 @@ __all__ = [
     "Assessment",
     "AssessmentAnswer",
     "AssessmentEvidenceFile",
+    "AssessmentSectionEvaluation",
     "AssessmentSectionScore",
     "AssessmentStatus",
     "AuditAction",
@@ -68,6 +82,13 @@ __all__ = [
     "OperationalSeverity",
     "Payment",
     "PaymentStatus",
+    "AnswerOptionCode",
+    "AnswerOptionTranslation",
+    "ChecklistStatusCode",
+    "ExpectedImplementation",
+    "ExpectedImplementationTranslation",
+    "Language",
+    "PaymentStatusCode",
     "PriorityLevel",
     "QuestionScoreMode",
     "Report",
@@ -77,6 +98,9 @@ __all__ = [
     "ReportSectionSummary",
     "ReportStatus",
     "SeverityLevel",
+    "SeverityCode",
+    "SeverityTranslation",
     "User",
     "UserRole",
+    "RoleCode",
 ]

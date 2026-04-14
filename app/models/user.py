@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 import uuid
 
-from sqlalchemy import DateTime, Enum, String, func
+from sqlalchemy import DateTime, Enum, ForeignKey, SmallInteger, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,6 +21,11 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    role_code_id: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        ForeignKey("role_codes.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role", native_enum=True),
         default=UserRole.customer,
