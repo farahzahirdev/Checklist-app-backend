@@ -252,7 +252,10 @@ def admin_create_question(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminQuestionResponse:
-    return create_question(db, checklist_id=checklist_id, section_id=section_id, payload=request)
+    try:
+        return create_question(db, checklist_id=checklist_id, section_id=section_id, payload=request)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.patch(
@@ -269,13 +272,16 @@ def admin_update_question(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminQuestionResponse:
-    question = update_question(
-        db,
-        checklist_id=checklist_id,
-        section_id=section_id,
-        question_id=question_id,
-        payload=request,
-    )
+    try:
+        question = update_question(
+            db,
+            checklist_id=checklist_id,
+            section_id=section_id,
+            question_id=question_id,
+            payload=request,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if question is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="question_not_found")
     return question

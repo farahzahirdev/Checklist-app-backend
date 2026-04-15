@@ -96,6 +96,24 @@ def _latest_question_translation(db: Session, question_id: uuid.UUID) -> Checkli
     )
 
 
+def _validate_parent_question(
+    db: Session,
+    *,
+    checklist_id: uuid.UUID,
+    section_id: uuid.UUID,
+    parent_question_id: uuid.UUID,
+) -> None:
+    parent_question = db.scalar(
+        select(ChecklistQuestion.id).where(
+            ChecklistQuestion.id == parent_question_id,
+            ChecklistQuestion.checklist_id == checklist_id,
+            ChecklistQuestion.section_id == section_id,
+        )
+    )
+    if parent_question is None:
+        raise ValueError("parent_question_not_found")
+
+
 def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
     translation = getattr(question, "_translation", None)
     legal_requirement = translation.question_text if translation else ""
@@ -106,12 +124,14 @@ def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
         id=question.id,
         checklist_id=question.checklist_id,
         section_id=question.section_id,
+        parent_question_id=question.parent_question_id,
         question_id=question.question_code,
         security_level=severity,
         legal_requirement=legal_requirement,
         explanation=explanation,
         expected_implementation=expected_implementation,
         points=_severity_to_points(severity),
+        note=question.note_for_user,
         evidence_rule=EvidenceRuleResponse(
             allowed_mime_types=DEFAULT_ALLOWED_MIME_TYPES,
             max_file_size_bytes=DEFAULT_MAX_FILE_SIZE_BYTES,
@@ -286,14 +306,24 @@ def create_question(db: Session, *, checklist_id, section_id, payload: AdminQues
     )
     next_order = (last_order or 0) + 1
 
+    if payload.parent_question_id is not None:
+        _validate_parent_question(
+            db,
+            checklist_id=checklist_id,
+            section_id=section_id,
+            parent_question_id=payload.parent_question_id,
+        )
+
     question = ChecklistQuestion(
         checklist_id=checklist_id,
         section_id=section_id,
+        parent_question_id=payload.parent_question_id,
         question_code=payload.question_id,
         severity=_points_to_severity(payload.points),
         report_domain=None,
         report_chapter=None,
         illustrative_image_url=None,
+        note_for_user=payload.note,
         note_enabled=True,
         evidence_enabled=True,
         display_order=next_order,
@@ -340,10 +370,23 @@ def update_question(
 
     if payload.question_id is not None:
         question.question_code = payload.question_id
+    if "parent_question_id" in payload.model_fields_set:
+        if payload.parent_question_id == question.id:
+            raise ValueError("parent_question_invalid")
+        if payload.parent_question_id is not None:
+            _validate_parent_question(
+                db,
+                checklist_id=checklist_id,
+                section_id=section_id,
+                parent_question_id=payload.parent_question_id,
+            )
+        question.parent_question_id = payload.parent_question_id
     if payload.security_level is not None:
         question.severity = payload.security_level
     if payload.points is not None:
         question.severity = _points_to_severity(payload.points)
+    if "note" in payload.model_fields_set:
+        question.note_for_user = payload.note
     if payload.order is not None:
         question.display_order = payload.order
 

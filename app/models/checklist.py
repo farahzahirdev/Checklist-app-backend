@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -119,6 +119,11 @@ class ChecklistQuestion(Base):
     section_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("checklist_sections.id", ondelete="CASCADE"), nullable=False
     )
+    parent_question_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("checklist_questions.id", ondelete="CASCADE"),
+        nullable=True,
+    )
     question_code: Mapped[str] = mapped_column(String(120), nullable=False)
     severity_code_id: Mapped[int | None] = mapped_column(
         SmallInteger,
@@ -128,6 +133,7 @@ class ChecklistQuestion(Base):
     report_domain: Mapped[str | None] = mapped_column(String(120), nullable=True)
     report_chapter: Mapped[str | None] = mapped_column(String(120), nullable=True)
     illustrative_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note_for_user: Mapped[str | None] = mapped_column(Text, nullable=True)
     note_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     evidence_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     display_order: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -135,6 +141,16 @@ class ChecklistQuestion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    parent_question: Mapped["ChecklistQuestion | None"] = relationship(
+        "ChecklistQuestion",
+        remote_side="ChecklistQuestion.id",
+        back_populates="sub_questions",
+    )
+    sub_questions: Mapped[list["ChecklistQuestion"]] = relationship(
+        "ChecklistQuestion",
+        back_populates="parent_question",
+        cascade="all, delete-orphan",
     )
 
     @property
