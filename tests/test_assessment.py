@@ -6,7 +6,6 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.models.access_event import AccessEvent
 from app.models.access_window import AccessWindow
 from app.models.assessment import Assessment, AssessmentStatus
 from app.models.checklist import Checklist, ChecklistStatus
@@ -22,7 +21,6 @@ class FakeSession:
         self.payments: list[Payment] = []
         self.access_windows: list[AccessWindow] = []
         self.assessments: list[Assessment] = []
-        self.access_events: list[AccessEvent] = []
 
     def add(self, obj) -> None:
         if getattr(obj, "id", None) is None:
@@ -39,8 +37,6 @@ class FakeSession:
             self.access_windows.append(obj)
         elif isinstance(obj, Assessment):
             self.assessments.append(obj)
-        elif isinstance(obj, AccessEvent):
-            self.access_events.append(obj)
 
     def flush(self) -> None:
         return None
@@ -121,7 +117,6 @@ def test_start_assessment_requires_payment() -> None:
         id=uuid4(),
         checklist_type_id=uuid4(),
         version=1,
-        title="Checklist",
         status=ChecklistStatus.published,
         created_by=user.id,
         updated_by=user.id,
@@ -144,7 +139,6 @@ def test_start_assessment_creates_session_and_is_idempotent() -> None:
         id=uuid4(),
         checklist_type_id=uuid4(),
         version=1,
-        title="Checklist",
         status=ChecklistStatus.published,
         created_by=user.id,
         updated_by=user.id,
@@ -180,7 +174,6 @@ def test_start_assessment_requires_payment_for_same_checklist() -> None:
         id=uuid4(),
         checklist_type_id=uuid4(),
         version=1,
-        title="Checklist A",
         status=ChecklistStatus.published,
         created_by=user.id,
         updated_by=user.id,
@@ -189,7 +182,6 @@ def test_start_assessment_requires_payment_for_same_checklist() -> None:
         id=uuid4(),
         checklist_type_id=uuid4(),
         version=1,
-        title="Checklist B",
         status=ChecklistStatus.published,
         created_by=user.id,
         updated_by=user.id,

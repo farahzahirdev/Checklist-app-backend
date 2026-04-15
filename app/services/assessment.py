@@ -8,7 +8,6 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models.access_event import AccessEvent, AccessEventType
 from app.models.access_window import AccessWindow
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentStatus, PriorityLevel
 from app.models.checklist import Checklist, ChecklistQuestion, ChecklistStatus
@@ -45,7 +44,7 @@ def _latest_succeeded_payment(db: Session, *, user_id: UUID, checklist_id: UUID)
         .where(
             Payment.user_id == user_id,
             Payment.checklist_id == checklist_id,
-            Payment.status == PaymentStatus.succeeded,
+            Payment.status_code_id == PaymentStatus.to_id(PaymentStatus.succeeded),
         )
         .order_by(desc(Payment.paid_at), desc(Payment.created_at))
     )
@@ -73,15 +72,6 @@ def _ensure_access_window(db: Session, *, user: User, payment: Payment, now: dat
     )
     db.add(access_window)
     db.flush()
-
-    db.add(
-        AccessEvent(
-            user_id=user.id,
-            access_window_id=access_window.id,
-            event_type=AccessEventType.unlocked_after_payment,
-            event_metadata={"source": "assessment_start"},
-        )
-    )
     return access_window
 
 
@@ -142,15 +132,6 @@ def start_assessment(db: Session, *, user: User, checklist_id: UUID) -> Assessme
     )
     db.add(assessment)
     db.flush()
-
-    db.add(
-        AccessEvent(
-            user_id=user.id,
-            access_window_id=access_window.id,
-            event_type=AccessEventType.assessment_started,
-            event_metadata={"assessment_id": str(assessment.id), "checklist_id": str(checklist_id)},
-        )
-    )
 
     db.commit()
     db.refresh(assessment)

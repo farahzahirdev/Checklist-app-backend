@@ -2,12 +2,11 @@ from datetime import datetime
 from enum import StrEnum
 import uuid
 
-from sqlalchemy import DateTime, Enum, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, SmallInteger, String, Text, func
 from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-from app.models.user import UserRole
 
 
 class AuditAction(StrEnum):
@@ -28,8 +27,10 @@ class AuditLog(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     actor_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    actor_role: Mapped[UserRole | None] = mapped_column(
-        Enum(UserRole, name="user_role", native_enum=True, create_constraint=False), nullable=True
+    actor_role_code_id: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        ForeignKey("role_codes.id", ondelete="RESTRICT"),
+        nullable=True,
     )
     action: Mapped[AuditAction] = mapped_column(
         Enum(AuditAction, name="audit_action", native_enum=True), nullable=False

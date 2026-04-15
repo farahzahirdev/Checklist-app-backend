@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.user import UserRole
 
@@ -9,7 +9,7 @@ from app.models.user import UserRole
 class UserCreate(BaseModel):
     email: EmailStr
     password_hash: str
-    role: UserRole = UserRole.customer
+    role: str = Field(default=UserRole.customer, description="Role code: admin, auditor, or customer")
 
 
 class UserRead(BaseModel):
@@ -17,7 +17,7 @@ class UserRead(BaseModel):
 
     id: UUID
     email: EmailStr
-    role: UserRole
+    role: str = Field(description="Role code: admin, auditor, or customer")
     is_active: bool
     created_at: datetime
     updated_at: datetime

@@ -30,6 +30,24 @@ class MalwareScanStatus(StrEnum):
     failed = "failed"
 
 
+class AnswerChoice(StrEnum):
+    yes = "yes"
+    partially = "partially"
+    dont_know = "dont_know"
+    no = "no"
+
+    @classmethod
+    def to_id(cls, choice: "AnswerChoice | str") -> int:
+        value = cls(choice)
+        mapping = {cls.yes: 1, cls.partially: 2, cls.dont_know: 3, cls.no: 4}
+        return mapping[value]
+
+    @classmethod
+    def from_id(cls, answer_option_code_id: int | None) -> "AnswerChoice | None":
+        mapping = {1: cls.yes, 2: cls.partially, 3: cls.dont_know, 4: cls.no}
+        return mapping.get(answer_option_code_id)
+
+
 class Assessment(Base):
     __tablename__ = "assessments"
 
@@ -85,6 +103,14 @@ class AssessmentAnswer(Base):
     )
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    @property
+    def answer(self) -> AnswerChoice | None:
+        return AnswerChoice.from_id(self.answer_option_code_id)
+
+    @answer.setter
+    def answer(self, value: AnswerChoice | str | None) -> None:
+        self.answer_option_code_id = None if value is None else AnswerChoice.to_id(value)
+
 
 class AssessmentEvidenceFile(Base):
     __tablename__ = "assessment_evidence_files"
@@ -130,25 +156,3 @@ class AssessmentSectionScore(Base):
     answered_count: Mapped[int] = mapped_column(Integer, nullable=False)
     total_count: Mapped[int] = mapped_column(Integer, nullable=False)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-
-
-class AssessmentSectionEvaluation(Base):
-    __tablename__ = "assessment_section_evaluations"
-    __table_args__ = (UniqueConstraint("assessment_id", "section_id", name="uq_assessment_section_evaluation"),)
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    assessment_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("assessments.id", ondelete="CASCADE"), nullable=False
-    )
-    section_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("checklist_sections.id", ondelete="CASCADE"), nullable=False
-    )
-    evaluator_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
-    maturity_score: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
-    auditor_note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
-    )

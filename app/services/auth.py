@@ -38,7 +38,7 @@ def _audit(db: Session, *, actor_user: User | None, action: AuditAction, target_
     db.add(
         AuditLog(
             actor_user_id=actor_user.id if actor_user else None,
-            actor_role=actor_user.role if actor_user else None,
+            actor_role_code_id=(UserRole.to_id(actor_user.role) if actor_user and actor_user.role else None),
             action=action,
             target_entity=target_entity,
             target_id=target_id,
