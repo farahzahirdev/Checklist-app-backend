@@ -26,12 +26,16 @@ from app.services.rbac import RBACService
 from app.services.user_management import UserManagementService
 
 
-def _role_to_code(role: UserRole) -> UserRoleCode:
-    return UserRoleCode[role.value]
+def _role_to_code(role: UserRole | str) -> UserRoleCode:
+    role_name = role.value if isinstance(role, UserRole) else str(role)
+    try:
+        return UserRoleCode[role_name]
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="invalid_user_role") from exc
 
 
-def _code_to_role(role_code: UserRoleCode) -> UserRole:
-    return UserRole(role_code.name)
+def _code_to_role(role_code: UserRoleCode) -> str:
+    return role_code.name
 
 
 def serialize_user(user: User) -> AuthUserResponse:
