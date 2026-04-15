@@ -20,7 +20,6 @@ class PaymentState(BaseModel):
 
 
 class PaymentSetupRequest(BaseModel):
-    user_id: UUID = Field(description="Customer user ID creating the payment.")
     checklist_id: UUID = Field(description="Checklist being purchased. Required for checklist-bound access control.")
     amount_cents: int | None = Field(default=None, gt=0, description="Optional amount in minor units; falls back to configured default.")
     currency: str | None = Field(default=None, description="Optional ISO-4217 currency code; falls back to configured default.")
@@ -33,6 +32,13 @@ class PaymentSetupResponse(BaseModel):
     client_secret: str = Field(description="Stripe client_secret for frontend Stripe SDK confirmation.")
     amount_cents: int = Field(description="Amount in minor units.")
     currency: str = Field(description="Uppercase currency code.")
+
+
+class AdminPaymentStatusUpdateRequest(BaseModel):
+    checklist_id: UUID = Field(description="Checklist id for which payment state is being set.")
+    payment_status: PaymentStatus = Field(description="Target payment status: pending, succeeded, or failed.")
+    amount_cents: int | None = Field(default=None, gt=0, description="Optional amount for synthetic dev payment records.")
+    currency: str | None = Field(default=None, description="Optional currency for synthetic dev payment records.")
 
 
 class StripeWebhookAck(BaseModel):

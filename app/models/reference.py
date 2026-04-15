@@ -22,24 +22,6 @@ class Language(Base):
     )
 
 
-class RoleCode(Base):
-    __tablename__ = "role_codes"
-
-    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
-    code: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-
-
-class PaymentStatusCode(Base):
-    __tablename__ = "payment_status_codes"
-
-    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
-    code: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-
-
 class ChecklistStatusCode(Base):
     __tablename__ = "checklist_status_codes"
 

@@ -19,7 +19,15 @@ from app.core.security import (
 from app.models.audit_log import AuditLog
 from app.models.mfa_totp import MfaTotp
 from app.models.user import User, UserRole
-from app.services.auth import authenticate_user, confirm_mfa_enrollment, register_user, start_mfa_enrollment, update_user_role
+from app.schemas.auth import UserRoleCode
+from app.services.auth import (
+    authenticate_user,
+    confirm_mfa_enrollment,
+    register_user,
+    start_mfa_enrollment,
+    update_user_role,
+    verify_mfa_challenge,
+)
 
 
 def _totp_code(secret: str, moment: datetime | None = None, digits: int = 6, period: int = 30) -> str:
@@ -112,6 +120,7 @@ def test_register_login_and_mfa_flow() -> None:
     registered = register_user(db, email="user@example.com", password="strong-password-123")
     assert registered.user.email == "user@example.com"
     assert registered.access_token is not None
+    assert registered.user.role == UserRoleCode.customer
 
     login_result = authenticate_user(db, email="user@example.com", password="strong-password-123")
     assert login_result.access_token is not None
@@ -125,10 +134,17 @@ def test_register_login_and_mfa_flow() -> None:
     verified_result = confirm_mfa_enrollment(db, user=user, code=code)
     assert verified_result.mfa_enabled is True
     assert verified_result.access_token is not None
+    assert verified_result.user.role == UserRoleCode.customer
 
-    mfa_login = authenticate_user(db, email="user@example.com", password="strong-password-123", mfa_code=code)
+    mfa_challenge = authenticate_user(db, email="user@example.com", password="strong-password-123")
+    assert mfa_challenge.access_token is None
+    assert mfa_challenge.challenge_token is not None
+    assert mfa_challenge.mfa_required is True
+
+    mfa_login = verify_mfa_challenge(db, challenge_token=mfa_challenge.challenge_token, code=code)
     assert mfa_login.access_token is not None
     assert mfa_login.mfa_enabled is True
+    assert mfa_login.user.role == UserRoleCode.customer
 
 
 def test_mfa_challenge_requires_code() -> None:
@@ -142,9 +158,10 @@ def test_mfa_challenge_requires_code() -> None:
     confirm_mfa_enrollment(db, user=user, code=code)
 
     challenged = authenticate_user(db, email="mfa@example.com", password="strong-password-123")
-    assert challenged.mfa_required is False
+    assert challenged.mfa_required is True
     assert challenged.mfa_enabled is True
-    assert challenged.access_token is not None
+    assert challenged.access_token is None
+    assert challenged.challenge_token is not None
 
 
 def test_admin_role_update() -> None:
@@ -155,7 +172,7 @@ def test_admin_role_update() -> None:
     db.add(customer)
     db.flush()
 
-    updated = update_user_role(db, actor_user=admin, user_id=customer.id, role=UserRole.auditor)
+    updated = update_user_role(db, actor_user=admin, user_id=customer.id, role_code=UserRoleCode.auditor)
 
-    assert updated.user.role == UserRole.auditor
+    assert updated.user.role == UserRoleCode.auditor
     assert db.users[1].role == UserRole.auditor

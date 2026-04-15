@@ -26,6 +26,7 @@ from app.schemas.auth import (
 	AuthResponse,
 	AuthUserResponse,
 	LoginRequest,
+	MfaChallengeVerifyRequest,
 	MfaVerifyRequest,
 	MfaVerifyResponse,
 	MfaSetupDetailsResponse,
@@ -35,7 +36,7 @@ from app.schemas.auth import (
 from app.schemas.common import MessageResponse
 from app.schemas.db import AccessWindowCreate, AccessWindowRead, PaymentCreate, PaymentRead, UserCreate, UserRead
 from app.schemas.health import HealthResponse
-from app.schemas.payment import PaymentSetupRequest, PaymentSetupResponse, PaymentState, StripeWebhookAck
+from app.schemas.payment import AdminPaymentStatusUpdateRequest, PaymentSetupRequest, PaymentSetupResponse, PaymentState, StripeWebhookAck
 from app.schemas.report import (
 	GenerateDraftReportRequest,
 	PublishReportRequest,
@@ -57,9 +58,16 @@ app = FastAPI(
 	),
 	openapi_tags=[
 		{"name": "health", "description": "Service health and uptime endpoints."},
-		{"name": "auth", "description": "Account registration, login, MFA, and role assignment APIs."},
+		{
+			"name": "auth",
+			"description": "Account registration, login, MFA enrollment, MFA login challenge verification, and role assignment APIs.",
+		},
 		{"name": "payments", "description": "Stripe payment setup and webhook processing APIs."},
 		{"name": "assessment", "description": "Assessment session start, answer save, and submit APIs."},
+		{
+			"name": "dashboard",
+			"description": "Role-based dashboard APIs for admin, auditor, and customer experiences.",
+		},
 		{"name": "admin-checklists", "description": "Admin APIs for checklist, section, and question lifecycle management."},
 		{"name": "reports", "description": "Admin report generation, review, approval, and publish workflow APIs."},
 	],
@@ -85,6 +93,7 @@ def custom_openapi() -> dict:
 		AuthUserResponse,
 		AuthResponse,
 		LoginRequest,
+		MfaChallengeVerifyRequest,
 		RegistrationRequest,
 		RoleAssignment,
 		MfaVerifyRequest,
@@ -104,6 +113,7 @@ def custom_openapi() -> dict:
 		EvidenceRuleResponse,
 		AdminQuestionResponse,
 		PaymentState,
+		AdminPaymentStatusUpdateRequest,
 		PaymentSetupRequest,
 		PaymentSetupResponse,
 		StripeWebhookAck,

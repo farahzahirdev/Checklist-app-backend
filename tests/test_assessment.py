@@ -131,6 +131,26 @@ def test_start_assessment_requires_payment() -> None:
     assert exc.value.detail == "payment_required"
 
 
+def test_start_assessment_allows_admin_without_payment() -> None:
+    db = FakeSession()
+    user = User(id=uuid4(), email="admin@example.com", password_hash="x", role=UserRole.admin, is_active=True)
+    checklist = Checklist(
+        id=uuid4(),
+        checklist_type_id=uuid4(),
+        version=1,
+        status=ChecklistStatus.published,
+        created_by=user.id,
+        updated_by=user.id,
+    )
+    db.add(user)
+    db.add(checklist)
+
+    started = start_assessment(db, user=user, checklist_id=checklist.id)
+
+    assert started.is_new is True
+    assert started.status == AssessmentStatus.in_progress
+
+
 def test_start_assessment_creates_session_and_is_idempotent() -> None:
     db = FakeSession()
     now = datetime.now(timezone.utc)

@@ -10,7 +10,7 @@ from app.models.access_window import AccessWindow
 from app.models.checklist import Checklist, ChecklistStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.user import User, UserRole
-from app.services.payments import handle_webhook_event
+from app.services.payments import admin_set_payment_status, handle_webhook_event
 
 
 class FakeSession:
@@ -148,3 +148,31 @@ def test_webhook_without_checklist_metadata_is_ignored() -> None:
 
     assert state is None
     assert len(db.payments) == 0
+
+
+def test_admin_set_payment_status_creates_synthetic_payment_and_access() -> None:
+    db = FakeSession()
+    user = User(id=uuid4(), email="u@example.com", password_hash="x", role=UserRole.customer, is_active=True)
+    checklist = Checklist(
+        id=uuid4(),
+        checklist_type_id=uuid4(),
+        version=1,
+        status=ChecklistStatus.published,
+        created_by=user.id,
+        updated_by=user.id,
+    )
+    db.add(user)
+    db.add(checklist)
+
+    state = admin_set_payment_status(
+        db,
+        user_id=user.id,
+        checklist_id=checklist.id,
+        payment_status=PaymentStatus.succeeded,
+        amount_cents=4900,
+        currency="USD",
+    )
+
+    assert state.payment_id is not None
+    assert state.payment_status == PaymentStatus.succeeded
+    assert state.access_window_id is not None

@@ -13,6 +13,7 @@ from app.models.assessment import PriorityLevel
 class ReportStatus(StrEnum):
     draft_generated = "draft_generated"
     under_review = "under_review"
+    changes_requested = "changes_requested"
     approved = "approved"
     published = "published"
 
@@ -21,6 +22,7 @@ class ReportEventType(StrEnum):
     draft_generated = "draft_generated"
     review_started = "review_started"
     summary_updated = "summary_updated"
+    changes_requested = "changes_requested"
     approved = "approved"
     published = "published"
 

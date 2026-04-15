@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -170,6 +170,68 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
 
     db.commit()
     db.refresh(payment)
+
+    return PaymentState(
+        payment_id=payment.id,
+        checklist_id=payment.checklist_id,
+        stripe_payment_intent_id=payment.stripe_payment_intent_id,
+        payment_status=payment.status,
+        paid_at=payment.paid_at,
+        access_window_id=access_window.id if access_window else None,
+        access_expires_at=access_window.expires_at if access_window else None,
+    )
+
+
+def admin_set_payment_status(
+    db: Session,
+    *,
+    user_id: UUID,
+    checklist_id: UUID,
+    payment_status: PaymentStatus,
+    amount_cents: int | None,
+    currency: str | None,
+) -> PaymentState:
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+
+    checklist = db.get(Checklist, checklist_id)
+    if checklist is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_not_found")
+
+    payment = db.scalar(
+        select(Payment)
+        .where(Payment.user_id == user_id, Payment.checklist_id == checklist_id)
+        .order_by(Payment.created_at.desc())
+    )
+
+    settings = get_settings()
+    if payment is None:
+        payment = Payment(
+            user_id=user_id,
+            checklist_id=checklist_id,
+            stripe_payment_intent_id=f"dev_manual_{uuid4().hex}",
+            amount_cents=amount_cents or settings.stripe_default_amount_cents,
+            currency=(currency or settings.stripe_currency).upper(),
+            status=PaymentStatus.pending,
+        )
+        db.add(payment)
+        db.flush()
+
+    payment.status = payment_status
+    access_window: AccessWindow | None = None
+
+    if payment_status == PaymentStatus.succeeded:
+        payment.paid_at = payment.paid_at or datetime.now(timezone.utc)
+        access_window = _ensure_access_window(db, payment, payment.paid_at)
+    elif payment_status == PaymentStatus.failed:
+        payment.paid_at = None
+
+    db.commit()
+    db.refresh(payment)
+
+    if access_window is None:
+        access_window = db.scalar(select(AccessWindow).where(AccessWindow.payment_id == payment.id))
 
     return PaymentState(
         payment_id=payment.id,

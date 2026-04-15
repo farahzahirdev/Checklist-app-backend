@@ -30,8 +30,6 @@ from app.models.reference import (
     AnswerOptionTranslation,
     ChecklistStatusCode,
     Language,
-    PaymentStatusCode,
-    RoleCode,
     SeverityCode,
     SeverityTranslation,
 )
@@ -70,7 +68,6 @@ __all__ = [
     "AnswerOptionTranslation",
     "ChecklistStatusCode",
     "Language",
-    "PaymentStatusCode",
     "PriorityLevel",
     "Report",
     "ReportEventType",
@@ -83,5 +80,4 @@ __all__ = [
     "SeverityTranslation",
     "User",
     "UserRole",
-    "RoleCode",
 ]
