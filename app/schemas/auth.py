@@ -67,6 +67,7 @@ class AuthResponse(BaseModel):
 class MfaSetupDetailsResponse(BaseModel):
     secret: str
     provisioning_uri: str
+    svg_qr: str
     verified: bool = False
 
 
