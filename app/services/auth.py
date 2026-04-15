@@ -22,6 +22,8 @@ from app.models.audit_log import AuditAction, AuditLog
 from app.models.mfa_totp import MfaTotp
 from app.models.user import User, UserRole
 from app.schemas.auth import AuthResponse, AuthUserResponse, MfaSetupDetailsResponse, UserRoleCode
+from app.services.rbac import RBACService
+from app.services.user_management import UserManagementService
 
 
 def _role_to_code(role: UserRole) -> UserRoleCode:
@@ -63,9 +65,13 @@ def register_user(db: Session, *, email: str, password: str) -> AuthResponse:
     if existing_user is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email_already_registered")
 
-    user = User(email=email.lower(), password_hash=hash_password(password), role=UserRole.customer)
-    db.add(user)
-    db.flush()
+    # Use UserManagementService to create user with default customer role and auto-assigned permissions
+    user = UserManagementService.create_user_with_role(
+        db,
+        email=email.lower(),
+        password_hash=hash_password(password),
+        role_code="customer"
+    )
 
     token = create_access_token(user_id=str(user.id), role=str(user.role))
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)

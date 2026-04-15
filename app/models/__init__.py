@@ -42,6 +42,14 @@ from app.models.report import (
     ReportStatus,
 )
 from app.models.user import User, UserRole
+from app.models.rbac import (
+    Permission,
+    PermissionAction,
+    PermissionResource,
+    Role,
+    RolePermission,
+    UserRoleAssignment,
+)
 
 __all__ = [
     "AccessWindow",
@@ -80,4 +88,10 @@ __all__ = [
     "SeverityTranslation",
     "User",
     "UserRole",
+    "Permission",
+    "PermissionAction",
+    "PermissionResource",
+    "Role",
+    "RolePermission",
+    "UserRoleAssignment",
 ]

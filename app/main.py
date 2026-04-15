@@ -37,6 +37,15 @@ from app.schemas.common import MessageResponse
 from app.schemas.db import AccessWindowCreate, AccessWindowRead, PaymentCreate, PaymentRead, UserCreate, UserRead
 from app.schemas.health import HealthResponse
 from app.schemas.payment import AdminPaymentStatusUpdateRequest, PaymentSetupRequest, PaymentSetupResponse, PaymentState, StripeWebhookAck
+from app.schemas.rbac import (
+	PermissionResponse,
+	PermissionCheckResponse,
+	RoleResponse,
+	RoleDetailResponse,
+	UserRoleResponse,
+	UserPermissionResponse,
+	MultiPermissionCheckResponse,
+)
 from app.schemas.report import (
 	GenerateDraftReportRequest,
 	PublishReportRequest,
@@ -45,6 +54,24 @@ from app.schemas.report import (
 	ReportSummaryItem,
 	ReviewActionRequest,
 	UpsertReportSummaryRequest,
+)
+from app.schemas.user_management import (
+	UserResponse,
+	UserDetailResponse,
+	UserListResponse,
+	UserChangeRoleRequest,
+	UserAssignPermissionsRequest,
+	UserResetPermissionsRequest,
+	CustomerResponse,
+	CustomerDetailResponse,
+	CustomerListResponse,
+	CustomerBanRequest,
+	CustomerActivateRequest,
+	AdminRoleSwitchRequest,
+	AdminRoleSwitchResponse,
+	AdminRoleSwitchEndRequest,
+	CustomerDashboardAccessRequest,
+	DashboardDataResponse,
 )
 
 settings = get_settings()
@@ -131,6 +158,30 @@ def custom_openapi() -> dict:
 		PaymentRead,
 		AccessWindowCreate,
 		AccessWindowRead,
+		PermissionResponse,
+		RoleResponse,
+		RoleDetailResponse,
+		UserRoleResponse,
+		UserPermissionResponse,
+		PermissionCheckResponse,
+		MultiPermissionCheckResponse,
+		# User Management Schemas
+		UserResponse,
+		UserDetailResponse,
+		UserListResponse,
+		UserChangeRoleRequest,
+		UserAssignPermissionsRequest,
+		UserResetPermissionsRequest,
+		CustomerResponse,
+		CustomerDetailResponse,
+		CustomerListResponse,
+		CustomerBanRequest,
+		CustomerActivateRequest,
+		AdminRoleSwitchRequest,
+		AdminRoleSwitchResponse,
+		AdminRoleSwitchEndRequest,
+		CustomerDashboardAccessRequest,
+		DashboardDataResponse,
 	]
 
 	for model in models:

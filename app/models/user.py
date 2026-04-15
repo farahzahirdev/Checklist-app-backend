@@ -34,3 +34,4 @@ class User(Base):
     payments = relationship("Payment", back_populates="user", cascade="all, delete-orphan")
     access_windows = relationship("AccessWindow", back_populates="user", cascade="all, delete-orphan")
     mfa_totp = relationship("MfaTotp", back_populates="user", cascade="all, delete-orphan", uselist=False)
+    user_roles_rel = relationship("UserRoleAssignment", back_populates="user", cascade="all, delete-orphan", foreign_keys="UserRoleAssignment.user_id")
