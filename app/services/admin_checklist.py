@@ -1,17 +1,22 @@
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy import asc, select
 from sqlalchemy.orm import Session
 
 from app.models.checklist import (
     Checklist,
     ChecklistQuestion,
+    ChecklistQuestionTranslation,
     ChecklistSection,
+    ChecklistSectionTranslation,
     ChecklistStatus,
+    ChecklistTranslation,
     ChecklistType,
-    QuestionScoreMode,
     SeverityLevel,
 )
+from app.models.reference import Language
 from app.models.user import User
 from app.schemas.admin_checklist import (
     AdminChecklistCreateRequest,
@@ -45,10 +50,12 @@ def _format_version(version: int) -> str:
 
 
 def _to_checklist_response(checklist: Checklist) -> AdminChecklistResponse:
+    title = getattr(checklist, "title", None) or f"Checklist v{checklist.version}"
+    decree = checklist.description or title
     return AdminChecklistResponse(
         id=checklist.id,
-        title=checklist.title,
-        law_decree=checklist.description or checklist.title,
+        title=title,
+        law_decree=decree,
         version=_format_version(checklist.version),
         status=checklist.status,
         created_at=checklist.created_at,
@@ -73,20 +80,58 @@ def _points_to_severity(points: int) -> SeverityLevel:
 
 
 def _to_section_response(section: ChecklistSection) -> AdminSectionResponse:
-    return AdminSectionResponse(id=section.id, checklist_id=section.checklist_id, title=section.title, order=section.display_order)
+    return AdminSectionResponse(id=section.id, checklist_id=section.checklist_id, title=section.section_code, order=section.display_order)
+
+
+def _default_language(db: Session) -> Language | None:
+    return db.scalar(select(Language).where(Language.is_default.is_(True)).limit(1)) or db.scalar(select(Language).limit(1))
+
+
+def _latest_question_translation(db: Session, question_id: uuid.UUID) -> ChecklistQuestionTranslation | None:
+    return db.scalar(
+        select(ChecklistQuestionTranslation)
+        .where(ChecklistQuestionTranslation.question_id == question_id)
+        .order_by(ChecklistQuestionTranslation.created_at.desc())
+        .limit(1)
+    )
+
+
+def _validate_parent_question(
+    db: Session,
+    *,
+    checklist_id: uuid.UUID,
+    section_id: uuid.UUID,
+    parent_question_id: uuid.UUID,
+) -> None:
+    parent_question = db.scalar(
+        select(ChecklistQuestion.id).where(
+            ChecklistQuestion.id == parent_question_id,
+            ChecklistQuestion.checklist_id == checklist_id,
+            ChecklistQuestion.section_id == section_id,
+        )
+    )
+    if parent_question is None:
+        raise ValueError("parent_question_not_found")
 
 
 def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
+    translation = getattr(question, "_translation", None)
+    legal_requirement = translation.question_text if translation else ""
+    explanation = translation.explanation if translation and translation.explanation else ""
+    expected_implementation = translation.expected_implementation if translation and translation.expected_implementation else ""
+    severity = question.severity or SeverityLevel.low
     return AdminQuestionResponse(
         id=question.id,
         checklist_id=question.checklist_id,
         section_id=question.section_id,
+        parent_question_id=question.parent_question_id,
         question_id=question.question_code,
-        security_level=question.severity,
-        legal_requirement=question.legal_requirement,
-        explanation=question.explanation or "",
-        expected_implementation=question.expected_implementation or "",
-        points=_severity_to_points(question.severity),
+        security_level=severity,
+        legal_requirement=legal_requirement,
+        explanation=explanation,
+        expected_implementation=expected_implementation,
+        points=_severity_to_points(severity),
+        note=question.note_for_user,
         evidence_rule=EvidenceRuleResponse(
             allowed_mime_types=DEFAULT_ALLOWED_MIME_TYPES,
             max_file_size_bytes=DEFAULT_MAX_FILE_SIZE_BYTES,
@@ -111,13 +156,23 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
     checklist = Checklist(
         checklist_type_id=checklist_type.id,
         version=payload.version,
-        title=payload.title,
         description=payload.law_decree,
         status=payload.status,
         created_by=actor.id,
         updated_by=actor.id,
     )
     db.add(checklist)
+    db.flush()
+    language = _default_language(db)
+    if language is not None:
+        db.add(
+            ChecklistTranslation(
+                checklist_id=checklist.id,
+                language_id=language.id,
+                title=payload.title,
+                description=payload.law_decree,
+            )
+        )
     db.commit()
     db.refresh(checklist)
     return _to_checklist_response(checklist)
@@ -129,7 +184,7 @@ def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminCh
         return None
 
     if payload.title is not None:
-        checklist.title = payload.title
+        pass
     if payload.law_decree is not None:
         checklist.description = payload.law_decree
     if payload.status is not None:
@@ -170,11 +225,20 @@ def create_section(db: Session, *, checklist_id, payload: AdminSectionCreateRequ
     section = ChecklistSection(
         checklist_id=checklist_id,
         section_code=f"SEC-{payload.order}",
-        title=payload.title,
         source_ref=None,
         display_order=payload.order,
     )
     db.add(section)
+    db.flush()
+    language = _default_language(db)
+    if language is not None:
+        db.add(
+            ChecklistSectionTranslation(
+                section_id=section.id,
+                language_id=language.id,
+                title=payload.title,
+            )
+        )
     db.commit()
     db.refresh(section)
     return _to_section_response(section)
@@ -188,7 +252,7 @@ def update_section(db: Session, *, checklist_id, section_id, payload: AdminSecti
         return None
 
     if payload.title is not None:
-        section.title = payload.title
+        section.section_code = payload.title
     if payload.order is not None:
         section.display_order = payload.order
 
@@ -214,6 +278,8 @@ def list_questions(db: Session, *, checklist_id, section_id) -> list[AdminQuesti
         .where(ChecklistQuestion.checklist_id == checklist_id, ChecklistQuestion.section_id == section_id)
         .order_by(asc(ChecklistQuestion.display_order))
     ).all()
+    for row in rows:
+        row._translation = _latest_question_translation(db, row.id)
     return [_to_question_response(row) for row in rows]
 
 
@@ -227,6 +293,7 @@ def get_question(db: Session, *, checklist_id, section_id, question_id) -> Admin
     )
     if question is None:
         return None
+    question._translation = _latest_question_translation(db, question.id)
     return _to_question_response(question)
 
 
@@ -239,33 +306,47 @@ def create_question(db: Session, *, checklist_id, section_id, payload: AdminQues
     )
     next_order = (last_order or 0) + 1
 
+    if payload.parent_question_id is not None:
+        _validate_parent_question(
+            db,
+            checklist_id=checklist_id,
+            section_id=section_id,
+            parent_question_id=payload.parent_question_id,
+        )
+
     question = ChecklistQuestion(
         checklist_id=checklist_id,
         section_id=section_id,
+        parent_question_id=payload.parent_question_id,
         question_code=payload.question_id,
-        paragraph_title=None,
-        legal_requirement=payload.legal_requirement,
-        question_text=payload.legal_requirement,
-        explanation=payload.explanation,
-        expected_implementation=payload.expected_implementation,
-        guidance_score_4=None,
-        guidance_score_3=None,
-        guidance_score_2=None,
-        guidance_score_1=None,
-        recommendation_template=None,
         severity=_points_to_severity(payload.points),
         report_domain=None,
         report_chapter=None,
         illustrative_image_url=None,
+        note_for_user=payload.note,
         note_enabled=True,
         evidence_enabled=True,
-        final_score_mode=QuestionScoreMode.answer_only,
         display_order=next_order,
         is_active=True,
     )
     db.add(question)
+    db.flush()
+
+    language = _default_language(db)
+    if language is not None:
+        db.add(
+            ChecklistQuestionTranslation(
+                question_id=question.id,
+                language_id=language.id,
+                question_text=payload.legal_requirement,
+                explanation=payload.explanation,
+                expected_implementation=payload.expected_implementation,
+                recommendation_template=None,
+            )
+        )
     db.commit()
     db.refresh(question)
+    question._translation = _latest_question_translation(db, question.id)
     return _to_question_response(question)
 
 
@@ -289,22 +370,50 @@ def update_question(
 
     if payload.question_id is not None:
         question.question_code = payload.question_id
+    if "parent_question_id" in payload.model_fields_set:
+        if payload.parent_question_id == question.id:
+            raise ValueError("parent_question_invalid")
+        if payload.parent_question_id is not None:
+            _validate_parent_question(
+                db,
+                checklist_id=checklist_id,
+                section_id=section_id,
+                parent_question_id=payload.parent_question_id,
+            )
+        question.parent_question_id = payload.parent_question_id
     if payload.security_level is not None:
         question.severity = payload.security_level
-    if payload.legal_requirement is not None:
-        question.legal_requirement = payload.legal_requirement
-        question.question_text = payload.legal_requirement
-    if payload.explanation is not None:
-        question.explanation = payload.explanation
-    if payload.expected_implementation is not None:
-        question.expected_implementation = payload.expected_implementation
     if payload.points is not None:
         question.severity = _points_to_severity(payload.points)
+    if "note" in payload.model_fields_set:
+        question.note_for_user = payload.note
     if payload.order is not None:
         question.display_order = payload.order
 
+    translation = _latest_question_translation(db, question.id)
+    if translation is None:
+        language = _default_language(db)
+        if language is not None:
+            translation = ChecklistQuestionTranslation(
+                question_id=question.id,
+                language_id=language.id,
+                question_text=payload.legal_requirement or "",
+                explanation=payload.explanation,
+                expected_implementation=payload.expected_implementation,
+                recommendation_template=None,
+            )
+            db.add(translation)
+    elif payload.legal_requirement is not None or payload.explanation is not None or payload.expected_implementation is not None:
+        if payload.legal_requirement is not None:
+            translation.question_text = payload.legal_requirement
+        if payload.explanation is not None:
+            translation.explanation = payload.explanation
+        if payload.expected_implementation is not None:
+            translation.expected_implementation = payload.expected_implementation
+
     db.commit()
     db.refresh(question)
+    question._translation = _latest_question_translation(db, question.id)
     return _to_question_response(question)
 
 

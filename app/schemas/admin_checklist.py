@@ -57,6 +57,8 @@ class AdminSectionResponse(BaseModel):
 
 class AdminQuestionCreateRequest(BaseModel):
     question_id: str = Field(min_length=1, max_length=120)
+    parent_question_id: UUID | None = None
+    note: str | None = None
     security_level: SeverityLevel
     legal_requirement: str = Field(min_length=1)
     explanation: str = Field(default="")
@@ -66,6 +68,8 @@ class AdminQuestionCreateRequest(BaseModel):
 
 class AdminQuestionUpdateRequest(BaseModel):
     question_id: str | None = Field(default=None, min_length=1, max_length=120)
+    parent_question_id: UUID | None = None
+    note: str | None = None
     security_level: SeverityLevel | None = None
     legal_requirement: str | None = Field(default=None, min_length=1)
     explanation: str | None = None
@@ -83,6 +87,7 @@ class AdminQuestionResponse(BaseModel):
     id: UUID
     checklist_id: UUID
     section_id: UUID
+    parent_question_id: UUID | None = None
     question_id: str
     security_level: SeverityLevel
     audit_type: AuditType = "compliance"

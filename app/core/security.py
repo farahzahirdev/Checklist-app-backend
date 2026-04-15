@@ -188,3 +188,12 @@ def create_access_token(*, user_id: str, role: str, ttl_minutes: int | None = No
         ttl_minutes=ttl_minutes or settings.auth_token_ttl_minutes,
         token_type="access",
     )
+
+
+def create_mfa_challenge_token(*, user_id: str, role: str, ttl_minutes: int | None = None) -> str:
+    settings = get_settings()
+    return create_signed_token(
+        {"sub": user_id, "role": role},
+        ttl_minutes=ttl_minutes or settings.mfa_secret_token_ttl_minutes,
+        token_type="mfa_challenge",
+    )

@@ -1,15 +1,20 @@
 from datetime import datetime
+from enum import IntEnum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.models.user import UserRole
+
+class UserRoleCode(IntEnum):
+    admin = 0
+    auditor = 1
+    customer = 2
 
 
 class UserCreate(BaseModel):
     email: EmailStr
     password_hash: str
-    role: UserRole = UserRole.customer
+    role: UserRoleCode = Field(default=UserRoleCode.customer, description="Role code: 0 admin, 1 auditor, 2 customer")
 
 
 class UserRead(BaseModel):
@@ -17,7 +22,7 @@ class UserRead(BaseModel):
 
     id: UUID
     email: EmailStr
-    role: UserRole
+    role: UserRoleCode = Field(description="Role code: 0 admin, 1 auditor, 2 customer")
     is_active: bool
     created_at: datetime
     updated_at: datetime

@@ -2,19 +2,11 @@ from datetime import datetime
 from enum import StrEnum
 import uuid
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-from app.models.checklist import SeverityLevel
-
-
-class AnswerChoice(StrEnum):
-    yes = "yes"
-    partially = "partially"
-    dont_know = "dont_know"
-    no = "no"
 
 
 class PriorityLevel(StrEnum):
@@ -38,6 +30,24 @@ class MalwareScanStatus(StrEnum):
     failed = "failed"
 
 
+class AnswerChoice(StrEnum):
+    yes = "yes"
+    partially = "partially"
+    dont_know = "dont_know"
+    no = "no"
+
+    @classmethod
+    def to_id(cls, choice: "AnswerChoice | str") -> int:
+        value = cls(choice)
+        mapping = {cls.yes: 1, cls.partially: 2, cls.dont_know: 3, cls.no: 4}
+        return mapping[value]
+
+    @classmethod
+    def from_id(cls, answer_option_code_id: int | None) -> "AnswerChoice | None":
+        mapping = {1: cls.yes, 2: cls.partially, 3: cls.dont_know, 4: cls.no}
+        return mapping.get(answer_option_code_id)
+
+
 class Assessment(Base):
     __tablename__ = "assessments"
 
@@ -49,6 +59,8 @@ class Assessment(Base):
     )
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    auditor_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    final_maturity_score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     status: Mapped[AssessmentStatus] = mapped_column(
         Enum(AssessmentStatus, name="assessment_status", native_enum=True),
         nullable=False,
@@ -75,7 +87,11 @@ class AssessmentAnswer(Base):
     question_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("checklist_questions.id", ondelete="RESTRICT"), nullable=False
     )
-    answer: Mapped[AnswerChoice] = mapped_column(Enum(AnswerChoice, name="answer_choice", native_enum=True), nullable=False)
+    answer_option_code_id: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        ForeignKey("answer_option_codes.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     answer_score: Mapped[int] = mapped_column(Integer, nullable=False)
     weighted_priority: Mapped[PriorityLevel | None] = mapped_column(
         Enum(PriorityLevel, name="priority_level", native_enum=True), nullable=True
@@ -86,6 +102,14 @@ class AssessmentAnswer(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def answer(self) -> AnswerChoice | None:
+        return AnswerChoice.from_id(self.answer_option_code_id)
+
+    @answer.setter
+    def answer(self, value: AnswerChoice | str | None) -> None:
+        self.answer_option_code_id = None if value is None else AnswerChoice.to_id(value)
 
 
 class AssessmentEvidenceFile(Base):

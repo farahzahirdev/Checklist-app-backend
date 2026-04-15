@@ -1,19 +1,18 @@
-from enum import StrEnum
+from enum import IntEnum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
-class UserRole(StrEnum):
-    admin = "admin"
-    auditor = "auditor"
-    customer = "customer"
+class UserRoleCode(IntEnum):
+    admin = 0
+    auditor = 1
+    customer = 2
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
-    mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
 
 
 class RegistrationRequest(BaseModel):
@@ -22,7 +21,7 @@ class RegistrationRequest(BaseModel):
 
 
 class RoleAssignment(BaseModel):
-    role: UserRole
+    role: UserRoleCode
 
 
 class MfaSetupRequest(BaseModel):
@@ -38,6 +37,11 @@ class MfaVerifyRequest(BaseModel):
     code: str
 
 
+class MfaChallengeVerifyRequest(BaseModel):
+    challenge_token: str
+    code: str = Field(min_length=6, max_length=6)
+
+
 class MfaVerifyResponse(BaseModel):
     verified: bool
 
@@ -47,13 +51,14 @@ class AuthUserResponse(BaseModel):
 
     id: UUID
     email: EmailStr
-    role: UserRole
+    role: UserRoleCode
     is_active: bool
 
 
 class AuthResponse(BaseModel):
     user: AuthUserResponse
     access_token: str | None = None
+    challenge_token: str | None = None
     token_type: str = "bearer"
     mfa_required: bool = False
     mfa_enabled: bool = False

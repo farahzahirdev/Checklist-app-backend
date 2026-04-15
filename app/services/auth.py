@@ -9,21 +9,35 @@ from sqlalchemy.orm import Session
 from app.core.security import (
     build_totp_provisioning_uri,
     create_access_token,
+    create_mfa_challenge_token,
     decrypt_secret,
     encrypt_secret,
     generate_totp_secret,
     hash_password,
+    verify_signed_token,
     verify_password,
     verify_totp_code,
 )
 from app.models.audit_log import AuditAction, AuditLog
 from app.models.mfa_totp import MfaTotp
 from app.models.user import User, UserRole
-from app.schemas.auth import AuthResponse, AuthUserResponse, MfaSetupDetailsResponse
+from app.schemas.auth import AuthResponse, AuthUserResponse, MfaSetupDetailsResponse, UserRoleCode
+from app.services.rbac import RBACService
+from app.services.user_management import UserManagementService
+
+
+def _role_to_code(role: UserRole) -> UserRoleCode:
+    return UserRoleCode[role.value]
+
+
+def _code_to_role(role_code: UserRoleCode) -> UserRole:
+    return UserRole(role_code.name)
 
 
 def serialize_user(user: User) -> AuthUserResponse:
-    return AuthUserResponse(id=user.id, email=user.email, role=user.role, is_active=bool(user.is_active))
+    if user.role is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="user_role_missing")
+    return AuthUserResponse(id=user.id, email=user.email, role=_role_to_code(user.role), is_active=bool(user.is_active))
 
 
 def _get_user_by_email(db: Session, email: str) -> User | None:
@@ -38,7 +52,7 @@ def _audit(db: Session, *, actor_user: User | None, action: AuditAction, target_
     db.add(
         AuditLog(
             actor_user_id=actor_user.id if actor_user else None,
-            actor_role=actor_user.role if actor_user else None,
+            actor_role=(str(actor_user.role) if actor_user and actor_user.role else None),
             action=action,
             target_entity=target_entity,
             target_id=target_id,
@@ -51,11 +65,15 @@ def register_user(db: Session, *, email: str, password: str) -> AuthResponse:
     if existing_user is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email_already_registered")
 
-    user = User(email=email.lower(), password_hash=hash_password(password), role=UserRole.customer)
-    db.add(user)
-    db.flush()
+    # Use UserManagementService to create user with default customer role and auto-assigned permissions
+    user = UserManagementService.create_user_with_role(
+        db,
+        email=email.lower(),
+        password_hash=hash_password(password),
+        role_code="customer"
+    )
 
-    token = create_access_token(user_id=str(user.id), role=user.role.value)
+    token = create_access_token(user_id=str(user.id), role=str(user.role))
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
     db.commit()
     db.refresh(user)
@@ -63,7 +81,7 @@ def register_user(db: Session, *, email: str, password: str) -> AuthResponse:
     return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=False)
 
 
-def authenticate_user(db: Session, *, email: str, password: str, mfa_code: str | None = None) -> AuthResponse:
+def authenticate_user(db: Session, *, email: str, password: str) -> AuthResponse:
     user = _get_user_by_email(db, email)
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials")
@@ -78,26 +96,48 @@ def authenticate_user(db: Session, *, email: str, password: str, mfa_code: str |
 
     mfa_record = _get_mfa_record(db, user.id)
     mfa_enabled = bool(mfa_record and mfa_record.is_verified)
-    
-    # CHANGE: MFA is now OPTIONAL during login
-    # - If MFA is enabled and mfa_code is provided, verify it
-    # - If MFA is enabled but no mfa_code provided, allow login (mfa_enabled will be True in response)
-    # - This allows users to login and setup/verify MFA code later via the /mfa/verify endpoint
-    if mfa_enabled and mfa_code:
-        secret = decrypt_secret(mfa_record.secret_encrypted)
-        if not verify_totp_code(secret, mfa_code):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_mfa_code")
 
-    # CHANGE: Payment is now OPTIONAL for login
-    # - No payment verification is performed during login
-    # - Users can access the system without an active payment status
-    # - Payment requirements will be enforced at resource access level if needed
-    
-    token = create_access_token(user_id=str(user.id), role=user.role.value)
+    if mfa_enabled:
+        challenge_token = create_mfa_challenge_token(user_id=str(user.id), role=str(user.role))
+        return AuthResponse(
+            user=serialize_user(user),
+            access_token=None,
+            challenge_token=challenge_token,
+            mfa_required=True,
+            mfa_enabled=True,
+        )
+
+    token = create_access_token(user_id=str(user.id), role=str(user.role))
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
     db.commit()
 
-    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=mfa_enabled)
+    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=False)
+
+
+def verify_mfa_challenge(db: Session, *, challenge_token: str, code: str) -> AuthResponse:
+    claims = verify_signed_token(challenge_token, token_type="mfa_challenge")
+    try:
+        user_id = UUID(str(claims.get("sub", "")))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token_subject") from exc
+
+    user = db.get(User, user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials")
+
+    mfa_record = _get_mfa_record(db, user.id)
+    if mfa_record is None or not mfa_record.is_verified:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="mfa_not_enabled")
+
+    secret = decrypt_secret(mfa_record.secret_encrypted)
+    if not verify_totp_code(secret, code):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_mfa_code")
+
+    token = create_access_token(user_id=str(user.id), role=str(user.role))
+    _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
+    db.commit()
+
+    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=True)
 
 
 def start_mfa_enrollment(db: Session, *, user: User) -> MfaSetupDetailsResponse:
@@ -133,14 +173,14 @@ def confirm_mfa_enrollment(db: Session, *, user: User, code: str) -> AuthRespons
     record.is_verified = True
     db.commit()
 
-    token = create_access_token(user_id=str(user.id), role=user.role.value)
+    token = create_access_token(user_id=str(user.id), role=str(user.role))
     _audit(db, actor_user=user, action=AuditAction.auth_mfa_verify, target_entity="user", target_id=user.id)
     db.commit()
 
     return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=True)
 
 
-def update_user_role(db: Session, *, actor_user: User, user_id: UUID, role: UserRole) -> AuthResponse:
+def update_user_role(db: Session, *, actor_user: User, user_id: UUID, role_code: UserRoleCode) -> AuthResponse:
     if actor_user.role != UserRole.admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="insufficient_permissions")
 
@@ -148,7 +188,7 @@ def update_user_role(db: Session, *, actor_user: User, user_id: UUID, role: User
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
 
-    user.role = role
+    user.role = _code_to_role(role_code)
     _audit(db, actor_user=actor_user, action=AuditAction.user_role_change, target_entity="user", target_id=user.id)
     db.commit()
     db.refresh(user)

@@ -8,12 +8,11 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models.access_event import AccessEvent, AccessEventType
 from app.models.access_window import AccessWindow
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentStatus, PriorityLevel
 from app.models.checklist import Checklist, ChecklistQuestion, ChecklistStatus
 from app.models.payment import Payment, PaymentStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.assessment import (
     AssessmentAnswerResponse,
     AssessmentSessionResponse,
@@ -39,10 +38,14 @@ def _serialize_assessment(assessment: Assessment, *, is_new: bool) -> Assessment
     )
 
 
-def _latest_succeeded_payment(db: Session, *, user_id: UUID) -> Payment | None:
+def _latest_succeeded_payment(db: Session, *, user_id: UUID, checklist_id: UUID) -> Payment | None:
     return db.scalar(
         select(Payment)
-        .where(Payment.user_id == user_id, Payment.status == PaymentStatus.succeeded)
+        .where(
+            Payment.user_id == user_id,
+            Payment.checklist_id == checklist_id,
+            Payment.status == PaymentStatus.succeeded,
+        )
         .order_by(desc(Payment.paid_at), desc(Payment.created_at))
     )
 
@@ -55,7 +58,7 @@ def _active_access_window(db: Session, *, user_id: UUID, now: datetime) -> Acces
     )
 
 
-def _ensure_access_window(db: Session, *, user: User, payment: Payment, now: datetime) -> AccessWindow:
+def _ensure_access_window(db: Session, *, user: User, payment: Payment | None, now: datetime) -> AccessWindow:
     settings = get_settings()
     existing = _active_access_window(db, user_id=user.id, now=now)
     if existing is not None:
@@ -63,21 +66,12 @@ def _ensure_access_window(db: Session, *, user: User, payment: Payment, now: dat
 
     access_window = AccessWindow(
         user_id=user.id,
-        payment_id=payment.id,
+        payment_id=payment.id if payment else None,
         activated_at=now,
         expires_at=now + timedelta(days=settings.access_unlock_days),
     )
     db.add(access_window)
     db.flush()
-
-    db.add(
-        AccessEvent(
-            user_id=user.id,
-            access_window_id=access_window.id,
-            event_type=AccessEventType.unlocked_after_payment,
-            event_metadata={"source": "assessment_start"},
-        )
-    )
     return access_window
 
 
@@ -120,11 +114,13 @@ def start_assessment(db: Session, *, user: User, checklist_id: UUID) -> Assessme
     if existing is not None:
         return _serialize_assessment(existing, is_new=False)
 
-    payment = _latest_succeeded_payment(db, user_id=user.id)
-    if payment is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="payment_required")
-
-    access_window = _ensure_access_window(db, user=user, payment=payment, now=now)
+    if user.role == UserRole.admin:
+        access_window = _ensure_access_window(db, user=user, payment=None, now=now)
+    else:
+        payment = _latest_succeeded_payment(db, user_id=user.id, checklist_id=checklist_id)
+        if payment is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="payment_required")
+        access_window = _ensure_access_window(db, user=user, payment=payment, now=now)
 
     settings = get_settings()
     assessment = Assessment(
@@ -138,15 +134,6 @@ def start_assessment(db: Session, *, user: User, checklist_id: UUID) -> Assessme
     )
     db.add(assessment)
     db.flush()
-
-    db.add(
-        AccessEvent(
-            user_id=user.id,
-            access_window_id=access_window.id,
-            event_type=AccessEventType.assessment_started,
-            event_metadata={"assessment_id": str(assessment.id), "checklist_id": str(checklist_id)},
-        )
-    )
 
     db.commit()
     db.refresh(assessment)

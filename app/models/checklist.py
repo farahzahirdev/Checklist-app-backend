@@ -2,9 +2,9 @@ from datetime import date, datetime
 from enum import StrEnum
 import uuid
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -14,16 +14,33 @@ class ChecklistStatus(StrEnum):
     published = "published"
     archived = "archived"
 
+    @classmethod
+    def to_id(cls, status: "ChecklistStatus | str") -> int:
+        value = cls(status)
+        mapping = {cls.draft: 1, cls.published: 2, cls.archived: 3}
+        return mapping[value]
+
+    @classmethod
+    def from_id(cls, status_code_id: int | None) -> "ChecklistStatus | None":
+        mapping = {1: cls.draft, 2: cls.published, 3: cls.archived}
+        return mapping.get(status_code_id)
+
 
 class SeverityLevel(StrEnum):
     low = "low"
     medium = "medium"
     high = "high"
 
+    @classmethod
+    def to_id(cls, severity: "SeverityLevel | str") -> int:
+        value = cls(severity)
+        mapping = {cls.low: 1, cls.medium: 2, cls.high: 3}
+        return mapping[value]
 
-class QuestionScoreMode(StrEnum):
-    answer_only = "answer_only"
-    answer_with_adjustment = "answer_with_adjustment"
+    @classmethod
+    def from_id(cls, severity_code_id: int | None) -> "SeverityLevel | None":
+        mapping = {1: cls.low, 2: cls.medium, 3: cls.high}
+        return mapping.get(severity_code_id)
 
 
 class ChecklistType(Base):
@@ -49,10 +66,10 @@ class Checklist(Base):
         UUID(as_uuid=True), ForeignKey("checklist_types.id", ondelete="RESTRICT"), nullable=False
     )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[ChecklistStatus] = mapped_column(
-        Enum(ChecklistStatus, name="checklist_status", native_enum=True), nullable=False, default=ChecklistStatus.draft
+    status_code_id: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        ForeignKey("checklist_status_codes.id", ondelete="RESTRICT"),
+        nullable=True,
     )
     effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -62,6 +79,14 @@ class Checklist(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
+    @property
+    def status(self) -> ChecklistStatus | None:
+        return ChecklistStatus.from_id(self.status_code_id)
+
+    @status.setter
+    def status(self, value: ChecklistStatus | str | None) -> None:
+        self.status_code_id = None if value is None else ChecklistStatus.to_id(value)
 
 
 class ChecklistSection(Base):
@@ -74,7 +99,6 @@ class ChecklistSection(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     checklist_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("checklists.id", ondelete="CASCADE"), nullable=False)
     section_code: Mapped[str] = mapped_column(String(100), nullable=False)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
     source_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_order: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -95,45 +119,60 @@ class ChecklistQuestion(Base):
     section_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("checklist_sections.id", ondelete="CASCADE"), nullable=False
     )
+    parent_question_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("checklist_questions.id", ondelete="CASCADE"),
+        nullable=True,
+    )
     question_code: Mapped[str] = mapped_column(String(120), nullable=False)
-    paragraph_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    legal_requirement: Mapped[str] = mapped_column(Text, nullable=False)
-    question_text: Mapped[str] = mapped_column(Text, nullable=False)
-    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
-    expected_implementation: Mapped[str | None] = mapped_column(Text, nullable=True)
-    guidance_score_4: Mapped[str | None] = mapped_column(Text, nullable=True)
-    guidance_score_3: Mapped[str | None] = mapped_column(Text, nullable=True)
-    guidance_score_2: Mapped[str | None] = mapped_column(Text, nullable=True)
-    guidance_score_1: Mapped[str | None] = mapped_column(Text, nullable=True)
-    recommendation_template: Mapped[str | None] = mapped_column(Text, nullable=True)
-    severity: Mapped[SeverityLevel] = mapped_column(
-        Enum(SeverityLevel, name="severity_level", native_enum=True), nullable=False
+    severity_code_id: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        ForeignKey("severity_codes.id", ondelete="RESTRICT"),
+        nullable=True,
     )
     report_domain: Mapped[str | None] = mapped_column(String(120), nullable=True)
     report_chapter: Mapped[str | None] = mapped_column(String(120), nullable=True)
     illustrative_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note_for_user: Mapped[str | None] = mapped_column(Text, nullable=True)
     note_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     evidence_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    final_score_mode: Mapped[QuestionScoreMode] = mapped_column(
-        Enum(QuestionScoreMode, name="question_score_mode", native_enum=True),
-        nullable=False,
-        default=QuestionScoreMode.answer_only,
-    )
     display_order: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
+    parent_question: Mapped["ChecklistQuestion | None"] = relationship(
+        "ChecklistQuestion",
+        remote_side="ChecklistQuestion.id",
+        back_populates="sub_questions",
+    )
+    sub_questions: Mapped[list["ChecklistQuestion"]] = relationship(
+        "ChecklistQuestion",
+        back_populates="parent_question",
+        cascade="all, delete-orphan",
+    )
+
+    @property
+    def severity(self) -> SeverityLevel | None:
+        return SeverityLevel.from_id(self.severity_code_id)
+
+    @severity.setter
+    def severity(self, value: SeverityLevel | str | None) -> None:
+        self.severity_code_id = None if value is None else SeverityLevel.to_id(value)
 
 
 class ChecklistTranslation(Base):
     __tablename__ = "checklist_translations"
-    __table_args__ = (UniqueConstraint("checklist_id", "lang_code", name="uq_checklist_translations"),)
+    __table_args__ = (UniqueConstraint("checklist_id", "language_id", name="uq_checklist_translations"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     checklist_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("checklists.id", ondelete="CASCADE"), nullable=False)
-    lang_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    language_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("languages.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -141,26 +180,34 @@ class ChecklistTranslation(Base):
 
 class ChecklistSectionTranslation(Base):
     __tablename__ = "checklist_section_translations"
-    __table_args__ = (UniqueConstraint("section_id", "lang_code", name="uq_section_translations"),)
+    __table_args__ = (UniqueConstraint("section_id", "language_id", name="uq_section_translations"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     section_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("checklist_sections.id", ondelete="CASCADE"), nullable=False
     )
-    lang_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    language_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("languages.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
 class ChecklistQuestionTranslation(Base):
     __tablename__ = "checklist_question_translations"
-    __table_args__ = (UniqueConstraint("question_id", "lang_code", name="uq_question_translations"),)
+    __table_args__ = (UniqueConstraint("question_id", "language_id", name="uq_question_translations"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     question_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("checklist_questions.id", ondelete="CASCADE"), nullable=False
     )
-    lang_code: Mapped[str] = mapped_column(String(10), nullable=False)
+    language_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("languages.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     expected_implementation: Mapped[str | None] = mapped_column(Text, nullable=True)

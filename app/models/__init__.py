@@ -1,11 +1,9 @@
-from app.models.access_event import AccessEvent, AccessEventType
 from app.models.access_window import AccessWindow
 from app.models.assessment import (
     AnswerChoice,
     Assessment,
     AssessmentAnswer,
     AssessmentEvidenceFile,
-    AssessmentSectionScore,
     AssessmentStatus,
     MalwareScanStatus,
     PriorityLevel,
@@ -13,9 +11,6 @@ from app.models.assessment import (
 from app.models.audit_log import (
     AuditAction,
     AuditLog,
-    OperationalEvent,
-    OperationalEventType,
-    OperationalSeverity,
 )
 from app.models.checklist import (
     Checklist,
@@ -26,11 +21,18 @@ from app.models.checklist import (
     ChecklistStatus,
     ChecklistTranslation,
     ChecklistType,
-    QuestionScoreMode,
     SeverityLevel,
 )
 from app.models.mfa_totp import MfaTotp
 from app.models.payment import Payment, PaymentStatus
+from app.models.reference import (
+    AnswerOptionCode,
+    AnswerOptionTranslation,
+    ChecklistStatusCode,
+    Language,
+    SeverityCode,
+    SeverityTranslation,
+)
 from app.models.report import (
     Report,
     ReportEventType,
@@ -40,17 +42,22 @@ from app.models.report import (
     ReportStatus,
 )
 from app.models.user import User, UserRole
+from app.models.rbac import (
+    Permission,
+    PermissionAction,
+    PermissionResource,
+    Role,
+    RolePermission,
+    UserRoleAssignment,
+)
 
 __all__ = [
-    "AccessEvent",
-    "AccessEventType",
     "AccessWindow",
-    "AnswerChoice",
     "Assessment",
     "AssessmentAnswer",
     "AssessmentEvidenceFile",
-    "AssessmentSectionScore",
     "AssessmentStatus",
+    "AnswerChoice",
     "AuditAction",
     "AuditLog",
     "Checklist",
@@ -63,20 +70,28 @@ __all__ = [
     "ChecklistType",
     "MalwareScanStatus",
     "MfaTotp",
-    "OperationalEvent",
-    "OperationalEventType",
-    "OperationalSeverity",
     "Payment",
     "PaymentStatus",
+    "AnswerOptionCode",
+    "AnswerOptionTranslation",
+    "ChecklistStatusCode",
+    "Language",
     "PriorityLevel",
-    "QuestionScoreMode",
     "Report",
     "ReportEventType",
     "ReportFinding",
     "ReportReviewEvent",
     "ReportSectionSummary",
     "ReportStatus",
+    "SeverityCode",
     "SeverityLevel",
+    "SeverityTranslation",
     "User",
     "UserRole",
+    "Permission",
+    "PermissionAction",
+    "PermissionResource",
+    "Role",
+    "RolePermission",
+    "UserRoleAssignment",
 ]

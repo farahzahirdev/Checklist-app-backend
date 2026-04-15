@@ -6,7 +6,6 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.models.access_event import AccessEvent
 from app.models.access_window import AccessWindow
 from app.models.assessment import Assessment, AssessmentStatus
 from app.models.checklist import Checklist, ChecklistStatus
@@ -22,7 +21,6 @@ class FakeSession:
         self.payments: list[Payment] = []
         self.access_windows: list[AccessWindow] = []
         self.assessments: list[Assessment] = []
-        self.access_events: list[AccessEvent] = []
 
     def add(self, obj) -> None:
         if getattr(obj, "id", None) is None:
@@ -39,8 +37,6 @@ class FakeSession:
             self.access_windows.append(obj)
         elif isinstance(obj, Assessment):
             self.assessments.append(obj)
-        elif isinstance(obj, AccessEvent):
-            self.access_events.append(obj)
 
     def flush(self) -> None:
         return None
@@ -64,7 +60,14 @@ class FakeSession:
 
         if entity is Payment:
             user_id = _extract_uuid(params, "user_id")
-            candidates = [item for item in self.payments if item.user_id == user_id and item.status == PaymentStatus.succeeded]
+            checklist_id = _extract_uuid(params, "checklist_id")
+            candidates = [
+                item
+                for item in self.payments
+                if item.user_id == user_id
+                and item.status == PaymentStatus.succeeded
+                and (checklist_id is None or item.checklist_id == checklist_id)
+            ]
             candidates.sort(key=lambda item: item.paid_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
             return candidates[0] if candidates else None
 
@@ -114,7 +117,6 @@ def test_start_assessment_requires_payment() -> None:
         id=uuid4(),
         checklist_type_id=uuid4(),
         version=1,
-        title="Checklist",
         status=ChecklistStatus.published,
         created_by=user.id,
         updated_by=user.id,
@@ -129,6 +131,26 @@ def test_start_assessment_requires_payment() -> None:
     assert exc.value.detail == "payment_required"
 
 
+def test_start_assessment_allows_admin_without_payment() -> None:
+    db = FakeSession()
+    user = User(id=uuid4(), email="admin@example.com", password_hash="x", role=UserRole.admin, is_active=True)
+    checklist = Checklist(
+        id=uuid4(),
+        checklist_type_id=uuid4(),
+        version=1,
+        status=ChecklistStatus.published,
+        created_by=user.id,
+        updated_by=user.id,
+    )
+    db.add(user)
+    db.add(checklist)
+
+    started = start_assessment(db, user=user, checklist_id=checklist.id)
+
+    assert started.is_new is True
+    assert started.status == AssessmentStatus.in_progress
+
+
 def test_start_assessment_creates_session_and_is_idempotent() -> None:
     db = FakeSession()
     now = datetime.now(timezone.utc)
@@ -137,7 +159,6 @@ def test_start_assessment_creates_session_and_is_idempotent() -> None:
         id=uuid4(),
         checklist_type_id=uuid4(),
         version=1,
-        title="Checklist",
         status=ChecklistStatus.published,
         created_by=user.id,
         updated_by=user.id,
@@ -145,6 +166,7 @@ def test_start_assessment_creates_session_and_is_idempotent() -> None:
     payment = Payment(
         id=uuid4(),
         user_id=user.id,
+        checklist_id=checklist.id,
         stripe_payment_intent_id="pi_123",
         amount_cents=4900,
         currency="USD",
@@ -162,6 +184,48 @@ def test_start_assessment_creates_session_and_is_idempotent() -> None:
     started_again = start_assessment(db, user=user, checklist_id=checklist.id)
     assert started_again.is_new is False
     assert started_again.assessment_id == started.assessment_id
+
+
+def test_start_assessment_requires_payment_for_same_checklist() -> None:
+    db = FakeSession()
+    now = datetime.now(timezone.utc)
+    user = User(id=uuid4(), email="u@example.com", password_hash="x", role=UserRole.customer, is_active=True)
+    checklist_a = Checklist(
+        id=uuid4(),
+        checklist_type_id=uuid4(),
+        version=1,
+        status=ChecklistStatus.published,
+        created_by=user.id,
+        updated_by=user.id,
+    )
+    checklist_b = Checklist(
+        id=uuid4(),
+        checklist_type_id=uuid4(),
+        version=1,
+        status=ChecklistStatus.published,
+        created_by=user.id,
+        updated_by=user.id,
+    )
+    payment_for_a = Payment(
+        id=uuid4(),
+        user_id=user.id,
+        checklist_id=checklist_a.id,
+        stripe_payment_intent_id="pi_for_a",
+        amount_cents=4900,
+        currency="USD",
+        status=PaymentStatus.succeeded,
+        paid_at=now - timedelta(minutes=5),
+    )
+    db.add(user)
+    db.add(checklist_a)
+    db.add(checklist_b)
+    db.add(payment_for_a)
+
+    with pytest.raises(HTTPException) as exc:
+        start_assessment(db, user=user, checklist_id=checklist_b.id)
+
+    assert exc.value.status_code == 403
+    assert exc.value.detail == "payment_required"
 
 
 def test_get_current_assessment_returns_active() -> None:

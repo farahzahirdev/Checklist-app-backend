@@ -104,7 +104,11 @@ Create a new migration after model changes:
 - `POST /api/v1/auth/register`
 - Purpose: create account and return signed auth token.
 - `POST /api/v1/auth/login`
-- Purpose: sign in with email/password (and MFA code if enabled).
+- Purpose: stage 1 sign in with email/password.
+- MFA behavior: if MFA is enabled, response returns `mfa_required=true` and `challenge_token` instead of `access_token`.
+- If MFA is not enabled, response returns `access_token` directly.
+- `POST /api/v1/auth/mfa/challenge/verify`
+- Purpose: stage 2 MFA login verification with `challenge_token` + TOTP code; returns final bearer token.
 - `GET /api/v1/auth/me`
 - Purpose: resolve current user from bearer token.
 - `POST /api/v1/auth/logout`
@@ -114,25 +118,75 @@ Create a new migration after model changes:
 - `POST /api/v1/auth/mfa/verify`
 - Purpose: confirm MFA activation using TOTP code.
 - `PATCH /api/v1/auth/admin/users/{user_id}/role`
-- Purpose: admin-only role assignment.
+- Purpose: admin-only role assignment using numeric codes (`0` admin, `1` auditor, `2` customer).
 
 ### Payments
 
 - `POST /api/v1/payments/stripe/setup-intent`
-- Purpose: create payment intent and internal payment record.
+- Purpose: create payment intent and internal payment record bound to a specific checklist.
+- Auth notes: requires bearer token and uses authenticated user identity.
+- Request notes: `checklist_id` is required and determines which checklist access is granted after payment success.
+- Response notes: returns `client_secret`, `stripe_payment_intent_id`, and the linked `checklist_id`.
+- `POST /api/v1/payments/admin/users/{user_id}/status`
+- Purpose: admin-only development endpoint to manually set payment status for a user+checklist.
+- Dev notes: creates a synthetic payment row when none exists and can unlock access when status is set to `succeeded`.
 - `POST /api/v1/payments/stripe/webhook`
 - Purpose: Stripe webhook receiver that updates payment/access state.
+- Webhook notes: on `payment_intent.succeeded`, backend creates access window for the same checklist linked in payment metadata.
 
 ### Assessment
 
 - `POST /api/v1/assessment/start`
 - Purpose: start/resume customer assessment after paid access is validated.
+- Access notes: admins bypass payment requirement for development/operations and can start assessments without paid records.
 - `GET /api/v1/assessment/current`
 - Purpose: fetch active in-progress assessment session.
 - `PUT /api/v1/assessment/{assessment_id}/answers`
 - Purpose: idempotent upsert of one answer per question.
 - `POST /api/v1/assessment/{assessment_id}/submit`
 - Purpose: finalize assessment and lock for report generation.
+
+### Dashboards
+
+- `GET /api/v1/dashboard/admin`
+- Purpose: admin KPI summary for users, checklists, assessments, reports, payments, plus pending/expired context.
+- `GET /api/v1/dashboard/admin/awaiting-review`
+- Purpose: latest submitted assessments awaiting review triage.
+- `GET /api/v1/dashboard/admin/activity`
+- Purpose: merged admin activity feed from audit logs, report workflow events, and successful payments.
+- `GET /api/v1/dashboard/admin/distribution`
+- Purpose: assessment lifecycle distribution counters.
+- `GET /api/v1/dashboard/admin/retention`
+- Purpose: retention/deletion queue summary and next eligible items.
+- `GET /api/v1/dashboard/admin/system-health`
+- Purpose: lightweight status indicators for payments, storage, and report publication integrity.
+- `GET /api/v1/dashboard/auditor`
+- Purpose: auditor queue summary for report review states and finding totals.
+- `GET /api/v1/dashboard/customer`
+- Purpose: customer-specific summary for paid checklist coverage, assessment activity, and latest report status.
+
+## Role model used by API
+
+- `0`: admin
+- `1`: auditor
+- `2`: customer
+- Note: product policy treats operator as equivalent to admin.
+
+## User role API contract
+
+- Auth responses return numeric role codes.
+- Role assignment requests accept numeric role codes.
+- Payment status stays string-based (`pending`, `succeeded`, `failed`).
+
+## Swagger usage notes for frontend
+
+- Open docs at `/docs` to view endpoint summaries, request models, and response models.
+- For protected endpoints, use **Authorize** with `Bearer <access_token>`.
+- For MFA-enabled accounts:
+	1. call `POST /api/v1/auth/login`
+	2. read `challenge_token` from response
+	3. call `POST /api/v1/auth/mfa/challenge/verify` with token + TOTP code
+	4. use returned `access_token` for subsequent calls
 
 ### Admin checklists
 
@@ -168,4 +222,8 @@ Create a new migration after model changes:
 4. Admin starts review and edits summary sections.
 5. Admin approves report.
 6. Admin publishes report by attaching final PDF storage key.
+
+## Frontend handoff
+
+- Use `apps/api/frontend_api_handoff.md` as the implementation contract for endpoint-by-endpoint frontend integration.
 
