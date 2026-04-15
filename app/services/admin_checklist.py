@@ -9,7 +9,6 @@ from app.models.checklist import (
     ChecklistSection,
     ChecklistStatus,
     ChecklistType,
-    QuestionScoreMode,
     SeverityLevel,
 )
 from app.models.user import User
@@ -259,7 +258,6 @@ def create_question(db: Session, *, checklist_id, section_id, payload: AdminQues
         illustrative_image_url=None,
         note_enabled=True,
         evidence_enabled=True,
-        final_score_mode=QuestionScoreMode.answer_only,
         display_order=next_order,
         is_active=True,
     )

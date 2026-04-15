@@ -1,18 +1,11 @@
 from datetime import datetime
-from enum import StrEnum
 import uuid
 
-from sqlalchemy import DateTime, Enum, ForeignKey, SmallInteger, String, func
+from sqlalchemy import DateTime, ForeignKey, SmallInteger, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-
-
-class UserRole(StrEnum):
-    admin = "admin"
-    auditor = "auditor"
-    customer = "customer"
 
 
 class User(Base):
@@ -25,11 +18,6 @@ class User(Base):
         SmallInteger,
         ForeignKey("role_codes.id", ondelete="RESTRICT"),
         nullable=True,
-    )
-    role: Mapped[UserRole] = mapped_column(
-        Enum(UserRole, name="user_role", native_enum=True),
-        default=UserRole.customer,
-        nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

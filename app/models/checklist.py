@@ -1,29 +1,11 @@
 from datetime import date, datetime
-from enum import StrEnum
 import uuid
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-
-
-class ChecklistStatus(StrEnum):
-    draft = "draft"
-    published = "published"
-    archived = "archived"
-
-
-class SeverityLevel(StrEnum):
-    low = "low"
-    medium = "medium"
-    high = "high"
-
-
-class QuestionScoreMode(StrEnum):
-    answer_only = "answer_only"
-    answer_with_adjustment = "answer_with_adjustment"
 
 
 class ChecklistType(Base):
@@ -55,9 +37,6 @@ class Checklist(Base):
         SmallInteger,
         ForeignKey("checklist_status_codes.id", ondelete="RESTRICT"),
         nullable=True,
-    )
-    status: Mapped[ChecklistStatus] = mapped_column(
-        Enum(ChecklistStatus, name="checklist_status", native_enum=True), nullable=False, default=ChecklistStatus.draft
     )
     effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)
     effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -121,19 +100,11 @@ class ChecklistQuestion(Base):
         ForeignKey("expected_implementations.id", ondelete="SET NULL"),
         nullable=True,
     )
-    severity: Mapped[SeverityLevel] = mapped_column(
-        Enum(SeverityLevel, name="severity_level", native_enum=True), nullable=False
-    )
     report_domain: Mapped[str | None] = mapped_column(String(120), nullable=True)
     report_chapter: Mapped[str | None] = mapped_column(String(120), nullable=True)
     illustrative_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     note_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     evidence_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    final_score_mode: Mapped[QuestionScoreMode] = mapped_column(
-        Enum(QuestionScoreMode, name="question_score_mode", native_enum=True),
-        nullable=False,
-        default=QuestionScoreMode.answer_only,
-    )
     display_order: Mapped[int] = mapped_column(Integer, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

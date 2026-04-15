@@ -7,14 +7,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-from app.models.checklist import SeverityLevel
-
-
-class AnswerChoice(StrEnum):
-    yes = "yes"
-    partially = "partially"
-    dont_know = "dont_know"
-    no = "no"
 
 
 class PriorityLevel(StrEnum):
@@ -47,7 +39,6 @@ class Assessment(Base):
     access_window_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("access_windows.id", ondelete="RESTRICT"), nullable=False
     )
-    unlocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     auditor_note: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -83,7 +74,6 @@ class AssessmentAnswer(Base):
         ForeignKey("answer_option_codes.id", ondelete="RESTRICT"),
         nullable=True,
     )
-    answer: Mapped[AnswerChoice] = mapped_column(Enum(AnswerChoice, name="answer_choice", native_enum=True), nullable=False)
     answer_score: Mapped[int] = mapped_column(Integer, nullable=False)
     weighted_priority: Mapped[PriorityLevel | None] = mapped_column(
         Enum(PriorityLevel, name="priority_level", native_enum=True), nullable=True
