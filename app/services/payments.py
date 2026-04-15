@@ -1,3 +1,29 @@
+def create_checkout_session_for_user(
+    user_id: UUID,
+    success_url: str,
+    cancel_url: str,
+    checklist_id: UUID | None = None,
+) -> str:
+    settings = get_settings()
+    stripe_client = _stripe_required()
+    line_items = [
+        {
+            "price": settings.stripe_price_id,
+            "quantity": 1,
+        }
+    ]
+    metadata = {"user_id": str(user_id)}
+    if checklist_id:
+        metadata["checklist_id"] = str(checklist_id)
+    session = stripe_client.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=line_items,
+        mode="payment",
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata=metadata,
+    )
+    return session.url
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

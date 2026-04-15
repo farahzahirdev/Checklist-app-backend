@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = Field(default="", alias="STRIPE_WEBHOOK_SECRET")
     stripe_currency: str = Field(default="USD", alias="STRIPE_CURRENCY")
     stripe_default_amount_cents: int = Field(default=4900, alias="STRIPE_DEFAULT_AMOUNT_CENTS")
+    stripe_product_id: str = Field(default="", alias="PRODUCT_ID")
+    stripe_price_id: str = Field(default="", alias="PRODUCT_PRICE_ID")
     auth_secret_key: str = Field(default="dev-auth-secret-change-me", alias="AUTH_SECRET_KEY")
     auth_token_ttl_minutes: int = Field(default=720, alias="AUTH_TOKEN_TTL_MINUTES")
     mfa_secret_token_ttl_minutes: int = Field(default=15, alias="MFA_SECRET_TOKEN_TTL_MINUTES")
