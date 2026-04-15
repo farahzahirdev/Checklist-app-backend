@@ -1,7 +1,7 @@
 """Create RBAC tables and populate initial permissions and roles.
 
 Revision ID: 20260416_0001_rbac_initial
-Revises: 20260415_0012_question_user_note
+Revises: 20260415_0014
 Create Date: 2026-04-16 00:00:00.000000
 
 """
@@ -13,7 +13,7 @@ import uuid
 
 # revision identifiers, used by Alembic.
 revision = '20260416_0001_rbac_initial'
-down_revision = '20260415_0012_question_user_note'
+down_revision = '20260415_0014'
 branch_labels = None
 depends_on = None
 
@@ -86,6 +86,7 @@ def upgrade() -> None:
         ('checklist', 'read', 'Read checklists'),
         ('checklist', 'create', 'Create checklists'),
         ('checklist', 'update', 'Update checklists'),
+        ('checklist', 'delete', 'Delete checklists'),
         
         ('checklist_admin', 'create', 'Create and manage checklists (admin only)'),
         ('checklist_admin', 'update', 'Update checklist content (admin only)'),
@@ -96,21 +97,28 @@ def upgrade() -> None:
         ('assessment', 'read', 'Read own assessments'),
         ('assessment', 'create', 'Create new assessments'),
         ('assessment', 'update', 'Update own assessments'),
+        ('assessment', 'delete', 'Delete assessments'),
         
         ('assessment_submit', 'submit', 'Submit assessment responses'),
         
-        # Dashboard and reporting
+        # Report and Dashboard
         ('dashboard', 'read', 'Access dashboard'),
         ('report', 'read', 'Read reports'),
         ('report', 'create', 'Generate reports'),
+        ('report', 'update', 'Update reports'),
+        ('report', 'delete', 'Delete reports'),
         
         # User and admin permissions
         ('user_management', 'read', 'View user information'),
+        ('user_management', 'create', 'Create users'),
+        ('user_management', 'update', 'Update user information'),
+        ('user_management', 'delete', 'Delete users'),
         ('user_management', 'manage', 'Manage users (admin only)'),
         
-        ('payment_management', 'read', 'View payment information'),
-        ('payment_management', 'manage', 'Manage payments (admin only)'),
+        ('payment', 'read', 'View payment information'),
+        ('payment', 'manage', 'Manage payments'),
         
+        ('permission_management', 'read', 'View permissions'),
         ('permission_management', 'manage', 'Manage permissions and roles (admin only)'),
         
         ('audit_log', 'read', 'View audit logs'),
@@ -146,9 +154,9 @@ def upgrade() -> None:
             """
             INSERT INTO roles (id, code, name, description, is_system_role, is_active)
             VALUES
-            (:admin_id, 'admin', 'Administrator', 'Full system access', true, true),
-            (:auditor_id, 'auditor', 'Auditor', 'Read-only access to audit data', true, true),
-            (:customer_id, 'customer', 'Customer', 'Access to own assessments and dashboards', true, true)
+                (:admin_id, 'admin', 'Administrator', 'Full system access', true, true),
+                (:auditor_id, 'auditor', 'Auditor', 'Read-only access to audit data', true, true),
+                (:customer_id, 'customer', 'Customer', 'Standard customer access', true, true)
             """
         ),
         {
@@ -158,41 +166,9 @@ def upgrade() -> None:
         }
     )
     
-    # Admin role gets all permissions
-    admin_permissions = [
-        'checklist:read', 'checklist:create', 'checklist:update',
-        'checklist_admin:create', 'checklist_admin:update', 'checklist_admin:delete', 'checklist_admin:manage',
-        'assessment:read', 'assessment:create', 'assessment:update', 'assessment_submit:submit',
-        'dashboard:read',
-        'report:read', 'report:create',
-        'user_management:read', 'user_management:manage',
-        'payment_management:read', 'payment_management:manage',
-        'permission_management:manage',
-        'audit_log:read', 'audit_log:manage',
-    ]
-    
-    # Auditor role gets read-only permissions
-    auditor_permissions = [
-        'checklist:read',
-        'assessment:read',
-        'dashboard:read',
-        'report:read',
-        'user_management:read',
-        'payment_management:read',
-        'audit_log:read',
-    ]
-    
-    # Customer role gets customer-specific permissions
-    customer_permissions = [
-        'checklist:read',
-        'assessment:read', 'assessment:create', 'assessment:update',
-        'assessment_submit:submit',
-        'dashboard:read',
-        'report:read',
-    ]
-    
-    # Insert role_permission assignments
-    for perm_key in admin_permissions:
+    # Assign permissions to admin role (all permissions)
+    for resource, action, _ in permissions:
+        perm_id = permission_ids[f"{resource}:{action}"]
         connection.execute(
             text(
                 """
@@ -203,11 +179,22 @@ def upgrade() -> None:
             {
                 'id': str(uuid.uuid4()),
                 'role_id': admin_role_id,
-                'permission_id': permission_ids[perm_key],
+                'permission_id': perm_id,
             }
         )
     
-    for perm_key in auditor_permissions:
+    # Assign permissions to auditor role (read-only permissions)
+    auditor_perms = [
+        ('checklist', 'read'),
+        ('assessment', 'read'),
+        ('dashboard', 'read'),
+        ('report', 'read'),
+        ('user_management', 'read'),
+        ('payment', 'read'),
+        ('audit_log', 'read'),
+    ]
+    for resource, action in auditor_perms:
+        perm_id = permission_ids[f"{resource}:{action}"]
         connection.execute(
             text(
                 """
@@ -218,11 +205,22 @@ def upgrade() -> None:
             {
                 'id': str(uuid.uuid4()),
                 'role_id': auditor_role_id,
-                'permission_id': permission_ids[perm_key],
+                'permission_id': perm_id,
             }
         )
     
-    for perm_key in customer_permissions:
+    # Assign permissions to customer role (customer-specific permissions)
+    customer_perms = [
+        ('checklist', 'read'),
+        ('assessment', 'read'),
+        ('assessment', 'create'),
+        ('assessment', 'update'),
+        ('assessment_submit', 'submit'),
+        ('dashboard', 'read'),
+        ('report', 'read'),
+    ]
+    for resource, action in customer_perms:
+        perm_id = permission_ids[f"{resource}:{action}"]
         connection.execute(
             text(
                 """
@@ -233,11 +231,9 @@ def upgrade() -> None:
             {
                 'id': str(uuid.uuid4()),
                 'role_id': customer_role_id,
-                'permission_id': permission_ids[perm_key],
+                'permission_id': perm_id,
             }
         )
-    
-    connection.commit()
 
 
 def downgrade() -> None:
