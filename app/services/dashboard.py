@@ -72,7 +72,7 @@ def get_admin_dashboard(db: Session) -> AdminDashboardResponse:
 
 def get_admin_awaiting_review(db: Session, *, limit: int = 10) -> list[AdminAwaitingReviewItemResponse]:
     rows = db.execute(
-        select(Assessment, User.email, Checklist.description, Report.id, Report.status)
+        select(Assessment, User.email, Checklist.version, Report.id, Report.status)
         .join(User, User.id == Assessment.user_id)
         .join(Checklist, Checklist.id == Assessment.checklist_id)
         .outerjoin(Report, Report.assessment_id == Assessment.id)
@@ -86,12 +86,12 @@ def get_admin_awaiting_review(db: Session, *, limit: int = 10) -> list[AdminAwai
             assessment_id=assessment.id,
             customer_email=email,
             checklist_id=assessment.checklist_id,
-            checklist_label=checklist_description or "Unnamed checklist",
+            checklist_label=f"Checklist v{checklist_version}",
             submitted_at=assessment.submitted_at,
             report_id=report_id,
             report_status=report_status,
         )
-        for assessment, email, checklist_description, report_id, report_status in rows
+        for assessment, email, checklist_version, report_id, report_status in rows
     ]
 
 
