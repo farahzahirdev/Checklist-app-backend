@@ -5,7 +5,6 @@ anyio==4.13.0
 certifi==2026.2.25
 cffi==2.0.0
 charset-normalizer==3.4.7
--e git+https://github.com/farahzahirdev/api.git@568ac10e2ca41dee0b1f49b8f374103fba3a124c#egg=checklist_app_api
 click==8.3.2
 cryptography==44.0.2
 dnspython==2.8.0
@@ -24,8 +23,7 @@ MarkupSafe==3.0.3
 mdurl==0.1.2
 packaging==26.0
 pluggy==1.6.0
-psycopg==3.3.3
-psycopg-binary==3.3.3
+psycopg[binary]==3.3.3
 pycparser==3.0
 pydantic==2.12.5
 pydantic-settings==2.13.1
