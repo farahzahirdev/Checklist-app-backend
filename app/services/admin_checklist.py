@@ -156,7 +156,6 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
     checklist = Checklist(
         checklist_type_id=checklist_type.id,
         version=payload.version,
-        description=payload.law_decree,
         status=payload.status,
         created_by=actor.id,
         updated_by=actor.id,
@@ -170,7 +169,7 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
                 checklist_id=checklist.id,
                 language_id=language.id,
                 title=payload.title,
-                description=payload.law_decree,
+                description=checklist_type.description,  # Use ChecklistType.description
             )
         )
     db.commit()
