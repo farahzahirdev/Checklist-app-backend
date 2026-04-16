@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
 from app.api.router import api_router
@@ -98,6 +99,15 @@ app = FastAPI(
 		{"name": "admin-checklists", "description": "Admin APIs for checklist, section, and question lifecycle management."},
 		{"name": "reports", "description": "Admin report generation, review, approval, and publish workflow APIs."},
 	],
+)
+
+# Add CORS middleware to allow OPTIONS calls (for login and others)
+app.add_middleware(
+	CORSMiddleware,
+	allow_origins=["*"],  # Adjust as needed for production
+	allow_credentials=True,
+	allow_methods=["*"],
+	allow_headers=["*"],
 )
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
