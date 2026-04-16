@@ -50,8 +50,29 @@ def _format_version(version: int) -> str:
 
 
 def _to_checklist_response(checklist: Checklist) -> AdminChecklistResponse:
-    title = getattr(checklist, "title", None) or f"Checklist v{checklist.version}"
-    decree = checklist.description or title
+    # Get translation for title/description
+    translation = None
+    if hasattr(checklist, 'translations'):
+        # If relationship is loaded
+        translation = next(iter(checklist.translations), None)
+    else:
+        # Fallback: query translation
+        from app.models.checklist import ChecklistTranslation
+        from app.db.session import SessionLocal
+        db = SessionLocal()
+        translation = db.query(ChecklistTranslation).filter_by(checklist_id=checklist.id).first()
+        db.close()
+
+    title = translation.title if translation else f"Checklist v{checklist.version}"
+    # Get ChecklistType for description
+    checklist_type = getattr(checklist, "checklist_type", None)
+    if not checklist_type:
+        from app.models.checklist import ChecklistType
+        from app.db.session import SessionLocal
+        db = SessionLocal()
+        checklist_type = db.query(ChecklistType).filter_by(id=checklist.checklist_type_id).first()
+        db.close()
+    decree = (translation.description if translation and translation.description else (checklist_type.description if checklist_type else title))
     return AdminChecklistResponse(
         id=checklist.id,
         title=title,
