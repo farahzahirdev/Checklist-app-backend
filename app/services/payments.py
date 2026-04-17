@@ -1,3 +1,54 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from typing import Any
+from uuid import UUID, uuid4
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from typing import Any
+import stripe
+from uuid import UUID, uuid4
+
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.models.access_window import AccessWindow
+from app.models.checklist import Checklist
+from app.models.payment import Payment, PaymentStatus
+from app.models.user import User
+from app.schemas.payment import PaymentState
+
+def _stripe_required() -> Any:
+    settings = get_settings()
+    if stripe is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="stripe_package_not_installed",
+        )
+    if not settings.stripe_secret_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="stripe_secret_key_missing",
+        )
+    stripe.api_key = settings.stripe_secret_key
+    return stripe
+
+
+def _webhook_secret_required() -> str:
+    settings = get_settings()
+    if not settings.stripe_webhook_secret:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="stripe_webhook_secret_missing",
+        )
+    return settings.stripe_webhook_secret
+
+
+
 def create_checkout_session_for_user(
     user_id: UUID,
     success_url: str,
@@ -42,53 +93,6 @@ def create_checkout_session_for_user(
         metadata=metadata,
     )
     return session.url
-from __future__ import annotations
-
-from datetime import datetime, timedelta, timezone
-from typing import Any
-from uuid import UUID, uuid4
-
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-from app.core.config import get_settings
-from app.models.access_window import AccessWindow
-from app.models.checklist import Checklist
-from app.models.payment import Payment, PaymentStatus
-from app.models.user import User
-from app.schemas.payment import PaymentState
-
-try:
-    import stripe
-except ImportError:  # pragma: no cover
-    stripe = None
-
-
-def _stripe_required() -> Any:
-    settings = get_settings()
-    if stripe is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="stripe_package_not_installed",
-        )
-    if not settings.stripe_secret_key:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="stripe_secret_key_missing",
-        )
-    stripe.api_key = settings.stripe_secret_key
-    return stripe
-
-
-def _webhook_secret_required() -> str:
-    settings = get_settings()
-    if not settings.stripe_webhook_secret:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="stripe_webhook_secret_missing",
-        )
-    return settings.stripe_webhook_secret
 
 
 def create_payment_intent_for_user(
