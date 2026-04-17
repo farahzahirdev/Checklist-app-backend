@@ -203,10 +203,30 @@ def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminCh
     if checklist is None:
         return None
 
-    if payload.title is not None:
-        pass
-    if payload.law_decree is not None:
-        checklist.description = payload.law_decree
+    # Update translation for title and description (law_decree)
+    language = _default_language(db)
+    translation = None
+    if language is not None:
+        translation = db.scalar(
+            select(ChecklistTranslation)
+            .where(ChecklistTranslation.checklist_id == checklist_id)
+            .where(ChecklistTranslation.language_id == language.id)
+        )
+        if translation is None:
+            translation = ChecklistTranslation(
+                checklist_id=checklist_id,
+                language_id=language.id,
+                title=payload.title or f"Checklist v{checklist.version}",
+                description=payload.law_decree or None,
+            )
+            db.add(translation)
+        else:
+            if payload.title is not None:
+                translation.title = payload.title
+            if payload.law_decree is not None:
+                translation.description = payload.law_decree
+
+    # Update status if provided
     if payload.status is not None:
         checklist.status = payload.status
     checklist.updated_by = actor.id
