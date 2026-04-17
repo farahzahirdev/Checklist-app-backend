@@ -184,12 +184,15 @@ def start_mfa_enrollment(db: Session, *, user: User) -> MfaSetupDetailsResponse:
     qr = qrcode.make(provisioning_uri, image_factory=factory)
     buf = io.BytesIO()
     qr.save(buf)
+    import base64
     svg_qr = buf.getvalue().decode("utf-8")
+    svg_b64 = base64.b64encode(svg_qr.encode("utf-8")).decode("ascii")
+    svg_data_url = f"data:image/svg+xml;base64,{svg_b64}"
 
     return MfaSetupDetailsResponse(
         secret=secret,
         provisioning_uri=provisioning_uri,
-        svg_qr=svg_qr,
+        svg_qr=svg_data_url,
         verified=False,
     )
 
