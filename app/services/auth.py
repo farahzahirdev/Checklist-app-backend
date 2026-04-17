@@ -175,12 +175,10 @@ def start_mfa_enrollment(db: Session, *, user: User) -> MfaSetupDetailsResponse:
     db.refresh(record)
 
     provisioning_uri = build_totp_provisioning_uri(email=user.email, secret=secret)
-
-    # Generate SVG QR code using qrcode
-    import qrcode
-    import qrcode.image.svg
-    qr = qrcode.make(provisioning_uri, image_factory=qrcode.image.svg.SvgImage)
-    svg_qr = qr.to_string().decode()  # SVG as string
+    # Generate SVG QR code
+    import segno
+    qr = segno.make(provisioning_uri)
+    svg_qr = qr.tostring()  # SVG as string
 
     return MfaSetupDetailsResponse(
         secret=secret,
