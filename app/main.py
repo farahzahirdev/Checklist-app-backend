@@ -99,7 +99,6 @@ app = FastAPI(
 		{"name": "admin-checklists", "description": "Admin APIs for checklist, section, and question lifecycle management."},
 		{"name": "reports", "description": "Admin report generation, review, approval, and publish workflow APIs."},
 	],
-	root_path="/api"
 )
 
 # Add CORS middleware to allow OPTIONS calls (for login and others)
