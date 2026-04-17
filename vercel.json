@@ -1,16 +1,14 @@
 {
-  "version": 2,
   "builds": [
     {
-      "src": "app/main.py",
+      "src": "api/index.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "app/main.py"
+      "dest": "api/index.py"
     }
-  ],
-  "postinstall": "pip install -r requirements.txt"
+  ]
 }
