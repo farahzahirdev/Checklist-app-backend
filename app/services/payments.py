@@ -3,24 +3,42 @@ def create_checkout_session_for_user(
     success_url: str,
     cancel_url: str,
     checklist_id: UUID | None = None,
+    quantity: int = 1,
 ) -> str:
     settings = get_settings()
     stripe_client = _stripe_required()
+    from app.models.user import User
+    from sqlalchemy.orm import Session
+    from app.db.session import get_db
+
+    db: Session = get_db()
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+
+    # Ensure Stripe customer exists in DB, create on Stripe if missing
+    if not user.stripe_customer_id:
+        customer = stripe_client.Customer.create(email=user.email)
+        user.stripe_customer_id = customer["id"]
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    # Use price/product from config
     line_items = [
         {
             "price": settings.stripe_price_id,
-            "quantity": 1,
+            "quantity": quantity,
         }
     ]
     metadata = {"user_id": str(user_id)}
-    if checklist_id:
-        metadata["checklist_id"] = str(checklist_id)
     session = stripe_client.checkout.Session.create(
         payment_method_types=["card"],
         line_items=line_items,
         mode="payment",
         success_url=success_url,
         cancel_url=cancel_url,
+        customer=user.stripe_customer_id,
         metadata=metadata,
     )
     return session.url

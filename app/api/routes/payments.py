@@ -50,19 +50,18 @@ def setup_payment_intent(
 @router.post(
     "/stripe/checkout-session",
     summary="Create Stripe Checkout Session",
-    description="Creates a Stripe Checkout Session for the configured product/price and returns the session URL.",
+    description="Creates a Stripe Checkout Session for the configured product/price and returns the session URL. Uses a single product for all checklists. Checklist selection is after payment.",
 )
 def create_checkout_session(
     success_url: str = Query(..., description="URL to redirect after successful payment"),
     cancel_url: str = Query(..., description="URL to redirect if payment is cancelled"),
-    checklist_id: UUID | None = Query(None, description="Optional checklist to bind to payment"),
     current_user=Depends(get_current_user),
 ):
     url = create_checkout_session_for_user(
         user_id=current_user.id,
         success_url=success_url,
         cancel_url=cancel_url,
-        checklist_id=checklist_id,
+        
     )
     return {"checkout_url": url}
 

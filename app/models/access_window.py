@@ -24,3 +24,6 @@ class AccessWindow(Base):
 
     user = relationship("User", back_populates="access_windows")
     payment = relationship("Payment", back_populates="access_windows")
+
+    # Checklist selected after payment (nullable until user selects)
+    checklist_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("checklists.id", ondelete="SET NULL"), nullable=True)

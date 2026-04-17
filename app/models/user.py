@@ -35,3 +35,5 @@ class User(Base):
     access_windows = relationship("AccessWindow", back_populates="user", cascade="all, delete-orphan")
     mfa_totp = relationship("MfaTotp", back_populates="user", cascade="all, delete-orphan", uselist=False)
     user_roles_rel = relationship("UserRoleAssignment", back_populates="user", cascade="all, delete-orphan", foreign_keys="UserRoleAssignment.user_id")
+
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
