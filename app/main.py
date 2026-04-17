@@ -99,6 +99,7 @@ app = FastAPI(
 		{"name": "admin-checklists", "description": "Admin APIs for checklist, section, and question lifecycle management."},
 		{"name": "reports", "description": "Admin report generation, review, approval, and publish workflow APIs."},
 	],
+	root_path="/api"
 )
 
 # Add CORS middleware to allow OPTIONS calls (for login and others)
@@ -206,3 +207,38 @@ def custom_openapi() -> dict:
 
 app.openapi = custom_openapi
 
+# # --- CLI commands for user creation ---
+import typer
+from app.db.session import SessionLocal
+from app.services.user_management import UserManagementService
+from app.core.security import hash_password
+
+cli = typer.Typer()
+
+@cli.command()
+def createsuperuser(email: str, password: str, role: str = "admin"):
+    """
+    Create a superuser (admin or auditor) from the command line.
+    Usage: python -m app.main createsuperuser --email user@example.com --password pass --role admin
+    """
+    if role not in ("admin", "auditor"):
+        typer.echo("Role must be 'admin' or 'auditor'.")
+        raise typer.Exit(code=1)
+    db = SessionLocal()
+    try:
+        user = UserManagementService.create_user_with_role(
+            db,
+            email=email,
+            password_hash=hash_password(password),
+            role_code=role,
+        )
+        typer.echo(f"Created {role} user: {user.email}")
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 1:
+        cli()
+    else:
+        pass

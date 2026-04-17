@@ -4,7 +4,6 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
-import segno
 from sqlalchemy.orm import Session
 
 from app.core.security import (
@@ -177,6 +176,7 @@ def start_mfa_enrollment(db: Session, *, user: User) -> MfaSetupDetailsResponse:
 
     provisioning_uri = build_totp_provisioning_uri(email=user.email, secret=secret)
     # Generate SVG QR code
+    import segno
     qr = segno.make(provisioning_uri)
     svg_qr = qr.tostring()  # SVG as string
 
