@@ -57,7 +57,7 @@ def create_checkout_session_for_user(
     from sqlalchemy.orm import Session
     from app.db.session import get_db
 
-    db: Session = get_db()
+    db: Session = next(get_db())
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
