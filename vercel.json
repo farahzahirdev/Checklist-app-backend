@@ -11,5 +11,6 @@
       "src": "/(.*)",
       "dest": "app/main.py"
     }
-  ]
+  ],
+  "postinstall": "pip install -r requirements.txt"
 }
