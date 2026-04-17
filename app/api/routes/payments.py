@@ -1,3 +1,5 @@
+from fastapi import Query
+from app.services.payments import create_checkout_session_for_user
 from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy.orm import Session
 from uuid import UUID
@@ -44,6 +46,24 @@ def setup_payment_intent(
         currency=payment.currency,
     )
 
+
+@router.post(
+    "/stripe/checkout-session",
+    summary="Create Stripe Checkout Session",
+    description="Creates a Stripe Checkout Session for the configured product/price and returns the session URL. Uses a single product for all checklists. Checklist selection is after payment.",
+)
+def create_checkout_session(
+    success_url: str = Query(..., description="URL to redirect after successful payment"),
+    cancel_url: str = Query(..., description="URL to redirect if payment is cancelled"),
+    current_user=Depends(get_current_user),
+):
+    url = create_checkout_session_for_user(
+        user_id=current_user.id,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        
+    )
+    return {"checkout_url": url}
 
 @router.post(
     "/stripe/webhook",

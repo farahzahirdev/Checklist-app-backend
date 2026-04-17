@@ -17,6 +17,7 @@ class AccessWindowRead(BaseModel):
     id: UUID
     user_id: UUID
     payment_id: UUID | None
+    checklist_id: UUID | None
     activated_at: datetime
     expires_at: datetime
     created_at: datetime
