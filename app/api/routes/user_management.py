@@ -406,7 +406,7 @@ def switch_admin_role_for_testing(
     temp_token = create_access_token(
         user_id=str(current_user.id),
         role=request.switch_to_role,
-        expires_delta=timedelta(minutes=request.duration_minutes)
+        ttl_minutes=request.duration_minutes
     )
     
     return {
