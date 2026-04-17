@@ -82,7 +82,8 @@ def register_user(db: Session, *, email: str, password: str) -> AuthResponse:
     db.commit()
     db.refresh(user)
 
-    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=False)
+    # At registration, MFA is never enabled or required
+    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=True, mfa_enabled=False)
 
 
 def authenticate_user(db: Session, *, email: str, password: str) -> AuthResponse:
@@ -101,6 +102,23 @@ def authenticate_user(db: Session, *, email: str, password: str) -> AuthResponse
     mfa_record = _get_mfa_record(db, user.id)
     mfa_enabled = bool(mfa_record and mfa_record.is_verified)
 
+    # For customer users, show both true if MFA is enabled
+    if str(user.role) == UserRole.customer.value:
+        if mfa_enabled:
+            challenge_token = create_mfa_challenge_token(user_id=str(user.id), role=str(user.role))
+            return AuthResponse(
+                user=serialize_user(user),
+                access_token=None,
+                challenge_token=challenge_token,
+                mfa_required=True,
+                mfa_enabled=True,
+            )
+        else:
+            token = create_access_token(user_id=str(user.id), role=str(user.role))
+            _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
+            db.commit()
+            return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=False)
+    # For other users, keep existing logic
     if mfa_enabled:
         challenge_token = create_mfa_challenge_token(user_id=str(user.id), role=str(user.role))
         return AuthResponse(
@@ -110,12 +128,10 @@ def authenticate_user(db: Session, *, email: str, password: str) -> AuthResponse
             mfa_required=True,
             mfa_enabled=True,
         )
-
     token = create_access_token(user_id=str(user.id), role=str(user.role))
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
     db.commit()
-
-    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=False)
+    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=True, mfa_enabled=False)
 
 
 def verify_mfa_challenge(db: Session, *, challenge_token: str, code: str) -> AuthResponse:

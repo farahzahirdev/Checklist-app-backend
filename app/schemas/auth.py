@@ -60,7 +60,7 @@ class AuthResponse(BaseModel):
     access_token: str | None = None
     challenge_token: str | None = None
     token_type: str = "bearer"
-    mfa_required: bool = False
+    mfa_required: bool = True
     mfa_enabled: bool = False
 
 
