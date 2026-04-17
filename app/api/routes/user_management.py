@@ -402,18 +402,29 @@ def switch_admin_role_for_testing(
     
     expires_at = datetime.utcnow() + timedelta(minutes=request.duration_minutes)
     
+    # Remove all existing roles for the user (simulate switch)
+    from app.models.rbac import UserRoleAssignment
+    db.query(UserRoleAssignment).filter(UserRoleAssignment.user_id == current_user.id).delete()
+    db.commit()
+
+    # Assign the switched role
+    from app.services.rbac import RBACService
+    RBACService.assign_role_by_code(db, current_user.id, request.switch_to_role, current_user.id)
+    db.commit()
+
     # Create temporary token with switched role (for testing purposes)
     temp_token = create_access_token(
         user_id=str(current_user.id),
         role=request.switch_to_role,
         ttl_minutes=request.duration_minutes
     )
-    
+
     return {
         "switched_to_role": request.switch_to_role,
         "temporary_token": temp_token,
         "expires_at": expires_at,
         "original_role": current_user.role,
+        "note": "User's roles in the database have been temporarily switched for testing. Remember to revert after testing."
     }
 
 
