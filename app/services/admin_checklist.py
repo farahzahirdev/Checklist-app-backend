@@ -173,7 +173,18 @@ def get_checklist(db: Session, *, checklist_id) -> AdminChecklistResponse | None
 
 
 def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateRequest) -> AdminChecklistResponse:
-    checklist_type = _ensure_default_checklist_type(db)
+    # Support custom checklist type code
+    checklist_type = db.scalar(select(ChecklistType).where(ChecklistType.code == payload.checklist_type_code))
+    if checklist_type is None:
+        checklist_type = ChecklistType(
+            code=payload.checklist_type_code,
+            name=payload.checklist_type_code.capitalize(),
+            description=payload.law_decree,
+            is_active=True,
+        )
+        db.add(checklist_type)
+        db.flush()
+
     checklist = Checklist(
         checklist_type_id=checklist_type.id,
         version=payload.version,
@@ -190,7 +201,7 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
                 checklist_id=checklist.id,
                 language_id=language.id,
                 title=payload.title,
-                description=checklist_type.description,  # Use ChecklistType.description
+                description=payload.law_decree,
             )
         )
     db.commit()

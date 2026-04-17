@@ -15,6 +15,7 @@ class AdminChecklistCreateRequest(BaseModel):
     law_decree: str = Field(min_length=1, max_length=255)
     version: int = Field(default=1, ge=1)
     status: ChecklistStatus = ChecklistStatus.draft
+    checklist_type_code: str = Field(default="compliance", min_length=1, max_length=80, description="Checklist type code (default: compliance)")
 
 
 class AdminChecklistUpdateRequest(BaseModel):
