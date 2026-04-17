@@ -99,6 +99,7 @@ app = FastAPI(
 		{"name": "admin-checklists", "description": "Admin APIs for checklist, section, and question lifecycle management."},
 		{"name": "reports", "description": "Admin report generation, review, approval, and publish workflow APIs."},
 	],
+	root_path="/api"
 )
 
 # Add CORS middleware to allow OPTIONS calls (for login and others)
@@ -227,7 +228,7 @@ app.openapi = custom_openapi
 #     try:
 #         user = UserManagementService.create_user_with_role(
 #             db,
-#             email=email,
+#             email=emai	l,
 #             password_hash=hash_password(password),
 #             role_code=role,
 #         )
