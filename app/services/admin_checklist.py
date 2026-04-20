@@ -252,6 +252,9 @@ def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminCh
             if payload.law_decree is not None:
                 translation.description = payload.law_decree
 
+    # Update version if provided
+    if payload.version is not None:
+        checklist.version = payload.version
     # Update status if provided
     if payload.status is not None:
         checklist.status = payload.status
@@ -469,8 +472,6 @@ def update_question(
         question.parent_question_id = payload.parent_question_id
     if payload.security_level is not None:
         question.severity = payload.security_level
-    elif payload.points is not None:
-        question.severity = _points_to_severity(payload.points)
     if "note" in payload.model_fields_set:
         question.note_for_user = payload.note
     if payload.order is not None:

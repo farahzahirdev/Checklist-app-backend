@@ -21,6 +21,7 @@ class AdminChecklistCreateRequest(BaseModel):
 class AdminChecklistUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     law_decree: str | None = Field(default=None, min_length=1, max_length=255)
+    version: int | None = Field(default=None, ge=1)
     status: ChecklistStatus | None = None
 
 
@@ -64,7 +65,6 @@ class AdminQuestionCreateRequest(BaseModel):
     legal_requirement: str = Field(min_length=1)
     explanation: str = Field(default="")
     expected_implementation: str = Field(default="")
-    points: int | None = Field(default=None, ge=1, le=4, description="Optional: will be derived from security_level if not provided")
 
 
 class AdminQuestionUpdateRequest(BaseModel):
@@ -75,7 +75,6 @@ class AdminQuestionUpdateRequest(BaseModel):
     legal_requirement: str | None = Field(default=None, min_length=1)
     explanation: str | None = None
     expected_implementation: str | None = None
-    points: int | None = Field(default=None, ge=1, le=4, description="Optional: will be derived from security_level if not provided")
     order: int | None = Field(default=None, ge=1)
 
 
