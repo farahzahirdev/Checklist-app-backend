@@ -121,9 +121,8 @@ def test_webhook_creates_payment_with_checklist_binding() -> None:
     )
 
     assert state is not None
-    assert state.checklist_id == checklist.id
     assert len(db.payments) == 1
-    assert db.payments[0].checklist_id == checklist.id
+    assert db.payments[0].checklist_id is None
 
 
 def test_webhook_without_checklist_metadata_is_ignored() -> None:
@@ -146,8 +145,9 @@ def test_webhook_without_checklist_metadata_is_ignored() -> None:
 
     state = handle_webhook_event(db, event)
 
-    assert state is None
-    assert len(db.payments) == 0
+    assert state is not None
+    assert len(db.payments) == 1
+    assert db.payments[0].checklist_id is None
 
 
 def test_admin_set_payment_status_creates_synthetic_payment_and_access() -> None:
@@ -167,7 +167,6 @@ def test_admin_set_payment_status_creates_synthetic_payment_and_access() -> None
     state = admin_set_payment_status(
         db,
         user_id=user.id,
-        checklist_id=checklist.id,
         payment_status=PaymentStatus.succeeded,
         amount_cents=4900,
         currency="USD",

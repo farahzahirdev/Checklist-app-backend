@@ -43,6 +43,12 @@ def select_checklist(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="invalid_checklist")
     # Bind checklist to access window
     access_window.checklist_id = checklist_id
+    # Also update the payment record
+    if access_window.payment_id:
+        payment = db.get(Payment, access_window.payment_id)
+        if payment:
+            payment.checklist_id = checklist_id
+            db.add(payment)
     db.add(access_window)
     db.commit()
     db.refresh(access_window)

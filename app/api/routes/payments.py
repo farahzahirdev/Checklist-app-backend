@@ -1,11 +1,14 @@
 from fastapi import Query
 from app.services.payments import create_checkout_session_for_user
-from fastapi import APIRouter, Depends, Header, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from uuid import UUID
 
 from app.api.dependencies.auth import get_current_user, require_roles
 from app.db.session import get_db
+from app.models.access_window import AccessWindow
+from app.models.payment import Payment
 from app.models.user import UserRole
 from app.schemas.payment import AdminPaymentStatusUpdateRequest, PaymentSetupRequest, PaymentSetupResponse, PaymentState, StripeWebhookAck
 from app.services.payments import admin_set_payment_status, construct_webhook_event, create_payment_intent_for_user, handle_webhook_event
@@ -19,10 +22,9 @@ router = APIRouter(prefix="/payments", tags=["payments"])
     status_code=status.HTTP_201_CREATED,
     summary="Create Stripe Setup Intent",
     description=(
-        "Creates a payment record and Stripe PaymentIntent bound to a specific checklist. "
-        "Requires bearer auth and uses authenticated user identity with provided checklist_id. "
-        "Use client_secret from the response in Stripe SDK confirmation. "
-        "Access is granted only to the checklist linked by checklist_id once webhook confirms success."
+        "Creates a payment record and Stripe PaymentIntent for the authenticated user. "
+        "Requires bearer auth and returns client_secret for Stripe SDK confirmation. "
+        "Checklist is selected separately after payment succeeds."
     ),
 )
 def setup_payment_intent(
@@ -33,17 +35,47 @@ def setup_payment_intent(
     payment, client_secret = create_payment_intent_for_user(
         db,
         user_id=current_user.id,
-        checklist_id=request.checklist_id,
         amount_cents=request.amount_cents,
         currency=request.currency,
     )
     return PaymentSetupResponse(
         payment_id=payment.id,
-        checklist_id=payment.checklist_id,
         stripe_payment_intent_id=payment.stripe_payment_intent_id,
         client_secret=client_secret,
         amount_cents=payment.amount_cents,
         currency=payment.currency,
+    )
+
+
+@router.get(
+    "/{payment_id}/status",
+    response_model=PaymentState,
+    summary="Get payment status",
+    description=(
+        "Returns the current payment and access window state for a payment record. "
+        "Authenticated users may only fetch their own payment status unless they are admin."
+    ),
+)
+def get_payment_status(
+    payment_id: UUID,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PaymentState:
+    payment = db.get(Payment, payment_id)
+    if payment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="payment_not_found")
+
+    if payment.user_id != current_user.id and current_user.role != UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+    access_window = db.scalar(select(AccessWindow).where(AccessWindow.payment_id == payment.id))
+    return PaymentState(
+        payment_id=payment.id,
+        stripe_payment_intent_id=payment.stripe_payment_intent_id,
+        payment_status=payment.status,
+        paid_at=payment.paid_at,
+        access_window_id=access_window.id if access_window else None,
+        access_expires_at=access_window.expires_at if access_window else None,
     )
 
 
@@ -91,7 +123,7 @@ async def stripe_webhook(
     response_model=PaymentState,
     summary="Admin Update User Payment Status",
     description=(
-        "Admin-only development endpoint to set payment status for a user's checklist. "
+        "Admin-only development endpoint to set payment status for a user. "
         "Creates a synthetic payment record if one does not exist yet."
     ),
 )
@@ -104,7 +136,6 @@ def admin_update_payment_status(
     return admin_set_payment_status(
         db,
         user_id=user_id,
-        checklist_id=request.checklist_id,
         payment_status=request.payment_status,
         amount_cents=request.amount_cents,
         currency=request.currency,

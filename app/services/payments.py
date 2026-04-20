@@ -94,7 +94,6 @@ def create_payment_intent_for_user(
     db: Session,
     *,
     user_id: UUID,
-    checklist_id: UUID,
     amount_cents: int | None,
     currency: str | None,
 ) -> tuple[Payment, str]:
@@ -105,10 +104,6 @@ def create_payment_intent_for_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
 
-    checklist = db.get(Checklist, checklist_id)
-    if checklist is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_not_found")
-
     request_amount = amount_cents or settings.stripe_default_amount_cents
     request_currency = (currency or settings.stripe_currency).upper()
 
@@ -116,12 +111,12 @@ def create_payment_intent_for_user(
         amount=request_amount,
         currency=request_currency.lower(),
         automatic_payment_methods={"enabled": True},
-        metadata={"user_id": str(user.id), "checklist_id": str(checklist.id)},
+        metadata={"user_id": str(user.id)},
     )
 
     payment = Payment(
         user_id=user.id,
-        checklist_id=checklist.id,
+        checklist_id=None,
         stripe_payment_intent_id=intent["id"],
         amount_cents=request_amount,
         currency=request_currency,
@@ -171,7 +166,7 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
     if not isinstance(data, dict):
         return None
 
-    if event_type not in {"payment_intent.succeeded", "payment_intent.payment_failed", "payment_intent.processing"}:
+    if event_type not in {"payment_intent.succeeded", "payment_intent.payment_failed", "payment_intent.processing", "checkout.session.completed"}:
         return None
 
     intent_id = data.get("id")
@@ -182,17 +177,15 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
     if payment is None:
         metadata = data.get("metadata") or {}
         user_id_raw = metadata.get("user_id")
-        checklist_id_raw = metadata.get("checklist_id")
-        if user_id_raw is None or checklist_id_raw is None:
+        if user_id_raw is None:
             return None
         try:
             user_id = UUID(user_id_raw)
-            checklist_id = UUID(checklist_id_raw)
         except ValueError:
             return None
         payment = Payment(
             user_id=user_id,
-            checklist_id=checklist_id,
+            checklist_id=None,
             stripe_payment_intent_id=intent_id,
             amount_cents=int(data.get("amount") or 0),
             currency=str(data.get("currency") or "USD").upper(),
@@ -229,7 +222,6 @@ def admin_set_payment_status(
     db: Session,
     *,
     user_id: UUID,
-    checklist_id: UUID,
     payment_status: PaymentStatus,
     amount_cents: int | None,
     currency: str | None,
@@ -238,13 +230,9 @@ def admin_set_payment_status(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
 
-    checklist = db.get(Checklist, checklist_id)
-    if checklist is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_not_found")
-
     payment = db.scalar(
         select(Payment)
-        .where(Payment.user_id == user_id, Payment.checklist_id == checklist_id)
+        .where(Payment.user_id == user_id)
         .order_by(Payment.created_at.desc())
     )
 
@@ -252,7 +240,7 @@ def admin_set_payment_status(
     if payment is None:
         payment = Payment(
             user_id=user_id,
-            checklist_id=checklist_id,
+            checklist_id=None,
             stripe_payment_intent_id=f"dev_manual_{uuid4().hex}",
             amount_cents=amount_cents or settings.stripe_default_amount_cents,
             currency=(currency or settings.stripe_currency).upper(),
@@ -278,7 +266,6 @@ def admin_set_payment_status(
 
     return PaymentState(
         payment_id=payment.id,
-        checklist_id=payment.checklist_id,
         stripe_payment_intent_id=payment.stripe_payment_intent_id,
         payment_status=payment.status,
         paid_at=payment.paid_at,

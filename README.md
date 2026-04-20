@@ -123,10 +123,13 @@ Create a new migration after model changes:
 ### Payments
 
 - `POST /api/v1/payments/stripe/setup-intent`
-- Purpose: create payment intent and internal payment record bound to a specific checklist.
+- Purpose: create payment intent and internal payment record for the authenticated user.
 - Auth notes: requires bearer token and uses authenticated user identity.
-- Request notes: `checklist_id` is required and determines which checklist access is granted after payment success.
-- Response notes: returns `client_secret`, `stripe_payment_intent_id`, and the linked `checklist_id`.
+- Request notes: payment intent is created without a bound checklist; checklist selection happens after payment success.
+- Response notes: returns `client_secret` and `stripe_payment_intent_id`.
+- `GET /api/v1/payments/{payment_id}/status`
+- Purpose: fetch current payment status and associated access window state for a payment record.
+- Auth notes: users may only fetch their own payment status; admins can fetch any payment.
 - `POST /api/v1/payments/admin/users/{user_id}/status`
 - Purpose: admin-only development endpoint to manually set payment status for a user+checklist.
 - Dev notes: creates a synthetic payment row when none exists and can unlock access when status is set to `succeeded`.
