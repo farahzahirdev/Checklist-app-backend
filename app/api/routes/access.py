@@ -1,5 +1,6 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.api.dependencies.auth import get_current_user
 from app.db.session import get_db
@@ -26,7 +27,7 @@ def select_checklist(
     now = datetime.now(timezone.utc)
     # Check for active access window (from payment, not yet bound to a checklist)
     access_window = db.scalar(
-        AccessWindow.__table__.select()
+        select(AccessWindow)
         .where(AccessWindow.user_id == current_user.id)
         .where(AccessWindow.activated_at <= now)
         .where(AccessWindow.expires_at > now)
