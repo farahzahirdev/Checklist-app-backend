@@ -64,7 +64,7 @@ class AdminQuestionCreateRequest(BaseModel):
     legal_requirement: str = Field(min_length=1)
     explanation: str = Field(default="")
     expected_implementation: str = Field(default="")
-    points: int = Field(default=1, ge=1, le=4)
+    points: int | None = Field(default=None, ge=1, le=4, description="Optional: will be derived from security_level if not provided")
 
 
 class AdminQuestionUpdateRequest(BaseModel):
@@ -75,7 +75,7 @@ class AdminQuestionUpdateRequest(BaseModel):
     legal_requirement: str | None = Field(default=None, min_length=1)
     explanation: str | None = None
     expected_implementation: str | None = None
-    points: int | None = Field(default=None, ge=1, le=4)
+    points: int | None = Field(default=None, ge=1, le=4, description="Optional: will be derived from security_level if not provided")
     order: int | None = Field(default=None, ge=1)
 
 

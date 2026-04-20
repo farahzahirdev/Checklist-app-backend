@@ -89,13 +89,13 @@ def _severity_to_points(severity: SeverityLevel) -> int:
         return 4
     if severity == SeverityLevel.medium:
         return 3
-    return 2
+    return 1
 
 
 def _points_to_severity(points: int) -> SeverityLevel:
     if points >= 4:
         return SeverityLevel.high
-    if points == 3:
+    if points >= 3:
         return SeverityLevel.medium
     return SeverityLevel.low
 
@@ -374,7 +374,7 @@ def create_question(db: Session, *, checklist_id, section_id, payload: AdminQues
         section_id=section_id,
         parent_question_id=payload.parent_question_id,
         question_code=payload.question_id,
-        severity=_points_to_severity(payload.points),
+        severity=payload.security_level,
         report_domain=None,
         report_chapter=None,
         illustrative_image_url=None,
@@ -438,7 +438,7 @@ def update_question(
         question.parent_question_id = payload.parent_question_id
     if payload.security_level is not None:
         question.severity = payload.security_level
-    if payload.points is not None:
+    elif payload.points is not None:
         question.severity = _points_to_severity(payload.points)
     if "note" in payload.model_fields_set:
         question.note_for_user = payload.note
