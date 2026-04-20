@@ -34,12 +34,12 @@ class MfaSetupResponse(BaseModel):
 
 
 class MfaVerifyRequest(BaseModel):
-    code: str
+    code: str = Field(min_length=1)
 
 
 class MfaChallengeVerifyRequest(BaseModel):
     challenge_token: str
-    code: str = Field(min_length=6, max_length=6)
+    code: str = Field(min_length=1)
 
 
 class MfaVerifyResponse(BaseModel):

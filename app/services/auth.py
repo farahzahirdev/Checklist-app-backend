@@ -149,6 +149,10 @@ def verify_mfa_challenge(db: Session, *, challenge_token: str, code: str) -> Aut
     if mfa_record is None or not mfa_record.is_verified:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="mfa_not_enabled")
 
+    code = code.strip()
+    if not code:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_mfa_code")
+
     secret = decrypt_secret(mfa_record.secret_encrypted)
     if not verify_totp_code(secret, code):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_mfa_code")
@@ -201,6 +205,10 @@ def confirm_mfa_enrollment(db: Session, *, user: User, code: str) -> AuthRespons
     record = _get_mfa_record(db, user.id)
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="mfa_not_initialized")
+
+    code = code.strip()
+    if not code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_mfa_code")
 
     secret = decrypt_secret(record.secret_encrypted)
     if not verify_totp_code(secret, code):

@@ -193,6 +193,13 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
             user_id = UUID(user_id_raw)
         except ValueError:
             return None
+        
+        # Verify user exists before creating payment
+        user = db.get(User, user_id)
+        if user is None:
+            # User was deleted or doesn't exist - skip payment creation
+            return None
+        
         payment = Payment(
             user_id=user_id,
             checklist_id=None,
