@@ -48,25 +48,29 @@ def setup_payment_intent(
 
 
 @router.get(
-    "/{payment_id}/status",
+    "/users/{user_id}/status",
     response_model=PaymentState,
-    summary="Get payment status",
+    summary="Get user payment status",
     description=(
-        "Returns the current payment and access window state for a payment record. "
-        "Authenticated users may only fetch their own payment status unless they are admin."
+        "Returns the most recent payment and access window state for a user. "
+        "Authenticated users may only fetch their own status unless they are admin."
     ),
 )
-def get_payment_status(
-    payment_id: UUID,
+def get_user_payment_status(
+    user_id: UUID,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> PaymentState:
-    payment = db.get(Payment, payment_id)
+    if user_id != current_user.id and current_user.role != UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+
+    payment = db.scalar(
+        select(Payment)
+        .where(Payment.user_id == user_id)
+        .order_by(Payment.created_at.desc())
+    )
     if payment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="payment_not_found")
-
-    if payment.user_id != current_user.id and current_user.role != UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
 
     access_window = db.scalar(select(AccessWindow).where(AccessWindow.payment_id == payment.id))
     return PaymentState(

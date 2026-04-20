@@ -166,10 +166,20 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
     if not isinstance(data, dict):
         return None
 
-    if event_type not in {"payment_intent.succeeded", "payment_intent.payment_failed", "payment_intent.processing", "checkout.session.completed"}:
+    expected_event_types = {
+        "payment_intent.succeeded",
+        "payment_intent.payment_failed",
+        "payment_intent.processing",
+        "checkout.session.completed",
+    }
+    if event_type not in expected_event_types:
         return None
 
-    intent_id = data.get("id")
+    if event_type == "checkout.session.completed":
+        intent_id = data.get("payment_intent")
+    else:
+        intent_id = data.get("id")
+
     if not intent_id:
         return None
 
@@ -187,15 +197,15 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
             user_id=user_id,
             checklist_id=None,
             stripe_payment_intent_id=intent_id,
-            amount_cents=int(data.get("amount") or 0),
-            currency=str(data.get("currency") or "USD").upper(),
+            amount_cents=int(data.get("amount") or data.get("amount_total") or 0),
+            currency=str(data.get("currency") or data.get("currency_total") or "USD").upper(),
             status=PaymentStatus.pending,
         )
         db.add(payment)
         db.flush()
 
     access_window: AccessWindow | None = None
-    if event_type == "payment_intent.succeeded":
+    if event_type in {"payment_intent.succeeded", "checkout.session.completed"}:
         payment.status = PaymentStatus.succeeded
         payment.paid_at = _parse_paid_at(data)
         access_window = _ensure_access_window(db, payment, payment.paid_at)

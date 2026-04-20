@@ -96,6 +96,25 @@ def _stripe_event(*, event_type: str, intent_id: str, user_id: UUID, checklist_i
     }
 
 
+def _checkout_session_event(*, session_id: str, intent_id: str, user_id: UUID, amount_total: int = 4900):
+    created_ts = int((datetime.now(timezone.utc) - timedelta(minutes=1)).timestamp())
+    return {
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "id": session_id,
+                "payment_intent": intent_id,
+                "amount_total": amount_total,
+                "currency": "usd",
+                "created": created_ts,
+                "metadata": {
+                    "user_id": str(user_id),
+                },
+            }
+        },
+    }
+
+
 def test_webhook_creates_payment_with_checklist_binding() -> None:
     db = FakeSession()
     user = User(id=uuid4(), email="u@example.com", password_hash="x", role=UserRole.customer, is_active=True)
@@ -123,6 +142,29 @@ def test_webhook_creates_payment_with_checklist_binding() -> None:
     assert state is not None
     assert len(db.payments) == 1
     assert db.payments[0].checklist_id is None
+
+
+def test_webhook_checkout_session_creates_payment_and_access() -> None:
+    db = FakeSession()
+    user = User(id=uuid4(), email="u@example.com", password_hash="x", role=UserRole.customer, is_active=True)
+    db.add(user)
+
+    state = handle_webhook_event(
+        db,
+        _checkout_session_event(
+            session_id="cs_webhook_123",
+            intent_id="pi_checkout_123",
+            user_id=user.id,
+            amount_total=4900,
+        ),
+    )
+
+    assert state is not None
+    assert state.payment_status == PaymentStatus.succeeded
+    assert state.access_window_id is not None
+    assert len(db.payments) == 1
+    assert db.payments[0].stripe_payment_intent_id == "pi_checkout_123"
+    assert db.payments[0].status == PaymentStatus.succeeded
 
 
 def test_webhook_without_checklist_metadata_is_ignored() -> None:
