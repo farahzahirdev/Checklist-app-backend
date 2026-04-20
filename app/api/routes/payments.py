@@ -8,9 +8,11 @@ from uuid import UUID
 from app.api.dependencies.auth import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.access_window import AccessWindow
+from app.models.checklist import Checklist, ChecklistTranslation
 from app.models.payment import Payment
+from app.models.reference import Language
 from app.models.user import UserRole
-from app.schemas.payment import AdminPaymentStatusUpdateRequest, PaymentSetupRequest, PaymentSetupResponse, PaymentState, StripeWebhookAck
+from app.schemas.payment import AdminPaymentStatusUpdateRequest, ChecklistInfo, PaymentSetupRequest, PaymentSetupResponse, PaymentState, StripeWebhookAck
 from app.services.payments import admin_set_payment_status, construct_webhook_event, create_payment_intent_for_user, handle_webhook_event
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -73,6 +75,28 @@ def get_user_payment_status(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="payment_not_found")
 
     access_window = db.scalar(select(AccessWindow).where(AccessWindow.payment_id == payment.id))
+    
+    # Fetch checklist info if available
+    checklist_info = None
+    checklist_id = payment.checklist_id or (access_window.checklist_id if access_window else None)
+    if checklist_id:
+        checklist = db.get(Checklist, checklist_id)
+        if checklist:
+            # Get default language for translation
+            default_language = db.scalar(select(Language).where(Language.is_default == True))
+            if default_language:
+                translation = db.scalar(
+                    select(ChecklistTranslation)
+                    .where(ChecklistTranslation.checklist_id == checklist_id)
+                    .where(ChecklistTranslation.language_id == default_language.id)
+                )
+                if translation:
+                    checklist_info = ChecklistInfo(
+                        id=checklist.id,
+                        title=translation.title,
+                        version=checklist.version,
+                    )
+    
     return PaymentState(
         payment_id=payment.id,
         stripe_payment_intent_id=payment.stripe_payment_intent_id,
@@ -80,6 +104,7 @@ def get_user_payment_status(
         paid_at=payment.paid_at,
         access_window_id=access_window.id if access_window else None,
         access_expires_at=access_window.expires_at if access_window else None,
+        checklist=checklist_info,
     )
 
 

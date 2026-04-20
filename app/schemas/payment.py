@@ -6,6 +6,13 @@ from pydantic import BaseModel, Field
 from app.models.payment import PaymentStatus
 
 
+class ChecklistInfo(BaseModel):
+    """Information about the checklist the user has access to."""
+    id: UUID = Field(description="Checklist ID.")
+    title: str = Field(description="Checklist title (translated to default language).")
+    version: int = Field(description="Checklist version.")
+
+
 class PaymentState(BaseModel):
     payment_id: UUID | None = Field(default=None, description="Internal payment record ID.")
     stripe_payment_intent_id: str | None = Field(default=None, description="Stripe PaymentIntent ID.")
@@ -13,6 +20,7 @@ class PaymentState(BaseModel):
     paid_at: datetime | None = Field(default=None, description="UTC timestamp when payment succeeded.")
     access_window_id: UUID | None = Field(default=None, description="Created access window ID after successful payment.")
     access_expires_at: datetime | None = Field(default=None, description="UTC expiry time of checklist access window.")
+    checklist: ChecklistInfo | None = Field(default=None, description="Checklist info the user has access to via this payment/access window.")
 
 
 class PaymentSetupRequest(BaseModel):
