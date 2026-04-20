@@ -59,7 +59,7 @@ class ChecklistType(Base):
 
 class Checklist(Base):
     __tablename__ = "checklists"
-    __table_args__ = (UniqueConstraint("checklist_type_id", "version", name="uq_checklists_type_version"),)
+    # Removed unique constraint on (checklist_type_id, version)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     checklist_type_id: Mapped[uuid.UUID] = mapped_column(

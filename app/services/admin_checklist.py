@@ -173,16 +173,20 @@ def get_checklist(db: Session, *, checklist_id) -> AdminChecklistResponse | None
 
 
 def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateRequest) -> AdminChecklistResponse:
-    # Support custom checklist type code
+    # Always create or update ChecklistType with name/description from payload
     checklist_type = db.scalar(select(ChecklistType).where(ChecklistType.code == payload.checklist_type_code))
     if checklist_type is None:
         checklist_type = ChecklistType(
             code=payload.checklist_type_code,
-            name=payload.checklist_type_code.capitalize(),
+            name=payload.title,
             description=payload.law_decree,
             is_active=True,
         )
         db.add(checklist_type)
+        db.flush()
+    else:
+        checklist_type.name = payload.title
+        checklist_type.description = payload.law_decree
         db.flush()
 
     checklist = Checklist(
