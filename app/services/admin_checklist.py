@@ -100,8 +100,19 @@ def _points_to_severity(points: int) -> SeverityLevel:
     return SeverityLevel.low
 
 
+def _latest_section_translation(db: Session, section_id: uuid.UUID) -> ChecklistSectionTranslation | None:
+    return db.scalar(
+        select(ChecklistSectionTranslation)
+        .where(ChecklistSectionTranslation.section_id == section_id)
+        .order_by(ChecklistSectionTranslation.created_at.desc())
+        .limit(1)
+    )
+
+
 def _to_section_response(section: ChecklistSection) -> AdminSectionResponse:
-    return AdminSectionResponse(id=section.id, checklist_id=section.checklist_id, title=section.section_code, order=section.display_order)
+    translation = getattr(section, "_translation", None)
+    title = translation.title if translation else section.section_code
+    return AdminSectionResponse(id=section.id, checklist_id=section.checklist_id, title=title, order=section.display_order)
 
 
 def _default_language(db: Session) -> Language | None:
@@ -273,6 +284,8 @@ def list_sections(db: Session, *, checklist_id) -> list[AdminSectionResponse]:
     rows = db.scalars(
         select(ChecklistSection).where(ChecklistSection.checklist_id == checklist_id).order_by(asc(ChecklistSection.display_order))
     ).all()
+    for row in rows:
+        row._translation = _latest_section_translation(db, row.id)
     return [_to_section_response(row) for row in rows]
 
 
@@ -307,12 +320,30 @@ def update_section(db: Session, *, checklist_id, section_id, payload: AdminSecti
         return None
 
     if payload.title is not None:
-        section.section_code = payload.title
+        # Update translation for title
+        language = _default_language(db)
+        if language is not None:
+            translation = db.scalar(
+                select(ChecklistSectionTranslation)
+                .where(ChecklistSectionTranslation.section_id == section_id)
+                .where(ChecklistSectionTranslation.language_id == language.id)
+            )
+            if translation is None:
+                translation = ChecklistSectionTranslation(
+                    section_id=section_id,
+                    language_id=language.id,
+                    title=payload.title,
+                )
+                db.add(translation)
+            else:
+                translation.title = payload.title
+    
     if payload.order is not None:
         section.display_order = payload.order
 
     db.commit()
     db.refresh(section)
+    section._translation = _latest_section_translation(db, section.id)
     return _to_section_response(section)
 
 
