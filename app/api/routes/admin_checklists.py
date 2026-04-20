@@ -1,6 +1,9 @@
 from uuid import UUID
+import base64
+import io
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
@@ -34,6 +37,18 @@ from app.services.admin_checklist import (
     update_checklist,
     update_question,
     update_section,
+)
+from app.schemas.bulk_checklist import (
+    ColumnMapping,
+    ColumnMappingResponse,
+    VerifyMappingRequest,
+    VerifyMappingResponse,
+    BulkChecklistCreateRequest,
+    BulkChecklistCreateResponse,
+)
+from app.services.bulk_checklist import (
+    verify_mapping,
+    create_checklist_from_file,
 )
 
 router = APIRouter(prefix="/admin/checklists", tags=["admin-checklists"])
@@ -304,3 +319,306 @@ def admin_delete_question(
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="question_not_found")
     return {"message": "question_deleted"}
+
+
+# ============================================================================
+# Bulk Import Routes
+# ============================================================================
+
+@router.get(
+    "/bulk/template/mapping",
+    response_model=ColumnMappingResponse,
+    summary="Get Column Mapping Specification",
+    description="Returns the column mapping template for Excel/CSV import.",
+)
+def get_column_mapping_spec(
+    _admin=Depends(require_roles(UserRole.admin)),
+) -> ColumnMappingResponse:
+    """Get the column mapping specification template."""
+    template = ColumnMapping(
+        section_name_col="B",
+        question_id_col="C",
+        child_question_col="D",
+        grandchild_question_col="E",
+        legal_requirement_col="F",
+        question_text_col="H",
+        severity_col="I",
+        explanation_col="O",
+        expected_implementation_col="N",
+        source_ref_col="B",
+        guidance_score_4_col="J",
+        guidance_score_3_col="K",
+        guidance_score_2_col="L",
+        guidance_score_1_col="M",
+    )
+    
+    return ColumnMappingResponse(
+        description="Standard mapping for checklist Excel import. Adjust column letters based on your file format.",
+        required_columns=[
+            "section_name_col",
+            "question_id_col",
+            "legal_requirement_col",
+            "question_text_col",
+            "severity_col",
+        ],
+        optional_columns=[
+            "child_question_col",
+            "grandchild_question_col",
+            "explanation_col",
+            "expected_implementation_col",
+            "source_ref_col",
+            "guidance_score_4_col",
+            "guidance_score_3_col",
+            "guidance_score_2_col",
+            "guidance_score_1_col",
+        ],
+        column_mapping_template=template,
+        example_format={
+            "section_name": "Governance & Management",
+            "parent_question_id": "Q001",
+            "parent_question_text": "Is there a defined governance structure?",
+            "child_question_id": "Q001.1",
+            "child_question_text": "Are roles and responsibilities clearly documented?",
+            "grandchild_question_id": "Q001.1.1",
+            "grandchild_question_text": "Is governance approved by board/leadership?",
+            "legal_requirement": "Article 5 of Regulation X",
+            "severity": "High",
+        },
+    )
+
+
+@router.get(
+    "/bulk/template/download",
+    summary="Download Sample Template",
+    description="Downloads a sample Excel or CSV template for bulk import.",
+)
+def download_template(
+    format: str = "csv",
+    _admin=Depends(require_roles(UserRole.admin)),
+):
+    """Download sample template in CSV or XLSX format."""
+    
+    format_lower = format.lower()
+    if format_lower not in ("csv", "xlsx"):
+        raise HTTPException(status_code=400, detail="Format must be 'csv' or 'xlsx'")
+    
+    # Sample data
+    columns = [
+        "Section",
+        "Question ID",
+        "Child Question ID",
+        "Grandchild Question ID",
+        "Legal Requirement",
+        "Question Text",
+        "Severity",
+        "Score 4 Guidance",
+        "Score 3 Guidance",
+        "Score 2 Guidance",
+        "Score 1 Guidance",
+        "Expected Implementation",
+        "Explanation",
+        "Source Reference",
+    ]
+    
+    sample_rows = [
+        [
+            "Governance & Management",
+            "GOV-001",
+            "GOV-001.1",
+            "GOV-001.1.1",
+            "Are roles and responsibilities clearly defined?",
+            "Does the organization have a documented governance structure?",
+            "High",
+            "Complete governance framework with clear roles",
+            "Documented but incomplete governance",
+            "Partial documentation of governance",
+            "No formal governance structure",
+            "Implement formal governance framework",
+            "Define roles, responsibilities, and reporting lines",
+            "ISO 27001:2022",
+        ],
+        [
+            "Governance & Management",
+            "GOV-002",
+            None,
+            None,
+            "Is compliance monitored continuously?",
+            "How does the organization ensure continuous compliance?",
+            "Medium",
+            "Continuous automated monitoring",
+            "Regular manual reviews",
+            "Periodic reviews",
+            "Ad-hoc reviews",
+            "Establish monitoring procedures",
+            "Set up compliance monitoring system",
+            "Regulation X Article 5",
+        ],
+    ]
+    
+    if format_lower == "csv":
+        # Generate CSV
+        output = io.StringIO()
+        output.write(",".join(columns) + "\n")
+        for row in sample_rows:
+            escaped_row = [f'"{str(cell).replace(chr(34), chr(34) + chr(34))}"' if cell else '""' 
+                          for cell in row]
+            output.write(",".join(escaped_row) + "\n")
+        
+        content = output.getvalue().encode('utf-8')
+        filename = "checklist_template.csv"
+        media_type = "text/csv"
+    else:  # xlsx
+        try:
+            import pandas as pd
+        except ImportError:
+            raise HTTPException(status_code=500, detail="pandas not installed")
+        
+        # Generate XLSX using pandas
+        df = pd.DataFrame(sample_rows, columns=columns)
+        
+        # Create Excel writer
+        output = io.BytesIO()
+        with pd.ExcelWriter(output) as writer:
+            df.to_excel(writer, sheet_name='Template', index=False)
+        
+        content = output.getvalue()
+        filename = "checklist_template.xlsx"
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type=media_type,
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.post(
+    "/bulk/verify",
+    response_model=VerifyMappingResponse,
+    summary="Verify Column Mapping",
+    description="Upload file and verify column mapping without creating data.",
+)
+def verify_column_mapping(
+    request: VerifyMappingRequest,
+    _admin=Depends(require_roles(UserRole.admin)),
+) -> VerifyMappingResponse:
+    """Verify column mapping by parsing file and showing preview."""
+    try:
+        if isinstance(request.file_content, str):
+            try:
+                file_content = base64.b64decode(request.file_content)
+            except Exception:
+                file_content = request.file_content.encode('utf-8')
+        else:
+            file_content = request.file_content
+        
+        response = verify_mapping(
+            file_content=file_content,
+            file_name=request.file_name,
+            column_mapping=request.column_mapping,
+            preview_rows=request.preview_rows,
+        )
+        return response
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Verification failed: {str(e)}"
+        )
+
+
+@router.post(
+    "/bulk/create",
+    response_model=BulkChecklistCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Checklist from File",
+    description="Parse file and create complete checklist with sections and questions.",
+)
+def create_from_file(
+    request: BulkChecklistCreateRequest,
+    admin=Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> BulkChecklistCreateResponse:
+    """Create checklist by parsing uploaded Excel/CSV file."""
+    try:
+        if isinstance(request.file_content, str):
+            try:
+                file_content = base64.b64decode(request.file_content)
+            except Exception:
+                file_content = request.file_content.encode('utf-8')
+        else:
+            file_content = request.file_content
+        
+        response = create_checklist_from_file(
+            db=db,
+            actor=admin,
+            file_content=file_content,
+            file_name=request.file_name,
+            column_mapping=request.column_mapping,
+            checklist_title=request.checklist_title,
+            checklist_description=request.checklist_description,
+            checklist_type_code=request.checklist_type_code,
+            checklist_version=request.checklist_version,
+        )
+        
+        if response.status == "failed":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=response.message
+            )
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create checklist: {str(e)}"
+        )
+
+
+@router.post(
+    "/bulk/upload-and-verify",
+    response_model=VerifyMappingResponse,
+    summary="Upload and Verify File",
+    description="Upload file as form-data and verify column mapping.",
+)
+async def upload_and_verify(
+    file: UploadFile = File(...),
+    section_col: str = "B",
+    question_id_col: str = "C",
+    child_question_col: str = "D",
+    grandchild_question_col: str = "E",
+    legal_req_col: str = "F",
+    question_text_col: str = "H",
+    severity_col: str = "I",
+    _admin=Depends(require_roles(UserRole.admin)),
+) -> VerifyMappingResponse:
+    """Upload file as form-data and verify column mapping."""
+    try:
+        file_content = await file.read()
+        
+        mapping = ColumnMapping(
+            section_name_col=section_col,
+            question_id_col=question_id_col,
+            child_question_col=child_question_col,
+            grandchild_question_col=grandchild_question_col,
+            legal_requirement_col=legal_req_col,
+            question_text_col=question_text_col,
+            severity_col=severity_col,
+        )
+        
+        response = verify_mapping(
+            file_content=file_content,
+            file_name=file.filename or "upload",
+            column_mapping=mapping,
+            preview_rows=10,
+        )
+        return response
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Upload verification failed: {str(e)}"
+        )
