@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+import os
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import get_current_user
@@ -13,6 +14,9 @@ from app.schemas.assessment import (
     StartAssessmentRequest,
 )
 from app.services.assessment import get_current_assessment, start_assessment, submit_assessment, upsert_assessment_answer
+from app.utils.file_upload import allowed_file, validate_file_type, get_file_size, compute_sha256, basic_malware_scan
+from app.models.assessment import AssessmentEvidenceFile, MalwareScanStatus
+import shutil
 
 router = APIRouter(prefix="/assessment", tags=["assessment"])
 
@@ -90,3 +94,57 @@ def submit_assessment_route(
     db: Session = Depends(get_db),
 ) -> AssessmentSubmitResponse:
     return submit_assessment(db, user=current_user, assessment_id=assessment_id)
+
+
+@router.post(
+    "/{assessment_id}/evidence",
+    summary="Upload evidence file for assessment answer",
+)
+def upload_evidence_file(
+    assessment_id: UUID,
+    question_id: UUID,
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Validate extension
+    if not allowed_file(file.filename):
+        raise HTTPException(status_code=400, detail="invalid_file_type")
+    # Validate file type and size
+    contents = file.file
+    if not validate_file_type(contents, file.filename):
+        raise HTTPException(status_code=400, detail="invalid_file_content")
+    size = get_file_size(contents)
+    if size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="file_too_large")
+    # Basic malware scan
+    if not basic_malware_scan(contents):
+        scan_status = MalwareScanStatus.infected
+    else:
+        scan_status = MalwareScanStatus.clean
+    # Compute hash
+    sha256 = compute_sha256(contents)
+    # Save file to private storage (local for now)
+    storage_dir = "private_uploads/assessment_evidence"
+    os.makedirs(storage_dir, exist_ok=True)
+    storage_key = f"{assessment_id}_{question_id}_{sha256}_{file.filename}"
+    storage_path = os.path.join(storage_dir, storage_key)
+    contents.seek(0)
+    with open(storage_path, "wb") as out_file:
+        shutil.copyfileobj(contents, out_file)
+    # Store metadata
+    evidence = AssessmentEvidenceFile(
+        assessment_id=assessment_id,
+        question_id=question_id,
+        storage_key=storage_key,
+        original_filename=file.filename,
+        mime_type=file.content_type,
+        file_size_bytes=size,
+        sha256=sha256,
+        scan_status=scan_status,
+        uploaded_by=current_user.id,
+    )
+    db.add(evidence)
+    db.commit()
+    db.refresh(evidence)
+    return {"id": evidence.id, "scan_status": evidence.scan_status, "filename": evidence.original_filename}
