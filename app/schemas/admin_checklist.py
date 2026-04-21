@@ -40,6 +40,13 @@ class AdminChecklistResponse(BaseModel):
     updated_at: datetime
 
 
+class AdminChecklistListResponse(BaseModel):
+    total: int
+    checklists: list[AdminChecklistResponse]
+    skip: int
+    limit: int
+
+
 class AdminSectionCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     order: int = Field(ge=1)
@@ -55,6 +62,13 @@ class AdminSectionResponse(BaseModel):
     checklist_id: UUID
     title: str
     order: int
+
+
+class AdminSectionListResponse(BaseModel):
+    total: int
+    sections: list[AdminSectionResponse]
+    skip: int
+    limit: int
 
 
 class AdminQuestionCreateRequest(BaseModel):
@@ -99,3 +113,10 @@ class AdminQuestionResponse(BaseModel):
     customer_answer_status: Literal["not_started"] = "not_started"
     note: str | None = None
     evidence_rule: EvidenceRuleResponse
+
+
+class AdminQuestionListResponse(BaseModel):
+    total: int
+    questions: list[AdminQuestionResponse]
+    skip: int
+    limit: int

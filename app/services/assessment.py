@@ -18,7 +18,7 @@ from app.schemas.assessment import (
     AssessmentSessionResponse,
     AssessmentSubmitResponse,
 )
-
+from app.utils.i18n_messages import translate
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -75,12 +75,13 @@ def _ensure_access_window(db: Session, *, user: User, payment: Payment | None, n
     return access_window
 
 
-def get_current_assessment(db: Session, *, user: User, checklist_id: UUID | None = None) -> AssessmentSessionResponse:
+def get_current_assessment(
+    db: Session, *, user: User, checklist_id: UUID | None = None, lang_code: str = "en"
+) -> AssessmentSessionResponse:
     now = _now_utc()
     conditions = [Assessment.user_id == user.id, Assessment.expires_at > now]
     if checklist_id is not None:
         conditions.append(Assessment.checklist_id == checklist_id)
-
     assessment = db.scalar(
         select(Assessment)
         .where(*conditions)
@@ -88,19 +89,19 @@ def get_current_assessment(db: Session, *, user: User, checklist_id: UUID | None
         .order_by(desc(Assessment.created_at))
     )
     if assessment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="assessment_not_found")
-
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("assessment_not_found", lang_code))
     return _serialize_assessment(assessment, is_new=False)
 
 
-def start_assessment(db: Session, *, user: User, checklist_id: UUID) -> AssessmentSessionResponse:
+def start_assessment(
+    db: Session, *, user: User, checklist_id: UUID, lang_code: str = "en"
+) -> AssessmentSessionResponse:
     now = _now_utc()
     checklist = db.get(Checklist, checklist_id)
     if checklist is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
     if checklist.status != ChecklistStatus.published:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="checklist_not_published")
-
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("checklist_not_published", lang_code))
     existing = db.scalar(
         select(Assessment)
         .where(
@@ -113,15 +114,13 @@ def start_assessment(db: Session, *, user: User, checklist_id: UUID) -> Assessme
     )
     if existing is not None:
         return _serialize_assessment(existing, is_new=False)
-
     if user.role == UserRole.admin:
         access_window = _ensure_access_window(db, user=user, payment=None, now=now)
     else:
         payment = _latest_succeeded_payment(db, user_id=user.id, checklist_id=checklist_id)
         if payment is None:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="payment_required")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("payment_required", lang_code))
         access_window = _ensure_access_window(db, user=user, payment=payment, now=now)
-
     settings = get_settings()
     assessment = Assessment(
         user_id=user.id,
@@ -134,10 +133,8 @@ def start_assessment(db: Session, *, user: User, checklist_id: UUID) -> Assessme
     )
     db.add(assessment)
     db.flush()
-
     db.commit()
     db.refresh(assessment)
-
     return _serialize_assessment(assessment, is_new=True)
 
 
@@ -149,20 +146,24 @@ ANSWER_SCORES: dict[AnswerChoice, int] = {
 }
 
 
-def _get_owned_active_assessment(db: Session, *, user: User, assessment_id: UUID) -> Assessment:
+def _get_owned_active_assessment(
+    db: Session, *, user: User, assessment_id: UUID, lang_code: str = "en"
+) -> Assessment:
     assessment = db.scalar(select(Assessment).where(Assessment.id == assessment_id, Assessment.user_id == user.id))
     if assessment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="assessment_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("assessment_not_found", lang_code))
     if assessment.status in {AssessmentStatus.submitted, AssessmentStatus.closed, AssessmentStatus.expired}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="assessment_not_editable")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("assessment_not_editable", lang_code))
     if assessment.expires_at <= _now_utc():
         assessment.status = AssessmentStatus.expired
         db.commit()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="assessment_expired")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("assessment_expired", lang_code))
     return assessment
 
 
-def _question_for_assessment(db: Session, *, assessment: Assessment, question_id: UUID) -> ChecklistQuestion:
+def _question_for_assessment(
+    db: Session, *, assessment: Assessment, question_id: UUID, lang_code: str = "en"
+) -> ChecklistQuestion:
     question = db.scalar(
         select(ChecklistQuestion).where(
             ChecklistQuestion.id == question_id,
@@ -171,7 +172,7 @@ def _question_for_assessment(db: Session, *, assessment: Assessment, question_id
         )
     )
     if question is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="question_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("question_not_found", lang_code))
     return question
 
 
@@ -209,9 +210,10 @@ def upsert_assessment_answer(
     question_id: UUID,
     answer: AnswerChoice,
     note_text: str | None,
+    lang_code: str = "en",
 ) -> AssessmentAnswerResponse:
-    assessment = _get_owned_active_assessment(db, user=user, assessment_id=assessment_id)
-    _question_for_assessment(db, assessment=assessment, question_id=question_id)
+    assessment = _get_owned_active_assessment(db, user=user, assessment_id=assessment_id, lang_code=lang_code)
+    _question_for_assessment(db, assessment=assessment, question_id=question_id, lang_code=lang_code)
 
     existing = db.scalar(
         select(AssessmentAnswer).where(
@@ -254,8 +256,8 @@ def upsert_assessment_answer(
     )
 
 
-def submit_assessment(db: Session, *, user: User, assessment_id: UUID) -> AssessmentSubmitResponse:
-    assessment = _get_owned_active_assessment(db, user=user, assessment_id=assessment_id)
+def submit_assessment(db: Session, *, user: User, assessment_id: UUID, lang_code: str = "en") -> AssessmentSubmitResponse:
+    assessment = _get_owned_active_assessment(db, user=user, assessment_id=assessment_id, lang_code=lang_code)
     completion = _recompute_completion(db, assessment=assessment)
 
     assessment.status = AssessmentStatus.submitted

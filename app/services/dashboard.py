@@ -23,13 +23,14 @@ from app.schemas.dashboard import (
     AuditorDashboardResponse,
     CustomerDashboardResponse,
 )
+from app.utils.i18n_messages import translate
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def get_admin_dashboard(db: Session) -> AdminDashboardResponse:
+def get_admin_dashboard(db: Session, *, lang_code: str = "en") -> AdminDashboardResponse:
     now = _now()
     users_total = db.scalar(select(func.count(User.id))) or 0
     customers_total = db.scalar(
@@ -70,7 +71,7 @@ def get_admin_dashboard(db: Session) -> AdminDashboardResponse:
     )
 
 
-def get_admin_awaiting_review(db: Session, *, limit: int = 10) -> list[AdminAwaitingReviewItemResponse]:
+def get_admin_awaiting_review(db: Session, *, limit: int = 10, lang_code: str = "en") -> list[AdminAwaitingReviewItemResponse]:
     rows = db.execute(
         select(Assessment, User.email, Checklist.version, Report.id, Report.status)
         .join(User, User.id == Assessment.user_id)
@@ -81,12 +82,13 @@ def get_admin_awaiting_review(db: Session, *, limit: int = 10) -> list[AdminAwai
         .limit(limit)
     ).all()
 
+    label_template = translate("checklist_label", lang_code)
     return [
         AdminAwaitingReviewItemResponse(
             assessment_id=assessment.id,
             customer_email=email,
             checklist_id=assessment.checklist_id,
-            checklist_label=f"Checklist v{checklist_version}",
+            checklist_label=label_template.format(version=checklist_version),
             submitted_at=assessment.submitted_at,
             report_id=report_id,
             report_status=report_status,
@@ -95,7 +97,7 @@ def get_admin_awaiting_review(db: Session, *, limit: int = 10) -> list[AdminAwai
     ]
 
 
-def get_admin_activity_feed(db: Session, *, limit: int = 20) -> list[AdminActivityItemResponse]:
+def get_admin_activity_feed(db: Session, *, limit: int = 20, lang_code: str = "en") -> list[AdminActivityItemResponse]:
     audit_rows = db.scalars(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)).all()
     review_rows = db.scalars(select(ReportReviewEvent).order_by(ReportReviewEvent.created_at.desc()).limit(limit)).all()
     payment_rows = db.scalars(
@@ -149,7 +151,7 @@ def get_admin_activity_feed(db: Session, *, limit: int = 20) -> list[AdminActivi
     return items[:limit]
 
 
-def get_admin_assessment_distribution(db: Session) -> AdminAssessmentDistributionResponse:
+def get_admin_assessment_distribution(db: Session, *, lang_code: str = "en") -> AdminAssessmentDistributionResponse:
     ready_to_start = db.scalar(
         select(func.count(Assessment.id)).where(Assessment.status == AssessmentStatus.not_started)
     ) or 0
@@ -168,7 +170,7 @@ def get_admin_assessment_distribution(db: Session) -> AdminAssessmentDistributio
     )
 
 
-def get_admin_retention_status(db: Session, *, limit: int = 10) -> AdminRetentionStatusResponse:
+def get_admin_retention_status(db: Session, *, limit: int = 10, lang_code: str = "en") -> AdminRetentionStatusResponse:
     now = _now()
     pending_assessment_rows = db.scalars(
         select(Assessment)
@@ -195,7 +197,7 @@ def get_admin_retention_status(db: Session, *, limit: int = 10) -> AdminRetentio
             AdminRetentionQueueItemResponse(
                 entity_type="assessment",
                 entity_id=row.id,
-                reason="retention_window_elapsed",
+                reason=translate("retention_window_elapsed", lang_code),
                 eligible_at=row.retention_expires_at,
             )
         )
@@ -208,7 +210,7 @@ def get_admin_retention_status(db: Session, *, limit: int = 10) -> AdminRetentio
             AdminRetentionQueueItemResponse(
                 entity_type="report",
                 entity_id=row.id,
-                reason="soft_deleted",
+                reason=translate("soft_deleted", lang_code),
                 eligible_at=eligible_at,
             )
         )
@@ -229,7 +231,7 @@ def get_admin_retention_status(db: Session, *, limit: int = 10) -> AdminRetentio
     )
 
 
-def get_admin_system_health(db: Session) -> AdminSystemHealthResponse:
+def get_admin_system_health(db: Session, *, lang_code: str = "en") -> AdminSystemHealthResponse:
     day_ago = _now() - timedelta(days=1)
     total_recent_payments = db.scalar(
         select(func.count(Payment.id)).where(Payment.created_at >= day_ago)
@@ -253,14 +255,14 @@ def get_admin_system_health(db: Session) -> AdminSystemHealthResponse:
     storage_status = "ok"
 
     return AdminSystemHealthResponse(
-        payments_status=payments_status,
-        storage_status=storage_status,
-        reports_status=reports_status,
+        payments_status=translate(f"status_{payments_status}", lang_code),
+        storage_status=translate(f"status_{storage_status}", lang_code),
+        reports_status=translate(f"status_{reports_status}", lang_code),
         generated_at=_now(),
     )
 
 
-def get_auditor_dashboard(db: Session) -> AuditorDashboardResponse:
+def get_auditor_dashboard(db: Session, *, lang_code: str = "en") -> AuditorDashboardResponse:
     reports_under_review = db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.under_review)) or 0
     reports_changes_requested = (
         db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.changes_requested)) or 0
@@ -277,7 +279,7 @@ def get_auditor_dashboard(db: Session) -> AuditorDashboardResponse:
     )
 
 
-def get_customer_dashboard(db: Session, *, user_id: UUID) -> CustomerDashboardResponse:
+def get_customer_dashboard(db: Session, *, user_id: UUID, lang_code: str = "en") -> CustomerDashboardResponse:
     paid_checklists_count = (
         db.scalar(
             select(func.count(distinct(Payment.checklist_id))).where(

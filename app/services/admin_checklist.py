@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import asc, select
+from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.checklist import (
@@ -171,9 +171,50 @@ def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
     )
 
 
-def list_checklists(db: Session) -> list[AdminChecklistResponse]:
-    rows = db.scalars(select(Checklist).order_by(asc(Checklist.created_at))).all()
-    return [_to_checklist_response(row) for row in rows]
+def list_checklists(
+    db: Session,
+    *,
+    lang_code: str = "en",
+    skip: int = 0,
+    limit: int = 50,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
+    search: str | None = None,
+) -> tuple[int, list[AdminChecklistResponse]]:
+    query = select(Checklist)
+    count_query = select(func.count(Checklist.id))
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.outerjoin(ChecklistTranslation).where(
+            or_(
+                ChecklistTranslation.title.ilike(search_term),
+                ChecklistTranslation.description.ilike(search_term),
+            )
+        )
+        count_query = count_query.select_from(Checklist).outerjoin(ChecklistTranslation).where(
+            or_(
+                ChecklistTranslation.title.ilike(search_term),
+                ChecklistTranslation.description.ilike(search_term),
+            )
+        )
+
+    sort_column = Checklist.created_at
+    if sort_by == "updated_at":
+        sort_column = Checklist.updated_at
+    elif sort_by == "version":
+        sort_column = Checklist.version
+    elif sort_by == "status":
+        sort_column = Checklist.status
+
+    if sort_order == "desc":
+        query = query.order_by(desc(sort_column))
+    else:
+        query = query.order_by(asc(sort_column))
+
+    total = db.scalar(count_query) or 0
+    rows = db.scalars(query.offset(skip).limit(limit)).all()
+    return total, [_to_checklist_response(row) for row in rows]
 
 
 def get_checklist(db: Session, *, checklist_id) -> AdminChecklistResponse | None:
@@ -283,13 +324,47 @@ def delete_checklist(db: Session, *, checklist_id) -> bool:
     return True
 
 
-def list_sections(db: Session, *, checklist_id) -> list[AdminSectionResponse]:
-    rows = db.scalars(
-        select(ChecklistSection).where(ChecklistSection.checklist_id == checklist_id).order_by(asc(ChecklistSection.display_order))
-    ).all()
+def list_sections(
+    db: Session,
+    *,
+    checklist_id,
+    lang_code: str = "en",
+    skip: int = 0,
+    limit: int = 50,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
+    search: str | None = None,
+) -> tuple[int, list[AdminSectionResponse]]:
+    query = select(ChecklistSection).where(ChecklistSection.checklist_id == checklist_id)
+    count_query = select(func.count(ChecklistSection.id)).where(ChecklistSection.checklist_id == checklist_id)
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.outerjoin(ChecklistSectionTranslation).where(
+            ChecklistSection.checklist_id == checklist_id,
+            or_(ChecklistSectionTranslation.title.ilike(search_term), ChecklistSection.section_code.ilike(search_term)),
+        )
+        count_query = select(func.count(ChecklistSection.id)).outerjoin(ChecklistSectionTranslation).where(
+            ChecklistSection.checklist_id == checklist_id,
+            or_(ChecklistSectionTranslation.title.ilike(search_term), ChecklistSection.section_code.ilike(search_term)),
+        )
+
+    sort_column = ChecklistSection.display_order
+    if sort_by == "title":
+        sort_column = ChecklistSection.display_order
+    elif sort_by == "section_code":
+        sort_column = ChecklistSection.section_code
+
+    if sort_order == "desc":
+        query = query.order_by(desc(sort_column))
+    else:
+        query = query.order_by(asc(sort_column))
+
+    total = db.scalar(count_query) or 0
+    rows = db.scalars(query.offset(skip).limit(limit)).all()
     for row in rows:
         row._translation = _latest_section_translation(db, row.id)
-    return [_to_section_response(row) for row in rows]
+    return total, [_to_section_response(row) for row in rows]
 
 
 def create_section(db: Session, *, checklist_id, payload: AdminSectionCreateRequest) -> AdminSectionResponse:
@@ -361,15 +436,66 @@ def delete_section(db: Session, *, checklist_id, section_id) -> bool:
     return True
 
 
-def list_questions(db: Session, *, checklist_id, section_id) -> list[AdminQuestionResponse]:
-    rows = db.scalars(
-        select(ChecklistQuestion)
-        .where(ChecklistQuestion.checklist_id == checklist_id, ChecklistQuestion.section_id == section_id)
-        .order_by(asc(ChecklistQuestion.display_order))
-    ).all()
+def list_questions(
+    db: Session,
+    *,
+    checklist_id,
+    section_id,
+    lang_code: str = "en",
+    skip: int = 0,
+    limit: int = 50,
+    sort_by: str | None = None,
+    sort_order: str = "asc",
+    search: str | None = None,
+) -> tuple[int, list[AdminQuestionResponse]]:
+    query = select(ChecklistQuestion).where(
+        ChecklistQuestion.checklist_id == checklist_id,
+        ChecklistQuestion.section_id == section_id,
+    )
+    count_query = select(func.count(ChecklistQuestion.id)).where(
+        ChecklistQuestion.checklist_id == checklist_id,
+        ChecklistQuestion.section_id == section_id,
+    )
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.outerjoin(ChecklistQuestionTranslation).where(
+            ChecklistQuestion.checklist_id == checklist_id,
+            ChecklistQuestion.section_id == section_id,
+            or_(
+                ChecklistQuestionTranslation.question_text.ilike(search_term),
+                ChecklistQuestionTranslation.explanation.ilike(search_term),
+                ChecklistQuestionTranslation.expected_implementation.ilike(search_term),
+                ChecklistQuestion.question_code.ilike(search_term),
+            ),
+        )
+        count_query = select(func.count(ChecklistQuestion.id)).outerjoin(ChecklistQuestionTranslation).where(
+            ChecklistQuestion.checklist_id == checklist_id,
+            ChecklistQuestion.section_id == section_id,
+            or_(
+                ChecklistQuestionTranslation.question_text.ilike(search_term),
+                ChecklistQuestionTranslation.explanation.ilike(search_term),
+                ChecklistQuestionTranslation.expected_implementation.ilike(search_term),
+                ChecklistQuestion.question_code.ilike(search_term),
+            ),
+        )
+
+    sort_column = ChecklistQuestion.display_order
+    if sort_by == "question_id":
+        sort_column = ChecklistQuestion.question_code
+    elif sort_by == "severity":
+        sort_column = ChecklistQuestion.severity
+
+    if sort_order == "desc":
+        query = query.order_by(desc(sort_column))
+    else:
+        query = query.order_by(asc(sort_column))
+
+    total = db.scalar(count_query) or 0
+    rows = db.scalars(query.offset(skip).limit(limit)).all()
     for row in rows:
         row._translation = _latest_question_translation(db, row.id)
-    return [_to_question_response(row) for row in rows]
+    return total, [_to_question_response(row) for row in rows]
 
 
 def get_question(db: Session, *, checklist_id, section_id, question_id) -> AdminQuestionResponse | None:

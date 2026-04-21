@@ -1,6 +1,8 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from app.utils.i18n import get_language_code
+from app.utils.i18n_messages import translate
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
@@ -8,14 +10,17 @@ from app.db.session import get_db
 from app.models.user import UserRole
 from app.schemas.admin_checklist import (
     AdminChecklistCreateRequest,
+    AdminChecklistListResponse,
     AdminChecklistResponse,
     AdminChecklistUpdateRequest,
     AdminQuestionCreateRequest,
-    AdminQuestionUpdateRequest,
+    AdminQuestionListResponse,
     AdminQuestionResponse,
+    AdminQuestionUpdateRequest,
     AdminSectionCreateRequest,
-    AdminSectionUpdateRequest,
+    AdminSectionListResponse,
     AdminSectionResponse,
+    AdminSectionUpdateRequest,
     PublishChecklistRequest,
 )
 from app.services.admin_checklist import (
@@ -41,15 +46,31 @@ router = APIRouter(prefix="/admin/checklists", tags=["admin-checklists"])
 
 @router.get(
     "",
-    response_model=list[AdminChecklistResponse],
+    response_model=AdminChecklistListResponse,
     summary="List Checklists",
     description="Admin-only list of all checklists available for publishing and assessment delivery.",
 )
 def admin_list_checklists(
+    request: Request,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    sort_by: str | None = Query(None, description="Field to sort by"),
+    sort_order: str = Query("asc", regex="^(asc|desc)$"),
+    search: str | None = Query(None, description="Search text for titles or law decree"),
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
-) -> list[AdminChecklistResponse]:
-    return list_checklists(db)
+) -> AdminChecklistListResponse:
+    lang_code = get_language_code(request, db)
+    total, items = list_checklists(
+        db,
+        lang_code=lang_code,
+        skip=skip,
+        limit=limit,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        search=search,
+    )
+    return {"total": total, "checklists": items, "skip": skip, "limit": limit}
 
 
 @router.post(
@@ -61,10 +82,12 @@ def admin_list_checklists(
 )
 def admin_create_checklist(
     request: AdminChecklistCreateRequest,
+    http_request: Request,
     admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminChecklistResponse:
-    return create_checklist(db, actor=admin, payload=request)
+    lang_code = get_language_code(http_request, db)
+    return create_checklist(db, actor=admin, payload=request, lang_code=lang_code)
 
 
 @router.get(
@@ -75,12 +98,14 @@ def admin_create_checklist(
 )
 def admin_get_checklist(
     checklist_id: UUID,
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminChecklistResponse:
-    checklist = get_checklist(db, checklist_id=checklist_id)
+    lang_code = get_language_code(request, db)
+    checklist = get_checklist(db, checklist_id=checklist_id, lang_code=lang_code)
     if checklist is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
     return checklist
 
 
@@ -93,12 +118,16 @@ def admin_get_checklist(
 def admin_update_checklist(
     checklist_id: UUID,
     request: AdminChecklistUpdateRequest,
+    http_request: Request,
     admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminChecklistResponse:
-    checklist = update_checklist(db, actor=admin, checklist_id=checklist_id, payload=request)
+    lang_code = get_language_code(http_request, db)
+    checklist = update_checklist(
+        db, actor=admin, checklist_id=checklist_id, payload=request, lang_code=lang_code
+    )
     if checklist is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
     return checklist
 
 
@@ -111,12 +140,16 @@ def admin_update_checklist(
 def admin_publish_checklist(
     checklist_id: UUID,
     request: PublishChecklistRequest,
+    http_request: Request,
     admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminChecklistResponse:
-    checklist = publish_checklist(db, actor=admin, checklist_id=checklist_id, payload=request)
+    lang_code = get_language_code(http_request, db)
+    checklist = publish_checklist(
+        db, actor=admin, checklist_id=checklist_id, payload=request, lang_code=lang_code
+    )
     if checklist is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
     return checklist
 
 
@@ -131,24 +164,42 @@ def admin_delete_checklist(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
+    lang_code = "en"  # No request object, fallback to English or refactor for lang_code
     deleted = delete_checklist(db, checklist_id=checklist_id)
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_not_found")
-    return {"message": "checklist_deleted"}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
+    return {"message": translate("checklist_deleted", lang_code)}
 
 
 @router.get(
     "/{checklist_id}/sections",
-    response_model=list[AdminSectionResponse],
+    response_model=AdminSectionListResponse,
     summary="List Sections",
     description="Lists all sections under the specified checklist in display order.",
 )
 def admin_list_sections(
     checklist_id: UUID,
+    request: Request,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    sort_by: str | None = Query(None, description="Field to sort by"),
+    sort_order: str = Query("asc", regex="^(asc|desc)$"),
+    search: str | None = Query(None, description="Search text for section titles"),
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
-) -> list[AdminSectionResponse]:
-    return list_sections(db, checklist_id=checklist_id)
+) -> AdminSectionListResponse:
+    lang_code = get_language_code(request, db)
+    total, items = list_sections(
+        db,
+        checklist_id=checklist_id,
+        lang_code=lang_code,
+        skip=skip,
+        limit=limit,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        search=search,
+    )
+    return {"total": total, "sections": items, "skip": skip, "limit": limit}
 
 
 @router.post(
@@ -161,10 +212,14 @@ def admin_list_sections(
 def admin_create_section(
     checklist_id: UUID,
     request: AdminSectionCreateRequest,
+    http_request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminSectionResponse:
-    return create_section(db, checklist_id=checklist_id, payload=request)
+    lang_code = get_language_code(http_request, db)
+    return create_section(
+        db, checklist_id=checklist_id, payload=request, lang_code=lang_code
+    )
 
 
 @router.patch(
@@ -177,12 +232,16 @@ def admin_update_section(
     checklist_id: UUID,
     section_id: UUID,
     request: AdminSectionUpdateRequest,
+    http_request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminSectionResponse:
-    section = update_section(db, checklist_id=checklist_id, section_id=section_id, payload=request)
+    lang_code = get_language_code(http_request, db)
+    section = update_section(
+        db, checklist_id=checklist_id, section_id=section_id, payload=request, lang_code=lang_code
+    )
     if section is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="section_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("section_not_found", lang_code))
     return section
 
 
@@ -198,25 +257,44 @@ def admin_delete_section(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
+    lang_code = "en"  # No request object, fallback to English or refactor for lang_code
     deleted = delete_section(db, checklist_id=checklist_id, section_id=section_id)
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="section_not_found")
-    return {"message": "section_deleted"}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("section_not_found", lang_code))
+    return {"message": translate("section_deleted", lang_code)}
 
 
 @router.get(
     "/{checklist_id}/sections/{section_id}/questions",
-    response_model=list[AdminQuestionResponse],
+    response_model=AdminQuestionListResponse,
     summary="List Questions",
     description="Lists all checklist questions for the target section.",
 )
 def admin_list_questions(
     checklist_id: UUID,
     section_id: UUID,
+    request: Request,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    sort_by: str | None = Query(None, description="Field to sort by"),
+    sort_order: str = Query("asc", regex="^(asc|desc)$"),
+    search: str | None = Query(None, description="Search text for question text/code"),
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
-) -> list[AdminQuestionResponse]:
-    return list_questions(db, checklist_id=checklist_id, section_id=section_id)
+) -> AdminQuestionListResponse:
+    lang_code = get_language_code(request, db)
+    total, items = list_questions(
+        db,
+        checklist_id=checklist_id,
+        section_id=section_id,
+        lang_code=lang_code,
+        skip=skip,
+        limit=limit,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        search=search,
+    )
+    return {"total": total, "questions": items, "skip": skip, "limit": limit}
 
 
 @router.get(
@@ -229,12 +307,16 @@ def admin_get_question(
     checklist_id: UUID,
     section_id: UUID,
     question_id: UUID,
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminQuestionResponse:
-    question = get_question(db, checklist_id=checklist_id, section_id=section_id, question_id=question_id)
+    lang_code = get_language_code(request, db)
+    question = get_question(
+        db, checklist_id=checklist_id, section_id=section_id, question_id=question_id, lang_code=lang_code
+    )
     if question is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="question_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("question_not_found", lang_code))
     return question
 
 
@@ -249,13 +331,17 @@ def admin_create_question(
     checklist_id: UUID,
     section_id: UUID,
     request: AdminQuestionCreateRequest,
+    http_request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminQuestionResponse:
+    lang_code = get_language_code(http_request, db)
     try:
-        return create_question(db, checklist_id=checklist_id, section_id=section_id, payload=request)
+        return create_question(
+            db, checklist_id=checklist_id, section_id=section_id, payload=request, lang_code=lang_code
+        )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate(str(exc), lang_code)) from exc
 
 
 @router.patch(
@@ -269,9 +355,11 @@ def admin_update_question(
     section_id: UUID,
     question_id: UUID,
     request: AdminQuestionUpdateRequest,
+    http_request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminQuestionResponse:
+    lang_code = get_language_code(http_request, db)
     try:
         question = update_question(
             db,
@@ -279,11 +367,12 @@ def admin_update_question(
             section_id=section_id,
             question_id=question_id,
             payload=request,
+            lang_code=lang_code,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate(str(exc), lang_code)) from exc
     if question is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="question_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("question_not_found", lang_code))
     return question
 
 
@@ -300,7 +389,10 @@ def admin_delete_question(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
-    deleted = delete_question(db, checklist_id=checklist_id, section_id=section_id, question_id=question_id)
+    lang_code = "en"  # No request object, fallback to English or refactor for lang_code
+    deleted = delete_question(
+        db, checklist_id=checklist_id, section_id=section_id, question_id=question_id
+    )
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="question_not_found")
-    return {"message": "question_deleted"}
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("question_not_found", lang_code))
+    return {"message": translate("question_deleted", lang_code)}

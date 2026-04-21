@@ -16,29 +16,30 @@ from app.models.checklist import Checklist
 from app.models.payment import Payment, PaymentStatus
 from app.models.user import User
 from app.schemas.payment import PaymentState
+from app.utils.i18n_messages import translate
 
-def _stripe_required() -> Any:
+def _stripe_required(lang_code: str = "en") -> Any:
     settings = get_settings()
     if stripe is None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="stripe_package_not_installed",
+            detail=translate("stripe_package_not_installed", lang_code),
         )
     if not settings.stripe_secret_key:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="stripe_secret_key_missing",
+            detail=translate("stripe_secret_key_missing", lang_code),
         )
     stripe.api_key = settings.stripe_secret_key
     return stripe
 
 
-def _webhook_secret_required() -> str:
+def _webhook_secret_required(lang_code: str = "en") -> str:
     settings = get_settings()
     if not settings.stripe_webhook_secret:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="stripe_webhook_secret_missing",
+            detail=translate("stripe_webhook_secret_missing", lang_code),
         )
     return settings.stripe_webhook_secret
 
@@ -50,9 +51,10 @@ def create_checkout_session_for_user(
     cancel_url: str,
     checklist_id: UUID | None = None,
     quantity: int = 1,
+    lang_code: str = "en",
 ) -> str:
     settings = get_settings()
-    stripe_client = _stripe_required()
+    stripe_client = _stripe_required(lang_code)
     from app.models.user import User
     from sqlalchemy.orm import Session
     from app.db.session import get_db
@@ -60,7 +62,7 @@ def create_checkout_session_for_user(
     db: Session = next(get_db())
     user = db.get(User, user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("user_not_found", lang_code))
 
     # Ensure Stripe customer exists in DB, create on Stripe if missing
     if not user.stripe_customer_id:
@@ -96,13 +98,14 @@ def create_payment_intent_for_user(
     user_id: UUID,
     amount_cents: int | None,
     currency: str | None,
+    lang_code: str = "en",
 ) -> tuple[Payment, str]:
     settings = get_settings()
-    stripe_client = _stripe_required()
+    stripe_client = _stripe_required(lang_code)
 
     user = db.get(User, user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("user_not_found", lang_code))
 
     request_amount = amount_cents or settings.stripe_default_amount_cents
     request_currency = (currency or settings.stripe_currency).upper()
@@ -129,13 +132,13 @@ def create_payment_intent_for_user(
     return payment, intent["client_secret"]
 
 
-def construct_webhook_event(payload: bytes, signature_header: str) -> Any:
-    stripe_client = _stripe_required()
-    webhook_secret = _webhook_secret_required()
+def construct_webhook_event(payload: bytes, signature_header: str, lang_code: str = "en") -> Any:
+    stripe_client = _stripe_required(lang_code)
+    webhook_secret = _webhook_secret_required(lang_code)
     try:
         return stripe_client.Webhook.construct_event(payload, signature_header, webhook_secret)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_webhook_signature") from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalid_webhook_signature", lang_code)) from exc
 
 
 def _parse_paid_at(intent: dict[str, Any]) -> datetime:
@@ -242,10 +245,11 @@ def admin_set_payment_status(
     payment_status: PaymentStatus,
     amount_cents: int | None,
     currency: str | None,
+    lang_code: str = "en",
 ) -> PaymentState:
     user = db.get(User, user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("user_not_found", lang_code))
 
     payment = db.scalar(
         select(Payment)

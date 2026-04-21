@@ -1,11 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
 from app.db.session import get_db
 from app.models.user import UserRole
+from app.utils.i18n import get_language_code
 from app.schemas.report import (
     GenerateDraftReportRequest,
     PublishReportRequest,
@@ -43,11 +44,13 @@ router = APIRouter(prefix="/reports", tags=["reports"])
     ),
 )
 def generate_draft_report_route(
-    request: GenerateDraftReportRequest,
+    request: Request,
+    payload: GenerateDraftReportRequest,
     admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
-    return generate_draft_report(db, assessment_id=request.assessment_id, actor=admin)
+    lang_code = get_language_code(request, db)
+    return generate_draft_report(db, assessment_id=payload.assessment_id, actor=admin, lang_code=lang_code)
 
 
 @router.get(
@@ -58,10 +61,12 @@ def generate_draft_report_route(
 )
 def get_report_by_assessment_route(
     assessment_id: UUID,
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
-    return get_report_by_assessment(db, assessment_id=assessment_id)
+    lang_code = get_language_code(request, db)
+    return get_report_by_assessment(db, assessment_id=assessment_id, lang_code=lang_code)
 
 
 @router.get(
@@ -72,10 +77,12 @@ def get_report_by_assessment_route(
 )
 def get_report_route(
     report_id: UUID,
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
-    return get_report(db, report_id=report_id)
+    lang_code = get_language_code(request, db)
+    return get_report(db, report_id=report_id, lang_code=lang_code)
 
 
 @router.post(
@@ -89,11 +96,13 @@ def get_report_route(
 )
 def start_review_route(
     report_id: UUID,
-    request: ReviewActionRequest,
+    request: Request,
+    payload: ReviewActionRequest,
     admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
-    return start_review(db, report_id=report_id, actor=admin, payload=request)
+    lang_code = get_language_code(request, db)
+    return start_review(db, report_id=report_id, actor=admin, payload=payload, lang_code=lang_code)
 
 
 @router.post(
@@ -104,11 +113,13 @@ def start_review_route(
 )
 def request_changes_route(
     report_id: UUID,
-    request: ReviewActionRequest,
+    request: Request,
+    payload: ReviewActionRequest,
     admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
-    return request_changes(db, report_id=report_id, actor=admin, payload=request)
+    lang_code = get_language_code(request, db)
+    return request_changes(db, report_id=report_id, actor=admin, payload=payload, lang_code=lang_code)
 
 
 @router.post(
@@ -122,11 +133,13 @@ def request_changes_route(
 )
 def upsert_summary_route(
     report_id: UUID,
-    request: UpsertReportSummaryRequest,
+    request: Request,
+    payload: UpsertReportSummaryRequest,
     admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> ReportSummaryItem:
-    return upsert_report_summary(db, report_id=report_id, actor=admin, payload=request)
+    lang_code = get_language_code(request, db)
+    return upsert_report_summary(db, report_id=report_id, actor=admin, payload=payload, lang_code=lang_code)
 
 
 @router.get(
@@ -137,10 +150,12 @@ def upsert_summary_route(
 )
 def list_summaries_route(
     report_id: UUID,
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> list[ReportSummaryItem]:
-    return list_report_summaries(db, report_id=report_id)
+    lang_code = get_language_code(request, db)
+    return list_report_summaries(db, report_id=report_id, lang_code=lang_code)
 
 
 @router.get(
@@ -151,10 +166,12 @@ def list_summaries_route(
 )
 def list_findings_route(
     report_id: UUID,
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> list[ReportFindingItem]:
-    return list_report_findings(db, report_id=report_id)
+    lang_code = get_language_code(request, db)
+    return list_report_findings(db, report_id=report_id, lang_code=lang_code)
 
 
 @router.post(
@@ -165,11 +182,13 @@ def list_findings_route(
 )
 def approve_report_route(
     report_id: UUID,
-    request: ReviewActionRequest,
+    request: Request,
+    payload: ReviewActionRequest,
     admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
-    return approve_report(db, report_id=report_id, actor=admin, payload=request)
+    lang_code = get_language_code(request, db)
+    return approve_report(db, report_id=report_id, actor=admin, payload=payload, lang_code=lang_code)
 
 
 @router.post(
@@ -183,8 +202,10 @@ def approve_report_route(
 )
 def publish_report_route(
     report_id: UUID,
-    request: PublishReportRequest,
+    request: Request,
+    payload: PublishReportRequest,
     admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
-    return publish_report(db, report_id=report_id, actor=admin, final_pdf_storage_key=request.final_pdf_storage_key)
+    lang_code = get_language_code(request, db)
+    return publish_report(db, report_id=report_id, actor=admin, final_pdf_storage_key=payload.final_pdf_storage_key, lang_code=lang_code)

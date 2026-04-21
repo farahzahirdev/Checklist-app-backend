@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import get_current_user, require_roles
@@ -25,6 +25,8 @@ from app.services.auth import (
     update_user_role,
     verify_mfa_challenge,
 )
+from app.utils.i18n import get_language_code
+from app.utils.i18n_messages import translate
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -35,8 +37,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     summary="Register User",
     description="Creates a new customer account, hashes the password, and returns a signed bearer token.",
 )
-def register(request: RegistrationRequest, db: Session = Depends(get_db)) -> AuthResponse:
-    return register_user(db, email=request.email, password=request.password)
+def register(request: RegistrationRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+    lang_code = get_language_code(http_request, db)
+    try:
+        return register_user(db, email=request.email, password=request.password, lang_code=lang_code)
+    except HTTPException as exc:
+        exc.detail = translate(exc.detail, lang_code)
+        raise
 
 
 @router.post(
@@ -50,8 +57,13 @@ def register(request: RegistrationRequest, db: Session = Depends(get_db)) -> Aut
         "If MFA is not enabled, this endpoint returns access_token directly."
     ),
 )
-def login(request: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
-    return authenticate_user(db, email=request.email, password=request.password)
+def login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+    lang_code = get_language_code(http_request, db)
+    try:
+        return authenticate_user(db, email=request.email, password=request.password, lang_code=lang_code)
+    except HTTPException as exc:
+        exc.detail = translate(exc.detail, lang_code)
+        raise
 
 
 @router.post(
@@ -60,8 +72,13 @@ def login(request: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
     summary="Verify MFA Login Challenge",
     description="Verifies login-time challenge_token plus TOTP code and returns the final bearer access token.",
 )
-def verify_login_mfa_challenge(request: MfaChallengeVerifyRequest, db: Session = Depends(get_db)) -> AuthResponse:
-    return verify_mfa_challenge(db, challenge_token=request.challenge_token, code=request.code)
+def verify_login_mfa_challenge(request: MfaChallengeVerifyRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+    lang_code = get_language_code(http_request, db)
+    try:
+        return verify_mfa_challenge(db, challenge_token=request.challenge_token, code=request.code, lang_code=lang_code)
+    except HTTPException as exc:
+        exc.detail = translate(exc.detail, lang_code)
+        raise
 
 
 @router.get(
@@ -70,7 +87,8 @@ def verify_login_mfa_challenge(request: MfaChallengeVerifyRequest, db: Session =
     summary="Get Current User",
     description="Validates bearer token and returns authenticated user profile and MFA status.",
 )
-def me(current_user=Depends(get_current_user)) -> AuthResponse:
+def me(http_request: Request, current_user=Depends(get_current_user)) -> AuthResponse:
+    lang_code = get_language_code(http_request, current_user.db) if hasattr(current_user, 'db') else None
     return AuthResponse(user=serialize_user(current_user), mfa_enabled=bool(current_user.mfa_totp and current_user.mfa_totp.is_verified))
 
 
@@ -80,8 +98,9 @@ def me(current_user=Depends(get_current_user)) -> AuthResponse:
     summary="Logout",
     description="Stateless logout acknowledgement. Client should delete the stored bearer token.",
 )
-def logout() -> MessageResponse:
-    return MessageResponse(message="logged_out")
+def logout(http_request: Request) -> MessageResponse:
+    lang_code = get_language_code(http_request, None)
+    return MessageResponse(message=translate("logged_out", lang_code))
 
 
 @router.post(
@@ -90,8 +109,9 @@ def logout() -> MessageResponse:
     summary="Start MFA Setup",
     description="Requires bearer auth. Generates a new TOTP shared secret and otpauth URI to enroll an authenticator app.",
 )
-def setup_mfa(current_user=Depends(get_current_user), db: Session = Depends(get_db)) -> MfaSetupDetailsResponse:
-    return start_mfa_enrollment(db, user=current_user)
+def setup_mfa(http_request: Request, current_user=Depends(get_current_user), db: Session = Depends(get_db)) -> MfaSetupDetailsResponse:
+    lang_code = get_language_code(http_request, db)
+    return start_mfa_enrollment(db, user=current_user, lang_code=lang_code)
 
 
 @router.post(
@@ -100,8 +120,9 @@ def setup_mfa(current_user=Depends(get_current_user), db: Session = Depends(get_
     summary="Verify MFA Enrollment",
     description="Requires bearer auth. Confirms a TOTP code to activate MFA on the authenticated account.",
 )
-def verify_mfa(request: MfaVerifyRequest, current_user=Depends(get_current_user), db: Session = Depends(get_db)) -> AuthResponse:
-    return confirm_mfa_enrollment(db, user=current_user, code=request.code)
+def verify_mfa(request: MfaVerifyRequest, http_request: Request, current_user=Depends(get_current_user), db: Session = Depends(get_db)) -> AuthResponse:
+    lang_code = get_language_code(http_request, db)
+    return confirm_mfa_enrollment(db, user=current_user, code=request.code, lang_code=lang_code)
 
 
 @router.patch(
@@ -113,7 +134,9 @@ def verify_mfa(request: MfaVerifyRequest, current_user=Depends(get_current_user)
 def assign_role(
     user_id: UUID,
     request: RoleAssignment,
+    http_request: Request,
     current_user=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AuthResponse:
-    return update_user_role(db, actor_user=current_user, user_id=user_id, role_code=request.role)
+    lang_code = get_language_code(http_request, db)
+    return update_user_role(db, actor_user=current_user, user_id=user_id, role_code=request.role, lang_code=lang_code)
