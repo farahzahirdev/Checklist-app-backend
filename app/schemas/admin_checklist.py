@@ -99,3 +99,4 @@ class AdminQuestionResponse(BaseModel):
     customer_answer_status: Literal["not_started"] = "not_started"
     note: str | None = None
     evidence_rule: EvidenceRuleResponse
+    sub_questions: list['AdminQuestionResponse'] = []  # Recursive nesting

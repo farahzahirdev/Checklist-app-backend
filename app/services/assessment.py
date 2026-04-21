@@ -258,6 +258,8 @@ def submit_assessment(db: Session, *, user: User, assessment_id: UUID) -> Assess
     assessment = _get_owned_active_assessment(db, user=user, assessment_id=assessment_id)
     completion = _recompute_completion(db, assessment=assessment)
 
+    _validate_assessment_completion(db, assessment)
+
     assessment.status = AssessmentStatus.submitted
     assessment.submitted_at = _now_utc()
 
@@ -270,3 +272,92 @@ def submit_assessment(db: Session, *, user: User, assessment_id: UUID) -> Assess
         submitted_at=assessment.submitted_at,
         completion_percent=completion,
     )
+
+
+def _get_section_and_question_order(db: Session, checklist_id: UUID):
+    """
+    Returns a list of section IDs in order, and for each section, a list of question IDs in order.
+    """
+    from app.models.checklist import ChecklistSection, ChecklistQuestion
+
+    sections = db.execute(
+        select(ChecklistSection.id)
+        .where(ChecklistSection.checklist_id == checklist_id)
+        .order_by(ChecklistSection.display_order)
+    ).scalars().all()
+    section_questions = {}
+    for section_id in sections:
+        questions = db.execute(
+            select(ChecklistQuestion.id, ChecklistQuestion.parent_question_id)
+            .where(ChecklistQuestion.section_id == section_id)
+            .order_by(ChecklistQuestion.display_order)
+        ).all()
+        section_questions[section_id] = questions
+    return sections, section_questions
+
+
+def _validate_assessment_completion(db: Session, assessment: Assessment):
+    """
+    Enforces:
+    - Only allow next section if previous is complete
+    - Only allow next question if previous is complete
+    - All parent questions must be answered before submission
+    - Sub-questions can be answered anytime, but parent must be answered for assessment to be valid
+    Raises HTTPException if validation fails.
+    """
+    from app.models.checklist import ChecklistSection, ChecklistQuestion
+    from app.models.assessment import AssessmentAnswer
+    checklist_id = assessment.checklist_id
+    sections, section_questions = _get_section_and_question_order(db, checklist_id)
+    # Get all answers for this assessment
+    answers = db.execute(
+        select(AssessmentAnswer.question_id)
+        .where(AssessmentAnswer.assessment_id == assessment.id)
+    ).scalars().all()
+    answered_set = set(answers)
+
+    # 1. Parent question validation (sub-question answered but parent not answered)
+    for section_id in sections:
+        for qid, parent_id in section_questions[section_id]:
+            if parent_id and parent_id not in answered_set and qid in answered_set:
+                raise HTTPException(status_code=400, detail="parent questions must be answered before sub-question.")
+
+    # 2. Question order validation (answering later question before previous)
+    for section_id in sections:
+        questions = section_questions[section_id]
+        for j, (qid, parent_id) in enumerate(questions):
+            if j > 0:
+                prev_qid, _ = questions[j-1]
+                if prev_qid not in answered_set and qid in answered_set:
+                    raise HTTPException(status_code=400, detail="Question order violated")
+
+    # 3. Section-by-section validation (only allow next section if previous is complete)
+    for i, section_id in enumerate(sections):
+        if i > 0:
+            prev_section_id = sections[i-1]
+            prev_questions = section_questions[prev_section_id]
+            if not all(qid in answered_set for qid, _ in prev_questions):
+                raise HTTPException(status_code=400, detail=f"Section {i+1} cannot be started until previous section is complete")
+
+    # 4. Final check: all parent questions must be answered before submission
+    for section_id in sections:
+        for qid, parent_id in section_questions[section_id]:
+            if parent_id is None and qid not in answered_set:
+                raise HTTPException(status_code=400, detail="parent questions must be answered")
+
+
+def _ensure_access_window(db: Session, *, user: User, payment: Payment | None, now: datetime) -> AccessWindow:
+    settings = get_settings()
+    existing = _active_access_window(db, user_id=user.id, now=now)
+    if existing is not None:
+        return existing
+
+    access_window = AccessWindow(
+        user_id=user.id,
+        payment_id=payment.id if payment else None,
+        activated_at=now,
+        expires_at=now + timedelta(days=settings.access_unlock_days),
+    )
+    db.add(access_window)
+    db.flush()
+    return access_window
