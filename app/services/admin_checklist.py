@@ -171,6 +171,37 @@ def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
     )
 
 
+def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> AdminQuestionResponse:
+    translation = getattr(question, "_translation", None)
+    legal_requirement = translation.question_text if translation else ""
+    explanation = translation.explanation if translation and translation.explanation else ""
+    expected_implementation = translation.expected_implementation if translation and translation.expected_implementation else ""
+    severity = question.severity or SeverityLevel.low
+    # Recursively fetch sub-questions
+    sub_questions = []
+    for subq in sorted(question.sub_questions, key=lambda q: q.display_order):
+        subq._translation = _latest_question_translation(db, subq.id)
+        sub_questions.append(_to_question_response_nested(subq, db))
+    return AdminQuestionResponse(
+        id=question.id,
+        checklist_id=question.checklist_id,
+        section_id=question.section_id,
+        parent_question_id=question.parent_question_id,
+        question_id=question.question_code,
+        security_level=severity,
+        legal_requirement=legal_requirement,
+        explanation=explanation,
+        expected_implementation=expected_implementation,
+        points=_severity_to_points(severity),
+        note=question.note_for_user,
+        evidence_rule=EvidenceRuleResponse(
+            allowed_mime_types=DEFAULT_ALLOWED_MIME_TYPES,
+            max_file_size_bytes=DEFAULT_MAX_FILE_SIZE_BYTES,
+        ),
+        sub_questions=sub_questions,
+    )
+
+
 def list_checklists(db: Session) -> list[AdminChecklistResponse]:
     rows = db.scalars(select(Checklist).order_by(asc(Checklist.created_at))).all()
     return [_to_checklist_response(row) for row in rows]
@@ -362,14 +393,28 @@ def delete_section(db: Session, *, checklist_id, section_id) -> bool:
 
 
 def list_questions(db: Session, *, checklist_id, section_id) -> list[AdminQuestionResponse]:
-    rows = db.scalars(
+    # Fetch all questions for the section
+    all_questions = db.scalars(
         select(ChecklistQuestion)
         .where(ChecklistQuestion.checklist_id == checklist_id, ChecklistQuestion.section_id == section_id)
         .order_by(asc(ChecklistQuestion.display_order))
     ).all()
-    for row in rows:
-        row._translation = _latest_question_translation(db, row.id)
-    return [_to_question_response(row) for row in rows]
+    # Build a map of id -> question
+    question_map = {q.id: q for q in all_questions}
+    # Attach translations
+    for q in all_questions:
+        q._translation = _latest_question_translation(db, q.id)
+    # Build tree: parent_id -> list of sub-questions
+    children_map = {}
+    for q in all_questions:
+        if q.parent_question_id:
+            children_map.setdefault(q.parent_question_id, []).append(q)
+    # Attach sub_questions to each question
+    for q in all_questions:
+        q.sub_questions = children_map.get(q.id, [])
+    # Only return top-level questions (no parent)
+    top_level = [q for q in all_questions if q.parent_question_id is None]
+    return [_to_question_response_nested(q, db) for q in top_level]
 
 
 def get_question(db: Session, *, checklist_id, section_id, question_id) -> AdminQuestionResponse | None:
