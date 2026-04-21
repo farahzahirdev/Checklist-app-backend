@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 from app.models.user import User, UserRole
 from app.models.checklist import ChecklistStatus, SeverityLevel
-from app.schemas.bulk_checklist import ColumnMapping, ParsedRow
+from app.schemas.bulk_checklist import ColumnMapping, ParsedRow, BulkChecklistCreateResponse, BulkChecklistTaskResponse, BulkChecklistTaskStatusResponse
 from app.services.bulk_checklist import (
     verify_mapping,
     create_checklist_from_file,
@@ -234,6 +234,39 @@ Governance,Q001,Req,What is it?,CRITICAL"""  # Invalid severity
         
         assert response.is_valid is False
         assert response.total_rows == 0
+
+
+class TestBulkChecklistTaskSchemas:
+    def test_task_response_schema(self):
+        response = BulkChecklistTaskResponse(
+            task_id="1234",
+            status="pending",
+            detail="Queued for background import.",
+        )
+        assert response.task_id == "1234"
+        assert response.status == "pending"
+
+    def test_task_status_response_schema_with_result(self):
+        result = BulkChecklistCreateResponse(
+            checklist_id=uuid4(),
+            checklist_title="Import Checklist",
+            sections_created=1,
+            questions_created=1,
+            sub_questions_created=0,
+            total_rows_processed=1,
+            warnings=[],
+            status="success",
+            message="Created checklist.",
+        )
+        status_response = BulkChecklistTaskStatusResponse(
+            task_id="1234",
+            celery_state="SUCCESS",
+            status="success",
+            detail="Completed.",
+            result=result,
+            error=None,
+        )
+        assert status_response.result.checklist_title == "Import Checklist"
 
 
 # Example usage for documentation

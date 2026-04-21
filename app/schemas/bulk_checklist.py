@@ -86,7 +86,7 @@ class BulkChecklistCreateRequest(BaseModel):
 
 class BulkChecklistCreateResponse(BaseModel):
     """Response after creating checklist from bulk import."""
-    checklist_id: UUID
+    checklist_id: UUID | None
     checklist_title: str
     sections_created: int
     questions_created: int
@@ -95,6 +95,23 @@ class BulkChecklistCreateResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     status: Literal["success", "success_with_warnings", "failed"]
     message: str
+
+
+class BulkChecklistTaskResponse(BaseModel):
+    """Response when a bulk import task is queued."""
+    task_id: str
+    status: Literal["pending", "queued"] = Field(description="Current state of the task request")
+    detail: str
+
+
+class BulkChecklistTaskStatusResponse(BaseModel):
+    """Response for checking bulk import task status."""
+    task_id: str
+    celery_state: str
+    status: Literal["pending", "started", "success", "success_with_warnings", "failed"]
+    detail: str
+    result: BulkChecklistCreateResponse | None = None
+    error: str | None = None
 
 
 class TemplateDownloadRequest(BaseModel):

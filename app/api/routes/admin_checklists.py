@@ -45,11 +45,15 @@ from app.schemas.bulk_checklist import (
     VerifyMappingResponse,
     BulkChecklistCreateRequest,
     BulkChecklistCreateResponse,
+    BulkChecklistTaskResponse,
+    BulkChecklistTaskStatusResponse,
 )
 from app.services.bulk_checklist import (
     verify_mapping,
     create_checklist_from_file,
 )
+from app.tasks.bulk_import import create_checklist_task
+from app.celery_app import celery_app
 
 router = APIRouter(prefix="/admin/checklists", tags=["admin-checklists"])
 
@@ -529,53 +533,94 @@ def verify_column_mapping(
 
 @router.post(
     "/bulk/create",
-    response_model=BulkChecklistCreateResponse,
-    status_code=status.HTTP_201_CREATED,
+    response_model=BulkChecklistTaskResponse,
+    status_code=status.HTTP_202_ACCEPTED,
     summary="Create Checklist from File",
-    description="Parse file and create complete checklist with sections and questions.",
+    description="Queue file parsing and checklist creation as a background task.",
 )
 def create_from_file(
     request: BulkChecklistCreateRequest,
     admin=Depends(require_roles(UserRole.admin)),
-    db: Session = Depends(get_db),
-) -> BulkChecklistCreateResponse:
-    """Create checklist by parsing uploaded Excel/CSV file."""
+) -> BulkChecklistTaskResponse:
+    """Queue checklist creation by parsing uploaded Excel/CSV file in the background."""
     try:
         if isinstance(request.file_content, str):
             try:
                 file_content = base64.b64decode(request.file_content)
             except Exception:
-                file_content = request.file_content.encode('utf-8')
+                file_content = request.file_content.encode("utf-8")
         else:
             file_content = request.file_content
-        
-        response = create_checklist_from_file(
-            db=db,
-            actor=admin,
-            file_content=file_content,
-            file_name=request.file_name,
-            column_mapping=request.column_mapping,
-            checklist_title=request.checklist_title,
-            checklist_description=request.checklist_description,
-            checklist_type_code=request.checklist_type_code,
-            checklist_version=request.checklist_version,
+
+        task = create_checklist_task.apply_async(
+            args=[
+                admin.id,
+                base64.b64encode(file_content).decode("ascii"),
+                request.file_name,
+                request.column_mapping.model_dump(),
+                request.checklist_title,
+                request.checklist_description,
+                request.checklist_type_code,
+                request.checklist_version,
+            ]
         )
-        
-        if response.status == "failed":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=response.message
-            )
-        
-        return response
-        
-    except HTTPException:
-        raise
+        return BulkChecklistTaskResponse(
+            task_id=str(task.id),
+            status="pending",
+            detail="Bulk checklist import task queued.",
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create checklist: {str(e)}"
+            detail=f"Failed to queue bulk import task: {str(e)}"
         )
+
+
+@router.get(
+    "/bulk/tasks/{task_id}",
+    response_model=BulkChecklistTaskStatusResponse,
+    summary="Get Bulk Import Task Status",
+    description="Returns current Celery task state and any completed result for bulk checklist import.",
+)
+def get_bulk_import_task_status(
+    task_id: str,
+    _admin=Depends(require_roles(UserRole.admin)),
+) -> BulkChecklistTaskStatusResponse:
+    async_result = celery_app.AsyncResult(task_id)
+    state = async_result.state
+    detail = "Task queued or waiting for worker execution."
+    status_text = "pending"
+    result = None
+    error = None
+
+    if state == "PENDING":
+        detail = "Task is pending execution."
+    elif state == "STARTED":
+        detail = "Task has started processing."
+        status_text = "started"
+    elif state == "SUCCESS":
+        payload = async_result.result or {}
+        if isinstance(payload, dict):
+            status_text = payload.get("status", "success")
+            detail = payload.get("message", "Bulk import task completed.")
+            result = BulkChecklistCreateResponse.model_validate(payload)
+        else:
+            status_text = "failed"
+            error = "Unexpected task result format."
+            detail = "Task completed with an invalid result payload."
+    elif state in ("FAILURE", "RETRY"):
+        status_text = "failed"
+        error = str(async_result.result)
+        detail = "Bulk import task failed."
+
+    return BulkChecklistTaskStatusResponse(
+        task_id=task_id,
+        celery_state=state,
+        status=status_text,
+        detail=detail,
+        result=result,
+        error=error,
+    )
 
 
 @router.post(

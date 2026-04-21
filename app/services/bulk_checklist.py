@@ -179,7 +179,7 @@ def verify_mapping(
 
 def create_checklist_from_file(
     db: Session,
-    actor: User,
+    actor: User | int,
     file_content: bytes | str,
     file_name: str,
     column_mapping: ColumnMapping,
@@ -234,13 +234,15 @@ def create_checklist_from_file(
             db.add(checklist_type)
             db.flush()
         
+        actor_id = actor.id if hasattr(actor, "id") else actor
+
         # Create checklist
         checklist = Checklist(
             checklist_type_id=checklist_type.id,
             version=checklist_version,
             status=ChecklistStatus.draft,
-            created_by=actor.id,
-            updated_by=actor.id,
+            created_by=actor_id,
+            updated_by=actor_id,
         )
         db.add(checklist)
         db.flush()

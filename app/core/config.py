@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     mfa_secret_token_ttl_minutes: int = Field(default=15, alias="MFA_SECRET_TOKEN_TTL_MINUTES")
     access_unlock_days: int = Field(default=30, alias="ACCESS_UNLOCK_DAYS")
     assessment_completion_days: int = Field(default=7, alias="ASSESSMENT_COMPLETION_DAYS")
+    celery_broker_url: str = Field(default="redis://localhost:6379/0", alias="CELERY_BROKER_URL")
+    celery_result_backend: str = Field(default="redis://localhost:6379/1", alias="CELERY_RESULT_BACKEND")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
