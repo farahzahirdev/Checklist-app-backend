@@ -24,6 +24,7 @@ from app.models.user import User, UserRole
 from app.schemas.auth import AuthResponse, AuthUserResponse, MfaSetupDetailsResponse, UserRoleCode
 from app.services.rbac import RBACService
 from app.services.user_management import UserManagementService
+import re
 
 
 def _role_to_code(role: UserRole | str) -> UserRoleCode:
@@ -64,7 +65,24 @@ def _audit(db: Session, *, actor_user: User | None, action: AuditAction, target_
     )
 
 
+def is_strong_password(password: str) -> bool:
+    # At least 12 chars, 1 uppercase, 1 lowercase, 1 digit, 1 special char
+    if len(password) < 12:
+        return False
+    if not re.search(r"[A-Z]", password):
+        return False
+    if not re.search(r"[a-z]", password):
+        return False
+    if not re.search(r"[0-9]", password):
+        return False
+    if not re.search(r"[^A-Za-z0-9]", password):
+        return False
+    return True
+
+
 def register_user(db: Session, *, email: str, password: str) -> AuthResponse:
+    if not is_strong_password(password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="weak_password")
     existing_user = _get_user_by_email(db, email)
     if existing_user is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email_already_registered")
