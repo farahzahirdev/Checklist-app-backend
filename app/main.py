@@ -23,6 +23,7 @@ from app.schemas.assessment import (
 	AssessmentSubmitResponse,
 	StartAssessmentRequest,
 )
+from app.schemas.media import MediaResponse, MediaUploadResponse
 from app.schemas.auth import (
 	AuthResponse,
 	AuthUserResponse,
@@ -98,6 +99,7 @@ app = FastAPI(
 		},
 		{"name": "admin-checklists", "description": "Admin APIs for checklist, section, and question lifecycle management."},
 		{"name": "reports", "description": "Admin report generation, review, approval, and publish workflow APIs."},
+		{"name": "media", "description": "Media file upload and management APIs for checklist questions and answer options."},
 	],
 	root_path="/api"
 )
@@ -193,6 +195,9 @@ def custom_openapi() -> dict:
 		AdminRoleSwitchEndRequest,
 		CustomerDashboardAccessRequest,
 		DashboardDataResponse,
+		# Media schemas
+		MediaResponse,
+		MediaUploadResponse,
 	]
 
 	for model in models:

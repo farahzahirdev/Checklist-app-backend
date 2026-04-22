@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -125,20 +125,15 @@ class AssessmentEvidenceFile(Base):
     question_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("checklist_questions.id", ondelete="RESTRICT"), nullable=False
     )
-    storage_key: Mapped[str] = mapped_column(String(512), nullable=False)
-    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
-    mime_type: Mapped[str] = mapped_column(String(120), nullable=False)
-    file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
-    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
-    scan_status: Mapped[MalwareScanStatus] = mapped_column(
-        Enum(MalwareScanStatus, name="malware_scan_status", native_enum=True),
-        nullable=False,
-        default=MalwareScanStatus.pending,
+    media_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("media.id", ondelete="CASCADE"), nullable=False
     )
-    uploaded_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Relationship to Media model
+    media: Mapped["Media"] = relationship("Media", foreign_keys=[media_id])
 
 
 class AssessmentSectionScore(Base):

@@ -18,6 +18,7 @@ from app.core.security import (
 )
 from app.models.audit_log import AuditLog
 from app.models.mfa_totp import MfaTotp
+from app.models.rbac import Role, UserRoleAssignment
 from app.models.user import User, UserRole
 from app.schemas.auth import UserRoleCode
 from app.services.auth import (
@@ -42,11 +43,53 @@ def _totp_code(secret: str, moment: datetime | None = None, digits: int = 6, per
     return f"{binary_code % (10 ** digits):0{digits}d}"
 
 
+class QueryStub:
+    def __init__(self, items: list):
+        self._items = items
+        self._conditions: list = []
+
+    def filter(self, *conditions):
+        self._conditions.extend(conditions)
+        return self
+
+    def _matches(self, item) -> bool:
+        for condition in self._conditions:
+            left = getattr(condition, "left", None)
+            right = getattr(condition, "right", condition)
+            key = None
+            if left is not None:
+                key = getattr(left, "key", None) or getattr(left, "name", None)
+            if key is None:
+                return False
+            value = getattr(right, "value", right)
+            if getattr(item, key, None) != value:
+                return False
+        return True
+
+    def first(self):
+        return next((item for item in self._items if self._matches(item)), None)
+
+    def all(self):
+        return [item for item in self._items if self._matches(item)]
+
+    def delete(self):
+        removed = [item for item in self._items if self._matches(item)]
+        for item in removed:
+            self._items.remove(item)
+        return len(removed)
+
+
 class FakeSession:
     def __init__(self) -> None:
         self.users: list[User] = []
         self.mfa_records: list[MfaTotp] = []
         self.audit_logs: list[AuditLog] = []
+        self.roles: list[Role] = [
+            Role(code="customer", name="Customer", is_system_role=True, is_active=True),
+            Role(code="auditor", name="Auditor", is_system_role=True, is_active=True),
+            Role(code="admin", name="Admin", is_system_role=True, is_active=True),
+        ]
+        self.user_roles: list[UserRoleAssignment] = []
 
     def add(self, obj) -> None:
         if getattr(obj, "id", None) is None:
@@ -61,6 +104,10 @@ class FakeSession:
             self.mfa_records.append(obj)
         elif isinstance(obj, AuditLog):
             self.audit_logs.append(obj)
+        elif isinstance(obj, Role):
+            self.roles.append(obj)
+        elif isinstance(obj, UserRoleAssignment):
+            self.user_roles.append(obj)
 
     def flush(self) -> None:
         for collection in (self.users, self.mfa_records, self.audit_logs):
@@ -73,6 +120,15 @@ class FakeSession:
 
     def refresh(self, obj) -> None:
         return None
+
+    def query(self, model):
+        if model is User:
+            return QueryStub(self.users)
+        if model is Role:
+            return QueryStub(self.roles)
+        if model is UserRoleAssignment:
+            return QueryStub(self.user_roles)
+        raise NotImplementedError(f"Query for model {model} is not supported in FakeSession")
 
     def get(self, model, object_id):
         if model is User:
@@ -117,12 +173,12 @@ def test_signed_token_round_trip() -> None:
 def test_register_login_and_mfa_flow() -> None:
     db = FakeSession()
 
-    registered = register_user(db, email="user@example.com", password="strong-password-123")
+    registered = register_user(db, email="user@example.com", password="Strong-password-123")
     assert registered.user.email == "user@example.com"
     assert registered.access_token is not None
     assert registered.user.role == UserRoleCode.customer
 
-    login_result = authenticate_user(db, email="user@example.com", password="strong-password-123")
+    login_result = authenticate_user(db, email="user@example.com", password="Strong-password-123")
     assert login_result.access_token is not None
     assert login_result.mfa_required is False
 
@@ -136,7 +192,7 @@ def test_register_login_and_mfa_flow() -> None:
     assert verified_result.access_token is not None
     assert verified_result.user.role == UserRoleCode.customer
 
-    mfa_challenge = authenticate_user(db, email="user@example.com", password="strong-password-123")
+    mfa_challenge = authenticate_user(db, email="user@example.com", password="Strong-password-123")
     assert mfa_challenge.access_token is None
     assert mfa_challenge.challenge_token is not None
     assert mfa_challenge.mfa_required is True
@@ -145,6 +201,30 @@ def test_register_login_and_mfa_flow() -> None:
     assert mfa_login.access_token is not None
     assert mfa_login.mfa_enabled is True
     assert mfa_login.user.role == UserRoleCode.customer
+
+
+def test_register_allows_eight_character_password() -> None:
+    db = FakeSession()
+    registered = register_user(db, email="eight@example.com", password="Passw0rd")
+    assert registered.user.email == "eight@example.com"
+    assert registered.access_token is not None
+    assert registered.user.role == UserRoleCode.customer
+
+
+def test_register_rejects_password_missing_uppercase() -> None:
+    db = FakeSession()
+    with pytest.raises(Exception) as exc_info:
+        register_user(db, email="noupper@example.com", password="password1")
+
+    assert "missing_uppercase" in str(exc_info.value)
+
+
+def test_register_rejects_password_missing_lowercase() -> None:
+    db = FakeSession()
+    with pytest.raises(Exception) as exc_info:
+        register_user(db, email="nolower@example.com", password="PASSWORD1")
+
+    assert "missing_lowercase" in str(exc_info.value)
 
 
 def test_mfa_challenge_requires_code() -> None:

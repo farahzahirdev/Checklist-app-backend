@@ -7,6 +7,7 @@ botocore==1.42.89
 certifi==2026.2.25
 cffi==2.0.0
 charset-normalizer==3.4.7
+clamav-client==0.7.2
 click==8.3.2
 cryptography==44.0.2
 dnspython==2.8.0
@@ -15,6 +16,7 @@ email-validator==2.3.0
 fastapi==0.135.3
 greenlet==3.4.0
 h11==0.16.0
+python-multipart==0.0.26
 httpcore==1.0.9
 httptools==0.7.1
 httpx==0.28.1
