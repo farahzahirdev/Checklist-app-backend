@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import uuid
-
-from sqlalchemy import asc, desc, func, or_, select
+from sqlalchemy import asc, desc, func, or_, select, delete
 from sqlalchemy.orm import Session
-
 from app.models.checklist import (
     Checklist,
     ChecklistQuestion,
@@ -170,6 +168,7 @@ def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
     legal_requirement = translation.question_text if translation else ""
     explanation = translation.explanation if translation and translation.explanation else ""
     expected_implementation = translation.expected_implementation if translation and translation.expected_implementation else ""
+    how_it_works = translation.how_it_works if translation and translation.how_it_works else ""
     severity = question.severity or SeverityLevel.low
     return AdminQuestionResponse(
         id=question.id,
@@ -179,11 +178,14 @@ def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
         question_id=question.question_code,
         question_title=question_title,
         security_level=severity,
+        audit_type=question.audit_type or "compliance",
         points=_question_points(question),
         answer_logic=question.answer_logic or DEFAULT_ANSWER_LOGIC,
-        legal_requirement=legal_requirement,
+        legal_requirement_title=translation.legal_requirement_title if translation else "",
+        legal_requirement_description=translation.legal_requirement_description if translation else "",
         explanation=explanation,
         expected_implementation=expected_implementation,
+        how_it_works=how_it_works,
         guidance_score_4=translation.guidance_score_4 if translation else None,
         guidance_score_3=translation.guidance_score_3 if translation else None,
         guidance_score_2=translation.guidance_score_2 if translation else None,
@@ -250,6 +252,7 @@ def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> Ad
     legal_requirement = translation.question_text if translation else ""
     explanation = translation.explanation if translation and translation.explanation else ""
     expected_implementation = translation.expected_implementation if translation and translation.expected_implementation else ""
+    how_it_works = translation.how_it_works if translation and translation.how_it_works else ""
     severity = question.severity or SeverityLevel.low
     # Recursively fetch sub-questions
     sub_questions = []
@@ -269,6 +272,7 @@ def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> Ad
         legal_requirement=legal_requirement,
         explanation=explanation,
         expected_implementation=expected_implementation,
+        how_it_works=how_it_works,
         guidance_score_4=translation.guidance_score_4 if translation else None,
         guidance_score_3=translation.guidance_score_3 if translation else None,
         guidance_score_2=translation.guidance_score_2 if translation else None,
@@ -313,7 +317,7 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
 
     checklist = Checklist(
         checklist_type_id=checklist_type.id,
-        version=payload.version,
+        version="1.0",  # Always start with version 1.0
         status=payload.status,
         created_by=actor.id,
         updated_by=actor.id,
@@ -363,12 +367,21 @@ def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminCh
             if payload.law_decree is not None:
                 translation.description = payload.law_decree
 
-    # Update version if provided
-    if payload.version is not None:
-        checklist.version = payload.version
-    # Update status if provided
+    # Check if any fields are actually being updated
+    fields_updated = False
+    
+    if payload.title is not None:
+        fields_updated = True
+    if payload.law_decree is not None:
+        fields_updated = True
     if payload.status is not None:
         checklist.status = payload.status
+        fields_updated = True
+    
+    # Auto-increment version if any fields were updated
+    if fields_updated:
+        checklist.increment_version()
+    
     checklist.updated_by = actor.id
 
     db.commit()
@@ -486,8 +499,20 @@ def update_section(db: Session, *, checklist_id, section_id, payload: AdminSecti
             else:
                 translation.title = payload.title
     
+    # Check if any fields are actually being updated
+    fields_updated = False
+    
+    if payload.title is not None:
+        fields_updated = True
     if payload.order is not None:
         section.display_order = payload.order
+        fields_updated = True
+    
+    # Auto-increment checklist version if any fields were updated
+    if fields_updated:
+        checklist = db.get(Checklist, checklist_id)
+        if checklist:
+            checklist.increment_version()
 
     db.commit()
     db.refresh(section)
@@ -602,6 +627,7 @@ def create_question(db: Session, *, checklist_id, section_id, payload: AdminQues
         section_id=section_id,
         parent_question_id=payload.parent_question_id,
         question_code=payload.question_id,
+        audit_type=payload.audit_type,
         severity=payload.security_level,
         points=payload.points if payload.points is not None else _severity_to_points(payload.security_level),
         answer_logic=payload.answer_logic,
@@ -624,9 +650,12 @@ def create_question(db: Session, *, checklist_id, section_id, payload: AdminQues
                 question_id=question.id,
                 language_id=language.id,
                 paragraph_title=payload.question_title,
-                question_text=payload.legal_requirement,
+                question_text=payload.legal_requirement_title,
+                legal_requirement_title=payload.legal_requirement_title,
+                legal_requirement_description=payload.legal_requirement_description,
                 explanation=payload.explanation,
                 expected_implementation=payload.expected_implementation,
+                how_it_works=payload.how_it_works,
                 guidance_score_4=payload.guidance_score_4,
                 guidance_score_3=payload.guidance_score_3,
                 guidance_score_2=payload.guidance_score_2,
@@ -674,6 +703,8 @@ def update_question(
 
     if payload.question_id is not None:
         question.question_code = payload.question_id
+    if payload.audit_type is not None:
+        question.audit_type = payload.audit_type
     if "parent_question_id" in payload.model_fields_set:
         if payload.parent_question_id == question.id:
             raise ValueError("parent_question_invalid")
@@ -700,11 +731,12 @@ def update_question(
     if payload.order is not None:
         question.display_order = payload.order
     if payload.answer_options is not None:
-        existing_options = db.scalars(
-            select(ChecklistQuestionAnswerOption).where(ChecklistQuestionAnswerOption.question_id == question.id)
-        ).all()
-        for existing in existing_options:
-            db.delete(existing)
+        # Use direct DELETE to ensure existing options are removed immediately
+        db.execute(
+            delete(ChecklistQuestionAnswerOption).where(ChecklistQuestionAnswerOption.question_id == question.id)
+        )
+        
+        # Now add the new options
         for option in payload.answer_options:
             db.add(
                 ChecklistQuestionAnswerOption(
@@ -726,9 +758,12 @@ def update_question(
                 question_id=question.id,
                 language_id=language.id,
                 paragraph_title=payload.question_title,
-                question_text=payload.legal_requirement or "",
+                question_text=payload.legal_requirement_title or "",
+                legal_requirement_title=payload.legal_requirement_title or "",
+                legal_requirement_description=payload.legal_requirement_description or "",
                 explanation=payload.explanation,
                 expected_implementation=payload.expected_implementation,
+                how_it_works=payload.how_it_works,
                 guidance_score_4=payload.guidance_score_4,
                 guidance_score_3=payload.guidance_score_3,
                 guidance_score_2=payload.guidance_score_2,
@@ -739,12 +774,17 @@ def update_question(
     else:
         if payload.question_title is not None:
             translation.paragraph_title = payload.question_title
-        if payload.legal_requirement is not None:
-            translation.question_text = payload.legal_requirement
+        if payload.legal_requirement_title is not None:
+            translation.question_text = payload.legal_requirement_title
+            translation.legal_requirement_title = payload.legal_requirement_title
+        if payload.legal_requirement_description is not None:
+            translation.legal_requirement_description = payload.legal_requirement_description
         if payload.explanation is not None:
             translation.explanation = payload.explanation
         if payload.expected_implementation is not None:
             translation.expected_implementation = payload.expected_implementation
+        if payload.how_it_works is not None:
+            translation.how_it_works = payload.how_it_works
         if payload.guidance_score_4 is not None:
             translation.guidance_score_4 = payload.guidance_score_4
         if payload.guidance_score_3 is not None:
@@ -755,6 +795,11 @@ def update_question(
             translation.guidance_score_1 = payload.guidance_score_1
         if payload.recommendation_template is not None:
             translation.recommendation_template = payload.recommendation_template
+
+    # Auto-increment checklist version since question was modified
+    checklist = db.get(Checklist, checklist_id)
+    if checklist:
+        checklist.increment_version()
 
     db.commit()
     db.refresh(question)
