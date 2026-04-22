@@ -594,6 +594,10 @@ def update_question(
         ).all()
         for existing in existing_options:
             db.delete(existing)
+        
+        # Flush the deletes to ensure they're applied before adding new options
+        db.flush()
+        
         for option in payload.answer_options:
             db.add(
                 ChecklistQuestionAnswerOption(
