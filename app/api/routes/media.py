@@ -1,3 +1,4 @@
+import os
 import uuid
 from pathlib import Path
 
@@ -5,10 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
+from app.core.config import get_settings
 from app.db.session import get_db
-from app.models.media import Media, MediaType
+from app.models.media import Media, MediaType, MalwareScanStatus
 from app.models.user import UserRole
 from app.schemas.media import MediaResponse, MediaUploadResponse
+from app.utils.file_upload import compute_sha256, basic_malware_scan
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -22,8 +25,18 @@ ALLOWED_MIME_TYPES = {
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
 
-UPLOAD_DIR = Path("uploads/media")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+def get_upload_dir() -> Path:
+    """Get upload directory, creating it if needed."""
+    settings = get_settings()
+    upload_dir = Path(settings.upload_dir or "uploads/media")
+    try:
+        upload_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Fallback to temporary directory if upload dir is not writable
+        import tempfile
+        upload_dir = Path(tempfile.gettempdir()) / "checklist_uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+    return upload_dir
 
 
 @router.post(
@@ -56,15 +69,29 @@ def upload_media(
             detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE_BYTES} bytes"
         )
     
-    # Generate unique filename
+    # Get upload directory and generate unique filename
+    upload_dir = get_upload_dir()
     file_extension = Path(file.filename).suffix if file.filename else ""
     unique_filename = f"{uuid.uuid4()}{file_extension}"
-    file_path = UPLOAD_DIR / unique_filename
+    file_path = upload_dir / unique_filename
+    
+    # Read file content for scanning and hashing
+    content = file.file.read()
+    file.file.seek(0)
+    
+    # Perform malware scan
+    if not basic_malware_scan(file.file):
+        scan_status = MalwareScanStatus.infected
+    else:
+        scan_status = MalwareScanStatus.clean
+    
+    # Compute SHA256 hash
+    sha256_hash = compute_sha256(file.file)
+    file.file.seek(0)
     
     # Save file
     try:
         with open(file_path, "wb") as buffer:
-            content = file.file.read()
             buffer.write(content)
     except Exception as e:
         raise HTTPException(
@@ -78,7 +105,7 @@ def upload_media(
     else:
         media_type = MediaType.document
     
-    # Create media record
+    # Create media record (admin media is NOT encrypted)
     media = Media(
         filename=unique_filename,
         original_filename=file.filename or "unknown",
@@ -86,6 +113,10 @@ def upload_media(
         file_size_bytes=file_size,
         file_path=str(file_path),
         media_type=media_type,
+        sha256=sha256_hash,
+        scan_status=scan_status,
+        encryption_status="unencrypted",  # Admin media is not encrypted
+        uploaded_by=admin.id,
     )
     
     db.add(media)
@@ -99,6 +130,9 @@ def upload_media(
         mime_type=media.mime_type,
         file_size_bytes=media.file_size_bytes,
         media_type=media.media_type,
+        sha256=media.sha256,
+        scan_status=media.scan_status,
+        encryption_status=media.encryption_status,
         created_at=media.created_at,
     )
 

@@ -1,6 +1,7 @@
 from uuid import UUID
-
+import uuid
 import os
+from datetime import datetime
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
 from sqlalchemy.orm import Session
 
@@ -21,8 +22,9 @@ from app.services.assessment import (
     submit_assessment,
     upsert_assessment_answer,
 )
-from app.utils.file_upload import allowed_file, validate_file_type, get_file_size, compute_sha256, basic_malware_scan
+from app.utils.file_upload import allowed_file, validate_file_type, get_file_size, compute_sha256, basic_malware_scan, encrypt_file_data
 from app.models.assessment import AssessmentEvidenceFile, MalwareScanStatus
+from app.models.media import Media, MediaType
 import shutil
 
 router = APIRouter(prefix="/assessment", tags=["assessment"])
@@ -141,34 +143,72 @@ def upload_evidence_file(
     size = get_file_size(contents)
     if size > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="file_too_large")
+    
+    # Determine media type
+    if file.content_type.startswith("image/"):
+        media_type = MediaType.image
+    else:
+        media_type = MediaType.document
+    
     # Basic malware scan
     if not basic_malware_scan(contents):
         scan_status = MalwareScanStatus.infected
     else:
         scan_status = MalwareScanStatus.clean
+    
     # Compute hash
     sha256 = compute_sha256(contents)
-    # Save file to private storage (local for now)
+    
+    # Read file content for encryption
+    contents.seek(0)
+    file_data = contents.read()
+    
+    # Encrypt evidence files (but not admin media)
+    encrypted_data, encryption_status = encrypt_file_data(file_data)
+    
+    # Create media record first
+    media = Media(
+        filename=f"evidence_{uuid.uuid4()}{os.path.splitext(file.filename or '')[1]}",
+        original_filename=file.filename or "unknown",
+        mime_type=file.content_type,
+        file_size_bytes=size,
+        file_path="",  # Will be set by media upload route if needed
+        media_type=media_type,
+        sha256=sha256,
+        scan_status=scan_status,
+        encryption_status=encryption_status,
+        uploaded_by=current_user.id,
+    )
+    db.add(media)
+    db.flush()  # Get the media ID without committing
+    
+    # Save encrypted file to storage
     storage_dir = "private_uploads/assessment_evidence"
     os.makedirs(storage_dir, exist_ok=True)
-    storage_key = f"{assessment_id}_{question_id}_{sha256}_{file.filename}"
+    storage_key = f"{assessment_id}_{question_id}_{sha256}_{media.filename}"
     storage_path = os.path.join(storage_dir, storage_key)
-    contents.seek(0)
+    
     with open(storage_path, "wb") as out_file:
-        shutil.copyfileobj(contents, out_file)
-    # Store metadata
+        out_file.write(encrypted_data)
+    
+    # Update media record with file path
+    media.file_path = storage_path
+    
+    # Store evidence record linking to media
     evidence = AssessmentEvidenceFile(
         assessment_id=assessment_id,
         question_id=question_id,
-        storage_key=storage_key,
-        original_filename=file.filename,
-        mime_type=file.content_type,
-        file_size_bytes=size,
-        sha256=sha256,
-        scan_status=scan_status,
-        uploaded_by=current_user.id,
+        media_id=media.id,
+        uploaded_at=datetime.utcnow(),
     )
     db.add(evidence)
     db.commit()
     db.refresh(evidence)
-    return {"id": evidence.id, "scan_status": evidence.scan_status, "filename": evidence.original_filename}
+    
+    return {
+        "id": evidence.id, 
+        "media_id": media.id,
+        "scan_status": media.scan_status,
+        "encryption_status": media.encryption_status,
+        "filename": evidence.media.original_filename
+    }

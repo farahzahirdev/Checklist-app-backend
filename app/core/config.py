@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     mfa_secret_token_ttl_minutes: int = Field(default=15, alias="MFA_SECRET_TOKEN_TTL_MINUTES")
     access_unlock_days: int = Field(default=30, alias="ACCESS_UNLOCK_DAYS")
     assessment_completion_days: int = Field(default=7, alias="ASSESSMENT_COMPLETION_DAYS")
+    upload_dir: str | None = Field(default=None, alias="UPLOAD_DIR")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
