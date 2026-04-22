@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from app.models.media import Media
 from app.db.base import Base
 
 
