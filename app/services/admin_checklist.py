@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import asc, select
+from sqlalchemy import asc, delete, select
 from sqlalchemy.orm import Session
 
 from app.models.checklist import (
@@ -610,15 +610,12 @@ def update_question(
     if payload.order is not None:
         question.display_order = payload.order
     if payload.answer_options is not None:
-        existing_options = db.scalars(
-            select(ChecklistQuestionAnswerOption).where(ChecklistQuestionAnswerOption.question_id == question.id)
-        ).all()
-        for existing in existing_options:
-            db.delete(existing)
+        # Use direct DELETE to ensure existing options are removed immediately
+        db.execute(
+            delete(ChecklistQuestionAnswerOption).where(ChecklistQuestionAnswerOption.question_id == question.id)
+        )
         
-        # Flush the deletes to ensure they're applied before adding new options
-        db.flush()
-        
+        # Now add the new options
         for option in payload.answer_options:
             db.add(
                 ChecklistQuestionAnswerOption(
