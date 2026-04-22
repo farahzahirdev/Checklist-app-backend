@@ -82,9 +82,12 @@ class AdminQuestionCreateRequest(BaseModel):
     security_level: SeverityLevel
     points: int | None = Field(default=None, ge=1, le=4)
     answer_logic: AnswerLogic = "answer_only"
-    legal_requirement: str = Field(min_length=1)
+    audit_type: str = Field(default="compliance", min_length=1, max_length=50)
+    legal_requirement_title: str = Field(min_length=1, max_length=500)
+    legal_requirement_description: str = Field(min_length=1)
     explanation: str = Field(default="")
     expected_implementation: str = Field(default="")
+    how_it_works: str = Field(default="")
     guidance_score_4: str | None = None
     guidance_score_3: str | None = None
     guidance_score_2: str | None = None
@@ -102,9 +105,12 @@ class AdminQuestionUpdateRequest(BaseModel):
     security_level: SeverityLevel | None = None
     points: int | None = Field(default=None, ge=1, le=4)
     answer_logic: AnswerLogic | None = None
-    legal_requirement: str | None = Field(default=None, min_length=1)
+    audit_type: str | None = Field(default=None, min_length=1, max_length=50)
+    legal_requirement_title: str | None = Field(default=None, min_length=1, max_length=500)
+    legal_requirement_description: str | None = Field(default=None, min_length=1)
     explanation: str | None = None
     expected_implementation: str | None = None
+    how_it_works: str | None = None
     guidance_score_4: str | None = None
     guidance_score_3: str | None = None
     guidance_score_2: str | None = None
@@ -128,12 +134,14 @@ class AdminQuestionResponse(BaseModel):
     question_id: str
     question_title: str | None = None
     security_level: SeverityLevel
-    audit_type: AuditType = "compliance"
+    audit_type: str
     points: int
     answer_logic: AnswerLogic = "answer_only"
-    legal_requirement: str
+    legal_requirement_title: str
+    legal_requirement_description: str
     explanation: str
     expected_implementation: str
+    how_it_works: str
     guidance_score_4: str | None = None
     guidance_score_3: str | None = None
     guidance_score_2: str | None = None

@@ -142,6 +142,7 @@ class ChecklistQuestion(Base):
         nullable=True,
     )
     question_code: Mapped[str] = mapped_column(String(120), nullable=False)
+    audit_type: Mapped[str] = mapped_column(String(50), nullable=False, default="compliance")
     points: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     answer_logic: Mapped[str] = mapped_column(String(40), nullable=False, default="answer_only")
     severity_code_id: Mapped[int | None] = mapped_column(
@@ -271,8 +272,11 @@ class ChecklistQuestionTranslation(Base):
     )
     paragraph_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    legal_requirement_title: Mapped[str] = mapped_column(String(500), nullable=False)
+    legal_requirement_description: Mapped[str] = mapped_column(Text, nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     expected_implementation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    how_it_works: Mapped[str | None] = mapped_column(Text, nullable=True)
     guidance_score_4: Mapped[str | None] = mapped_column(Text, nullable=True)
     guidance_score_3: Mapped[str | None] = mapped_column(Text, nullable=True)
     guidance_score_2: Mapped[str | None] = mapped_column(Text, nullable=True)
