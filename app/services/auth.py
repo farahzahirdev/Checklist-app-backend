@@ -65,24 +65,26 @@ def _audit(db: Session, *, actor_user: User | None, action: AuditAction, target_
     )
 
 
-def is_strong_password(password: str) -> bool:
-    # At least 12 chars, 1 uppercase, 1 lowercase, 1 digit, 1 special char
-    if len(password) < 12:
-        return False
+def get_password_validation_error(password: str) -> str | None:
+    if len(password) < 8:
+        return "password_too_short"
     if not re.search(r"[A-Z]", password):
-        return False
+        return "missing_uppercase"
     if not re.search(r"[a-z]", password):
-        return False
+        return "missing_lowercase"
     if not re.search(r"[0-9]", password):
-        return False
-    if not re.search(r"[^A-Za-z0-9]", password):
-        return False
-    return True
+        return "missing_digit"
+    return None
+
+
+def is_strong_password(password: str) -> bool:
+    return get_password_validation_error(password) is None
 
 
 def register_user(db: Session, *, email: str, password: str) -> AuthResponse:
-    if not is_strong_password(password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="weak_password")
+    validation_error = get_password_validation_error(password)
+    if validation_error is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=validation_error)
     existing_user = _get_user_by_email(db, email)
     if existing_user is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email_already_registered")

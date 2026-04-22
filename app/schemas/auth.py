@@ -17,7 +17,7 @@ class LoginRequest(BaseModel):
 
 class RegistrationRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=12)
+    password: str = Field(min_length=8)
 
 
 class RoleAssignment(BaseModel):
