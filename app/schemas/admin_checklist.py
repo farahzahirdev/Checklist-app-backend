@@ -14,7 +14,6 @@ AnswerLogic = Literal["answer_only", "answer_with_adjustment"]
 class AdminChecklistCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     law_decree: str = Field(min_length=1, max_length=255)
-    version: int = Field(default=1, ge=1)
     status: ChecklistStatus = ChecklistStatus.draft
     checklist_type_code: str = Field(default="compliance", min_length=1, max_length=80, description="Checklist type code (default: compliance)")
 
@@ -22,7 +21,6 @@ class AdminChecklistCreateRequest(BaseModel):
 class AdminChecklistUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     law_decree: str | None = Field(default=None, min_length=1, max_length=255)
-    version: int | None = Field(default=None, ge=1)
     status: ChecklistStatus | None = None
 
 

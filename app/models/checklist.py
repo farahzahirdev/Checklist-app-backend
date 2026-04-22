@@ -65,7 +65,7 @@ class Checklist(Base):
     checklist_type_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("checklist_types.id", ondelete="RESTRICT"), nullable=False
     )
-    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.0")
     status_code_id: Mapped[int | None] = mapped_column(
         SmallInteger,
         ForeignKey("checklist_status_codes.id", ondelete="RESTRICT"),
@@ -87,6 +87,23 @@ class Checklist(Base):
     @status.setter
     def status(self, value: ChecklistStatus | str | None) -> None:
         self.status_code_id = None if value is None else ChecklistStatus.to_id(value)
+
+    def increment_version(self) -> str:
+        """Increment version number (1.0 -> 1.1 -> 1.2 etc.)"""
+        try:
+            parts = self.version.split('.')
+            major = int(parts[0])
+            minor = int(parts[1]) if len(parts) > 1 else 0
+            
+            # Increment minor version
+            minor += 1
+            new_version = f"{major}.{minor}"
+            self.version = new_version
+            return new_version
+        except (ValueError, IndexError):
+            # Fallback to 1.0 if version format is invalid
+            self.version = "1.0"
+            return "1.0"
 
 
 class ChecklistSection(Base):

@@ -271,7 +271,7 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
 
     checklist = Checklist(
         checklist_type_id=checklist_type.id,
-        version=payload.version,
+        version="1.0",  # Always start with version 1.0
         status=payload.status,
         created_by=actor.id,
         updated_by=actor.id,
@@ -321,12 +321,21 @@ def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminCh
             if payload.law_decree is not None:
                 translation.description = payload.law_decree
 
-    # Update version if provided
-    if payload.version is not None:
-        checklist.version = payload.version
-    # Update status if provided
+    # Check if any fields are actually being updated
+    fields_updated = False
+    
+    if payload.title is not None:
+        fields_updated = True
+    if payload.law_decree is not None:
+        fields_updated = True
     if payload.status is not None:
         checklist.status = payload.status
+        fields_updated = True
+    
+    # Auto-increment version if any fields were updated
+    if fields_updated:
+        checklist.increment_version()
+    
     checklist.updated_by = actor.id
 
     db.commit()
@@ -410,8 +419,20 @@ def update_section(db: Session, *, checklist_id, section_id, payload: AdminSecti
             else:
                 translation.title = payload.title
     
+    # Check if any fields are actually being updated
+    fields_updated = False
+    
+    if payload.title is not None:
+        fields_updated = True
     if payload.order is not None:
         section.display_order = payload.order
+        fields_updated = True
+    
+    # Auto-increment checklist version if any fields were updated
+    if fields_updated:
+        checklist = db.get(Checklist, checklist_id)
+        if checklist:
+            checklist.increment_version()
 
     db.commit()
     db.refresh(section)
@@ -648,6 +669,11 @@ def update_question(
             translation.guidance_score_1 = payload.guidance_score_1
         if payload.recommendation_template is not None:
             translation.recommendation_template = payload.recommendation_template
+
+    # Auto-increment checklist version since question was modified
+    checklist = db.get(Checklist, checklist_id)
+    if checklist:
+        checklist.increment_version()
 
     db.commit()
     db.refresh(question)
