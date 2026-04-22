@@ -125,6 +125,8 @@ class ChecklistQuestion(Base):
         nullable=True,
     )
     question_code: Mapped[str] = mapped_column(String(120), nullable=False)
+    points: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    answer_logic: Mapped[str] = mapped_column(String(40), nullable=False, default="answer_only")
     severity_code_id: Mapped[int | None] = mapped_column(
         SmallInteger,
         ForeignKey("severity_codes.id", ondelete="RESTRICT"),
@@ -132,7 +134,9 @@ class ChecklistQuestion(Base):
     )
     report_domain: Mapped[str | None] = mapped_column(String(120), nullable=True)
     report_chapter: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    illustrative_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    illustrative_image_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("media.id", ondelete="SET NULL"), nullable=True
+    )
     note_for_user: Mapped[str | None] = mapped_column(Text, nullable=True)
     note_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     evidence_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -152,6 +156,15 @@ class ChecklistQuestion(Base):
         back_populates="parent_question",
         cascade="all, delete-orphan",
     )
+    answer_options: Mapped[list["ChecklistQuestionAnswerOption"]] = relationship(
+        "ChecklistQuestionAnswerOption",
+        back_populates="question",
+        cascade="all, delete-orphan",
+    )
+    illustrative_image: Mapped["Media | None"] = relationship(
+        "Media",
+        foreign_keys=[illustrative_image_id],
+    )
 
     @property
     def severity(self) -> SeverityLevel | None:
@@ -160,6 +173,37 @@ class ChecklistQuestion(Base):
     @severity.setter
     def severity(self, value: SeverityLevel | str | None) -> None:
         self.severity_code_id = None if value is None else SeverityLevel.to_id(value)
+
+
+class ChecklistQuestionAnswerOption(Base):
+    __tablename__ = "checklist_question_answer_options"
+    __table_args__ = (UniqueConstraint("question_id", "position", name="uq_question_answer_option_position"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    question_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("checklist_questions.id", ondelete="CASCADE"), nullable=False
+    )
+    position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    choice_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    illustrative_image_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("media.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    question: Mapped["ChecklistQuestion"] = relationship(
+        "ChecklistQuestion",
+        back_populates="answer_options",
+    )
+    illustrative_image: Mapped["Media | None"] = relationship(
+        "Media",
+        foreign_keys=[illustrative_image_id],
+    )
 
 
 class ChecklistTranslation(Base):
@@ -208,6 +252,7 @@ class ChecklistQuestionTranslation(Base):
         ForeignKey("languages.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    paragraph_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     expected_implementation: Mapped[str | None] = mapped_column(Text, nullable=True)
