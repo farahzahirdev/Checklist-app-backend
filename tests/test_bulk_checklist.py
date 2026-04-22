@@ -12,7 +12,7 @@ from app.services.bulk_checklist import (
     create_checklist_from_file,
     _normalize_severity,
 )
-from app.services.file_parser import parse_file, parse_csv
+from app.services.file_parser import get_column_value, parse_file, parse_csv
 
 
 class TestSeverityNormalization:
@@ -77,6 +77,79 @@ Governance,Q002
         rows = parse_csv(csv_content)
         assert len(rows) == 1
         assert rows[0]["Question ID"] == "Q001"
+
+
+class TestParserUtilities:
+    def test_get_column_value_by_letter(self):
+        row = {"Section": "Governance", "Question ID": "Q001", "_row_number": 2}
+        headers = ["Section", "Question ID"]
+
+        assert get_column_value(row, "A", headers) == "Governance"
+        assert get_column_value(row, "B", headers) == "Q001"
+
+    def test_parse_xlsx_multilevel_header(self):
+        try:
+            import pandas as pd
+        except ImportError:
+            pytest.skip("pandas is required for XLSX parsing tests")
+
+        from io import BytesIO
+
+        columns = pd.MultiIndex.from_tuples([
+            ("#", ""),
+            ("", "section"),
+            ("Source", ""),
+            ("Paragraph Title", ""),
+            ("Question id", "1"),
+            ("Question id", "2"),
+            ("Question id", "3"),
+            ("Legal Requirement", ""),
+            ("Severity", ""),
+            ("Explaination", ""),
+            ("Expected Implementation", ""),
+            ("Answers yes / 4 points", ""),
+            ("Answers yes / 3 points", ""),
+            ("Answers yes / 2 points", ""),
+            ("Answers yes / 1 points", ""),
+            ("Final score", ""),
+            ("Add a note (for user)", ""),
+            ("Upload evidence", ""),
+        ])
+
+        data = [
+            [
+                "1",
+                "Governance & Management",
+                "ISO 27001",
+                "Does the organization have a documented governance structure?",
+                "GOV-001",
+                "GOV-001.1",
+                "GOV-001.1.1",
+                "Article 5 of Regulation X",
+                "High",
+                "Explanation text",
+                "Implement a formal governance framework.",
+                "Complete governance framework with clear roles",
+                "Documented but incomplete governance",
+                "Partial documentation of governance",
+                "No formal governance structure",
+                "4",
+                "Note",
+                "Evidence",
+            ]
+        ]
+
+        df = pd.DataFrame(data, columns=columns)
+        output = BytesIO()
+        with pd.ExcelWriter(output) as writer:
+            df.to_excel(writer, sheet_name="Template", index=False)
+        output.seek(0)
+
+        headers, rows = parse_file(output.getvalue(), "test.xlsx")
+        assert headers[1] == "section"
+        assert headers[4] == "1"
+        assert rows[0]["section"] == "Governance & Management"
+        assert rows[0]["1"] == "GOV-001"
 
 
 class TestColumnMapping:

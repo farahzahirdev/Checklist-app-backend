@@ -341,23 +341,27 @@ def get_column_mapping_spec(
     """Get the column mapping specification template."""
     template = ColumnMapping(
         section_name_col="B",
-        question_id_col="C",
-        child_question_col="D",
-        grandchild_question_col="E",
-        legal_requirement_col="F",
-        question_text_col="H",
+        question_id_col="E",
+        child_question_col="F",
+        grandchild_question_col="G",
+        legal_requirement_col="H",
+        question_text_col="D",
         severity_col="I",
-        explanation_col="O",
-        expected_implementation_col="N",
-        source_ref_col="B",
-        guidance_score_4_col="J",
-        guidance_score_3_col="K",
-        guidance_score_2_col="L",
-        guidance_score_1_col="M",
+        explanation_col="J",
+        expected_implementation_col="K",
+        source_ref_col="C",
+        guidance_score_4_col="L",
+        guidance_score_3_col="M",
+        guidance_score_2_col="N",
+        guidance_score_1_col="O",
     )
     
     return ColumnMappingResponse(
-        description="Standard mapping for checklist Excel import. Adjust column letters based on your file format.",
+        description=(
+            "Standard mapping for checklist Excel import with two header rows. "
+            "Row 1 contains grouped labels, and row 2 contains the actual section and question-id subcolumn labels. "
+            "Use column letters for fixed positions or row-2 header values for matching."
+        ),
         required_columns=[
             "section_name_col",
             "question_id_col",
@@ -379,14 +383,19 @@ def get_column_mapping_spec(
         column_mapping_template=template,
         example_format={
             "section_name": "Governance & Management",
-            "parent_question_id": "Q001",
-            "parent_question_text": "Is there a defined governance structure?",
-            "child_question_id": "Q001.1",
-            "child_question_text": "Are roles and responsibilities clearly documented?",
-            "grandchild_question_id": "Q001.1.1",
-            "grandchild_question_text": "Is governance approved by board/leadership?",
+            "parent_question_id": "GOV-001",
+            "parent_question_text": "Does the organization have a documented governance structure?",
+            "child_question_id": "GOV-001.1",
+            "grandchild_question_id": "GOV-001.1.1",
             "legal_requirement": "Article 5 of Regulation X",
             "severity": "High",
+            "explanation": "Explain why this requirement is important.",
+            "expected_implementation": "Implement a formal governance framework.",
+            "source_ref": "ISO 27001:2022",
+            "guidance_score_4": "Complete governance framework with clear roles",
+            "guidance_score_3": "Documented but incomplete governance",
+            "guidance_score_2": "Partial documentation of governance",
+            "guidance_score_1": "No formal governance structure",
         },
     )
 
@@ -406,66 +415,101 @@ def download_template(
     if format_lower not in ("csv", "xlsx"):
         raise HTTPException(status_code=400, detail="Format must be 'csv' or 'xlsx'")
     
-    # Sample data
-    columns = [
-        "Section",
-        "Question ID",
-        "Child Question ID",
-        "Grandchild Question ID",
+    # Sample data using a two-row header layout for import files.
+    header_row_1 = [
+        "#",
+        "",
+        "Source",
+        "Paragraph Title",
+        "Question id",
+        "",
+        "",
         "Legal Requirement",
-        "Question Text",
         "Severity",
-        "Score 4 Guidance",
-        "Score 3 Guidance",
-        "Score 2 Guidance",
-        "Score 1 Guidance",
+        "Explaination",
         "Expected Implementation",
-        "Explanation",
-        "Source Reference",
+        "Answers yes / 4 points",
+        "Answers yes / 3 points",
+        "Answers yes / 2 points",
+        "Answers yes / 1 points",
+        "Final score",
+        "Add a note (for user)",
+        "Upload evidence",
     ]
-    
+    header_row_2 = [
+        "",
+        "section",
+        "",
+        "",
+        "1",
+        "2",
+        "3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+    ]
+
     sample_rows = [
         [
+            "1",
             "Governance & Management",
+            "ISO 27001",
+            "Does the organization have a documented governance structure?",
             "GOV-001",
             "GOV-001.1",
             "GOV-001.1.1",
-            "Are roles and responsibilities clearly defined?",
-            "Does the organization have a documented governance structure?",
+            "Article 5 of Regulation X",
             "High",
+            "Detailed explanation for governance requirement.",
+            "Implement a formal governance framework.",
             "Complete governance framework with clear roles",
             "Documented but incomplete governance",
             "Partial documentation of governance",
             "No formal governance structure",
-            "Implement formal governance framework",
-            "Define roles, responsibilities, and reporting lines",
-            "ISO 27001:2022",
+            "4",
+            "Add note if needed",
+            "Evidence file",
         ],
         [
+            "2",
             "Governance & Management",
+            "Regulation X",
+            "How does the organization ensure continuous compliance?",
             "GOV-002",
             None,
             None,
-            "Is compliance monitored continuously?",
-            "How does the organization ensure continuous compliance?",
+            "Ongoing monitoring requirement",
             "Medium",
+            "Explanation for compliance monitoring.",
+            "Establish monitoring procedures.",
             "Continuous automated monitoring",
             "Regular manual reviews",
             "Periodic reviews",
             "Ad-hoc reviews",
-            "Establish monitoring procedures",
-            "Set up compliance monitoring system",
-            "Regulation X Article 5",
+            "3",
+            "User note example",
+            "Evidence attachment",
         ],
     ]
     
     if format_lower == "csv":
-        # Generate CSV
+        # Generate CSV with two header rows to reflect merged Excel header groups.
         output = io.StringIO()
-        output.write(",".join(columns) + "\n")
+        output.write(",".join(header_row_1) + "\n")
+        output.write(",".join(header_row_2) + "\n")
         for row in sample_rows:
-            escaped_row = [f'"{str(cell).replace(chr(34), chr(34) + chr(34))}"' if cell else '""' 
-                          for cell in row]
+            escaped_row = [
+                f'"{str(cell).replace(chr(34), chr(34) + chr(34))}"' if cell is not None else '""'
+                for cell in row
+            ]
             output.write(",".join(escaped_row) + "\n")
         
         content = output.getvalue().encode('utf-8')
@@ -477,12 +521,31 @@ def download_template(
         except ImportError:
             raise HTTPException(status_code=500, detail="pandas not installed")
         
-        # Generate XLSX using pandas
+        # Generate XLSX using pandas with a two-row header structure.
+        columns = pd.MultiIndex.from_tuples([
+            ("#", ""),
+            ("", "section"),
+            ("Source", ""),
+            ("Paragraph Title", ""),
+            ("Question id", "1"),
+            ("Question id", "2"),
+            ("Question id", "3"),
+            ("Legal Requirement", ""),
+            ("Severity", ""),
+            ("Explaination", ""),
+            ("Expected Implementation", ""),
+            ("Answers yes / 4 points", ""),
+            ("Answers yes / 3 points", ""),
+            ("Answers yes / 2 points", ""),
+            ("Answers yes / 1 points", ""),
+            ("Final score", ""),
+            ("Add a note (for user)", ""),
+            ("Upload evidence", ""),
+        ])
         df = pd.DataFrame(sample_rows, columns=columns)
         
-        # Create Excel writer
         output = io.BytesIO()
-        with pd.ExcelWriter(output) as writer:
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name='Template', index=False)
         
         content = output.getvalue()

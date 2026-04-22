@@ -1,5 +1,6 @@
 """Service for parsing Excel and CSV files for bulk checklist import."""
 import io
+import re
 from enum import StrEnum
 from typing import Optional
 
@@ -8,6 +9,36 @@ try:
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
+
+
+def _normalize_excel_headers(columns) -> list[str]:
+    """Flatten Excel column headers, including MultiIndex from merged header rows."""
+    headers: list[str] = []
+    if hasattr(columns, 'levels') and getattr(columns, 'nlevels', 1) > 1:
+        for col in columns:
+            if isinstance(col, tuple):
+                parts = [
+                    str(part).strip()
+                    for part in col
+                    if part is not None and (not isinstance(part, float) or not pd.isna(part))
+                ]
+                if len(parts) == 0:
+                    headers.append("")
+                elif len(parts) == 1:
+                    headers.append(parts[0])
+                else:
+                    top, bottom = parts[0], parts[-1]
+                    if bottom.isdigit():
+                        headers.append(bottom)
+                    elif top and bottom and top != bottom:
+                        headers.append(f"{top} {bottom}")
+                    else:
+                        headers.append(bottom or top)
+            else:
+                headers.append(str(col).strip())
+    else:
+        headers = [str(col).strip() for col in columns]
+    return headers
 
 
 class FileType(StrEnum):
@@ -105,8 +136,8 @@ def parse_xlsx(content: bytes) -> tuple[list[str], list[dict]]:
         # Use pandas to read Excel - much more robust than manual parsing
         df = pd.read_excel(io.BytesIO(content), dtype=str, na_filter=False)
         
-        # Get headers
-        headers = df.columns.tolist()
+        # Get headers, flattening multi-row header metadata if present
+        headers = _normalize_excel_headers(df.columns)
         
         # Convert to list of dicts, adding row number
         rows = []
@@ -124,12 +155,29 @@ def parse_xlsx(content: bytes) -> tuple[list[str], list[dict]]:
 def get_column_value(row: dict, column_spec: str | None, headers: list[str] | None = None) -> Optional[str]:
     """
     Get value from row using column specification.
-    Spec can be: "A" (letter), "1" (number), or "Column Name" (header name)
+    Spec can be: "A" (letter), "1" (number), or "Column Name" (header name).
     """
     if not column_spec:
         return None
     
     column_spec = column_spec.strip()
+    
+    # Try by positional reference first if possible
+    try:
+        idx, _ = normalize_column_ref(column_spec)
+    except ValueError:
+        idx = None
+    if idx is not None:
+        if headers and idx < len(headers):
+            header_key = headers[idx]
+            if header_key in row:
+                value = row.get(header_key)
+                return str(value) if value is not None else None
+        # Fallback to row order if headers are not available or mismatch
+        keys = [key for key in row.keys() if key != '_row_number']
+        if idx < len(keys):
+            value = row.get(keys[idx])
+            return str(value) if value is not None else None
     
     # Try direct key match first (column name/header)
     if column_spec in row:
