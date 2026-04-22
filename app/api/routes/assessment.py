@@ -9,11 +9,18 @@ from app.db.session import get_db
 from app.schemas.assessment import (
     AssessmentAnswerResponse,
     AssessmentAnswerUpsertRequest,
+    AssessmentDetailResponse,
     AssessmentSessionResponse,
     AssessmentSubmitResponse,
     StartAssessmentRequest,
 )
-from app.services.assessment import get_current_assessment, start_assessment, submit_assessment, upsert_assessment_answer
+from app.services.assessment import (
+    get_current_assessment,
+    get_current_assessment_detail,
+    start_assessment,
+    submit_assessment,
+    upsert_assessment_answer,
+)
 from app.utils.file_upload import allowed_file, validate_file_type, get_file_size, compute_sha256, basic_malware_scan
 from app.models.assessment import AssessmentEvidenceFile, MalwareScanStatus
 import shutil
@@ -53,6 +60,23 @@ def get_current_assessment_route(
     db: Session = Depends(get_db),
 ) -> AssessmentSessionResponse:
     return get_current_assessment(db, user=current_user, checklist_id=checklist_id)
+
+
+@router.get(
+    "/current/detail",
+    response_model=AssessmentDetailResponse,
+    summary="Get Current Assessment Detail",
+    description=(
+        "Returns the active in-progress assessment session for the current user, "
+        "along with checklist sections, questions, nested sub-questions, and current answers."
+    ),
+)
+def get_current_assessment_detail_route(
+    checklist_id: UUID | None = None,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AssessmentDetailResponse:
+    return get_current_assessment_detail(db, user=current_user, checklist_id=checklist_id)
 
 
 @router.put(
