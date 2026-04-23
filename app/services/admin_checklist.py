@@ -568,6 +568,20 @@ def get_question(db: Session, *, checklist_id, section_id, question_id) -> Admin
 
 
 def create_question(db: Session, *, checklist_id, section_id, payload: AdminQuestionCreateRequest) -> AdminQuestionResponse:
+    # Check if question_code already exists in this checklist
+    existing_question = db.scalar(
+        select(ChecklistQuestion)
+        .where(
+            ChecklistQuestion.checklist_id == checklist_id,
+            ChecklistQuestion.question_code == payload.question_id
+        )
+    )
+    if existing_question:
+        if payload.parent_question_id:
+            raise ValueError(f"Question code '{payload.question_id}' already exists in this checklist. Child questions must have unique identifiers (e.g., '{payload.question_id}_1', '{payload.question_id}_2').")
+        else:
+            raise ValueError(f"Question code '{payload.question_id}' already exists in this checklist")
+    
     last_order = db.scalar(
         select(ChecklistQuestion.display_order)
         .where(ChecklistQuestion.section_id == section_id)
