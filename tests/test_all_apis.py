@@ -52,6 +52,19 @@ def admin_user(db):
     db.add(user)
     db.commit()
     db.refresh(user)
+    
+    # Assign admin role with RBAC permissions
+    from app.models.rbac import Role, UserRoleAssignment
+    admin_role = db.query(Role).filter(Role.code == "admin").first()
+    if admin_role:
+        role_assignment = UserRoleAssignment(
+            user_id=user.id,
+            role_id=admin_role.id,
+            assigned_by=user.id
+        )
+        db.add(role_assignment)
+        db.commit()
+    
     return user
 
 @pytest.fixture(scope="function")
@@ -77,6 +90,19 @@ def customer_user(db):
     db.add(user)
     db.commit()
     db.refresh(user)
+    
+    # Assign customer role with RBAC permissions
+    from app.models.rbac import Role, UserRoleAssignment
+    customer_role = db.query(Role).filter(Role.code == "customer").first()
+    if customer_role:
+        role_assignment = UserRoleAssignment(
+            user_id=user.id,
+            role_id=customer_role.id,
+            assigned_by=user.id
+        )
+        db.add(role_assignment)
+        db.commit()
+    
     return user
 
 @pytest.fixture(scope="function")
@@ -102,6 +128,19 @@ def auditor_user(db):
     db.add(user)
     db.commit()
     db.refresh(user)
+    
+    # Assign auditor role with RBAC permissions
+    from app.models.rbac import Role, UserRoleAssignment
+    auditor_role = db.query(Role).filter(Role.code == "auditor").first()
+    if auditor_role:
+        role_assignment = UserRoleAssignment(
+            user_id=user.id,
+            role_id=auditor_role.id,
+            assigned_by=user.id
+        )
+        db.add(role_assignment)
+        db.commit()
+    
     return user
 
 @pytest.fixture(scope="function")
@@ -449,9 +488,8 @@ class TestRBACAPI:
     
     def test_check_permission(self, admin_token):
         """Test checking user permissions"""
-        response = client.post("/api/api/v1/admin/rbac/check-permission", 
-            headers={"Authorization": f"Bearer {admin_token}"},
-            json={"permission": "admin:access"})
+        response = client.post("/api/api/v1/admin/rbac/check-permission?resource=permission_management&action=manage", 
+            headers={"Authorization": f"Bearer {admin_token}"})
         assert response.status_code == 200
         data = response.json()
         assert data["has_permission"] is True
