@@ -218,10 +218,25 @@ def admin_reorder_sections(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> list[AdminSectionResponse]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Log the incoming request for debugging
+    logger.info(f"REORDER REQUEST - Checklist ID: {checklist_id}")
+    logger.info(f"REORDER REQUEST - Section orders count: {len(request.section_orders)}")
+    for i, item in enumerate(request.section_orders):
+        logger.info(f"REORDER REQUEST - Section {i+1}: ID={item.section_id}, Order={item.order}")
+    
     try:
-        return reorder_sections(db, checklist_id=checklist_id, section_orders=request.section_orders)
+        result = reorder_sections(db, checklist_id=checklist_id, section_orders=request.section_orders)
+        logger.info(f"REORDER SUCCESS - Returned {len(result)} sections")
+        return result
     except ValueError as exc:
+        logger.error(f"REORDER ERROR - ValueError: {exc}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(f"REORDER ERROR - Unexpected error: {exc}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from exc
 
 
 @router.get(

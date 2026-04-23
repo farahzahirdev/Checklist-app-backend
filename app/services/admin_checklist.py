@@ -461,9 +461,17 @@ def delete_section(db: Session, *, checklist_id, section_id) -> bool:
 
 
 def reorder_sections(db: Session, *, checklist_id, section_orders: list[dict]) -> list[AdminSectionResponse]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"SERVICE REORDER - Starting reordering for checklist {checklist_id}")
+    
     # Convert SectionOrderItem objects to dicts if needed
     if section_orders and hasattr(section_orders[0], 'section_id'):
+        logger.info("SERVICE REORDER - Converting SectionOrderItem objects to dicts")
         section_orders = [{"section_id": item.section_id, "order": item.order} for item in section_orders]
+    
+    logger.info(f"SERVICE REORDER - Processing {len(section_orders)} section orders")
     
     # Validate all sections exist and belong to the checklist
     section_ids = [item["section_id"] for item in section_orders]
