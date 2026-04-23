@@ -25,6 +25,7 @@ from app.models.checklist import (
 )
 from app.models.mfa_totp import MfaTotp
 from app.models.payment import Payment, PaymentStatus
+from app.models.media import Media, MediaType
 from app.models.reference import (
     AnswerOptionCode,
     AnswerOptionTranslation,
@@ -72,6 +73,8 @@ __all__ = [
     "MfaTotp",
     "Payment",
     "PaymentStatus",
+    "Media",
+    "MediaType",
     "AnswerOptionCode",
     "AnswerOptionTranslation",
     "ChecklistStatusCode",

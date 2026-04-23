@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
+from app.models.media import Media
 from app.db.base import Base
 
 
@@ -65,7 +65,7 @@ class Checklist(Base):
     checklist_type_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("checklist_types.id", ondelete="RESTRICT"), nullable=False
     )
-    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.0")
     status_code_id: Mapped[int | None] = mapped_column(
         SmallInteger,
         ForeignKey("checklist_status_codes.id", ondelete="RESTRICT"),
@@ -87,6 +87,23 @@ class Checklist(Base):
     @status.setter
     def status(self, value: ChecklistStatus | str | None) -> None:
         self.status_code_id = None if value is None else ChecklistStatus.to_id(value)
+
+    def increment_version(self) -> str:
+        """Increment version number (1.0 -> 1.1 -> 1.2 etc.)"""
+        try:
+            parts = self.version.split('.')
+            major = int(parts[0])
+            minor = int(parts[1]) if len(parts) > 1 else 0
+            
+            # Increment minor version
+            minor += 1
+            new_version = f"{major}.{minor}"
+            self.version = new_version
+            return new_version
+        except (ValueError, IndexError):
+            # Fallback to 1.0 if version format is invalid
+            self.version = "1.0"
+            return "1.0"
 
 
 class ChecklistSection(Base):
@@ -125,6 +142,9 @@ class ChecklistQuestion(Base):
         nullable=True,
     )
     question_code: Mapped[str] = mapped_column(String(120), nullable=False)
+    audit_type: Mapped[str] = mapped_column(String(50), nullable=False, default="compliance")
+    points: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    answer_logic: Mapped[str] = mapped_column(String(40), nullable=False, default="answer_only")
     severity_code_id: Mapped[int | None] = mapped_column(
         SmallInteger,
         ForeignKey("severity_codes.id", ondelete="RESTRICT"),
@@ -132,7 +152,9 @@ class ChecklistQuestion(Base):
     )
     report_domain: Mapped[str | None] = mapped_column(String(120), nullable=True)
     report_chapter: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    illustrative_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    illustrative_image_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("media.id", ondelete="SET NULL"), nullable=True
+    )
     note_for_user: Mapped[str | None] = mapped_column(Text, nullable=True)
     note_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     evidence_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -152,6 +174,15 @@ class ChecklistQuestion(Base):
         back_populates="parent_question",
         cascade="all, delete-orphan",
     )
+    answer_options: Mapped[list["ChecklistQuestionAnswerOption"]] = relationship(
+        "ChecklistQuestionAnswerOption",
+        back_populates="question",
+        cascade="all, delete-orphan",
+    )
+    illustrative_image: Mapped["Media | None"] = relationship(
+        "Media",
+        foreign_keys=[illustrative_image_id],
+    )
 
     @property
     def severity(self) -> SeverityLevel | None:
@@ -160,6 +191,37 @@ class ChecklistQuestion(Base):
     @severity.setter
     def severity(self, value: SeverityLevel | str | None) -> None:
         self.severity_code_id = None if value is None else SeverityLevel.to_id(value)
+
+
+class ChecklistQuestionAnswerOption(Base):
+    __tablename__ = "checklist_question_answer_options"
+    __table_args__ = (UniqueConstraint("question_id", "position", name="uq_question_answer_option_position"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    question_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("checklist_questions.id", ondelete="CASCADE"), nullable=False
+    )
+    position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    choice_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    illustrative_image_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("media.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    question: Mapped["ChecklistQuestion"] = relationship(
+        "ChecklistQuestion",
+        back_populates="answer_options",
+    )
+    illustrative_image: Mapped["Media | None"] = relationship(
+        "Media",
+        foreign_keys=[illustrative_image_id],
+    )
 
 
 class ChecklistTranslation(Base):
@@ -208,9 +270,13 @@ class ChecklistQuestionTranslation(Base):
         ForeignKey("languages.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    paragraph_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
+    legal_requirement_title: Mapped[str] = mapped_column(String(500), nullable=False)
+    legal_requirement_description: Mapped[str] = mapped_column(Text, nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     expected_implementation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    how_it_works: Mapped[str | None] = mapped_column(Text, nullable=True)
     guidance_score_4: Mapped[str | None] = mapped_column(Text, nullable=True)
     guidance_score_3: Mapped[str | None] = mapped_column(Text, nullable=True)
     guidance_score_2: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     assessment_completion_days: int = Field(default=7, alias="ASSESSMENT_COMPLETION_DAYS")
     celery_broker_url: str = Field(default="redis://localhost:6379/0", alias="CELERY_BROKER_URL")
     celery_result_backend: str = Field(default="redis://localhost:6379/1", alias="CELERY_RESULT_BACKEND")
+    upload_dir: str | None = Field(default=None, alias="UPLOAD_DIR")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

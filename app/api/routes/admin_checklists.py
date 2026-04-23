@@ -17,6 +17,7 @@ from app.schemas.admin_checklist import (
     AdminQuestionUpdateRequest,
     AdminQuestionResponse,
     AdminSectionCreateRequest,
+    AdminSectionReorderRequest,
     AdminSectionUpdateRequest,
     AdminSectionResponse,
     PublishChecklistRequest,
@@ -34,6 +35,7 @@ from app.services.admin_checklist import (
     list_questions,
     list_sections,
     publish_checklist,
+    reorder_sections,
     update_checklist,
     update_question,
     update_section,
@@ -221,6 +223,56 @@ def admin_delete_section(
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="section_not_found")
     return {"message": "section_deleted"}
+
+
+@router.patch(
+    "/{checklist_id}/sections/reorder",
+    response_model=list[AdminSectionResponse],
+    summary="Reorder Sections",
+    description="Updates the order of multiple sections for drag-and-drop functionality.",
+)
+def admin_reorder_sections(
+    checklist_id: UUID,
+    request: AdminSectionReorderRequest,
+    _admin=Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> list[AdminSectionResponse]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Log the incoming request for debugging
+    logger.info(f"REORDER REQUEST - Checklist ID: {checklist_id}")
+    logger.info(f"REORDER REQUEST - Section orders count: {len(request.section_orders)}")
+    for i, item in enumerate(request.section_orders):
+        logger.info(f"REORDER REQUEST - Section {i+1}: ID={item.section_id}, Order={item.order}")
+    
+    try:
+        result = reorder_sections(db, checklist_id=checklist_id, section_orders=request.section_orders)
+        logger.info(f"REORDER SUCCESS - Returned {len(result)} sections")
+        return result
+    except ValueError as exc:
+        logger.error(f"REORDER ERROR - ValueError: {exc}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(f"REORDER ERROR - Unexpected error: {exc}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from exc
+
+
+@router.patch(
+    "/{checklist_id}/sections/reorder/",
+    response_model=list[AdminSectionResponse],
+    summary="Reorder Sections (with trailing slash)",
+    description="Updates the order of multiple sections for drag-and-drop functionality. Handles URLs with trailing slash.",
+    include_in_schema=False,  # Hide from OpenAPI docs to avoid duplication
+)
+def admin_reorder_sections_trailing_slash(
+    checklist_id: UUID,
+    request: AdminSectionReorderRequest,
+    _admin=Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> list[AdminSectionResponse]:
+    # Redirect to the main endpoint to avoid code duplication
+    return admin_reorder_sections(checklist_id, request, _admin, db)
 
 
 @router.get(
