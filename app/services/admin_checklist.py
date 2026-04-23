@@ -327,19 +327,16 @@ def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> Ad
     )
 
 
-def list_checklists(db: Session) -> list[AdminChecklistResponse]:
-    rows = db.scalars(select(Checklist).order_by(asc(Checklist.created_at))).all()
-    return [_to_checklist_response(row, db) for row in rows]
 
 
-def get_checklist(db: Session, *, checklist_id) -> AdminChecklistResponse | None:
+def get_checklist(db: Session, *, checklist_id, lang_code: str = "en") -> AdminChecklistResponse | None:
     checklist = db.get(Checklist, checklist_id)
     if checklist is None:
         return None
     return _to_checklist_response(checklist, db)
 
 
-def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateRequest) -> AdminChecklistResponse:
+def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateRequest, lang_code: str = "en") -> AdminChecklistResponse:
     # Always create or update ChecklistType with name/description from payload
     checklist_type = db.scalar(select(ChecklistType).where(ChecklistType.code == payload.checklist_type_code))
     if checklist_type is None:
@@ -393,7 +390,7 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
     return _to_checklist_response(checklist, db)
 
 
-def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminChecklistUpdateRequest) -> AdminChecklistResponse | None:
+def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminChecklistUpdateRequest, lang_code: str = "en") -> AdminChecklistResponse | None:
     checklist = db.get(Checklist, checklist_id)
     if checklist is None:
         return None
@@ -443,12 +440,13 @@ def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminCh
     return _to_checklist_response(checklist, db)
 
 
-def publish_checklist(db: Session, *, actor: User, checklist_id, payload: PublishChecklistRequest) -> AdminChecklistResponse | None:
+def publish_checklist(db: Session, *, actor: User, checklist_id, payload: PublishChecklistRequest, lang_code: str = "en") -> AdminChecklistResponse | None:
     return update_checklist(
         db,
         actor=actor,
         checklist_id=checklist_id,
         payload=AdminChecklistUpdateRequest(status=payload.status),
+        lang_code=lang_code,
     )
 
 
@@ -504,7 +502,7 @@ def list_sections(
     return total, [_to_section_response(row) for row in rows]
 
 
-def create_section(db: Session, *, checklist_id, payload: AdminSectionCreateRequest) -> AdminSectionResponse:
+def create_section(db: Session, *, checklist_id, payload: AdminSectionCreateRequest, lang_code: str = "en") -> AdminSectionResponse:
     section = ChecklistSection(
         checklist_id=checklist_id,
         section_code=f"SEC-{payload.order}",
@@ -527,7 +525,7 @@ def create_section(db: Session, *, checklist_id, payload: AdminSectionCreateRequ
     return _to_section_response(section)
 
 
-def update_section(db: Session, *, checklist_id, section_id, payload: AdminSectionUpdateRequest) -> AdminSectionResponse | None:
+def update_section(db: Session, *, checklist_id, section_id, payload: AdminSectionUpdateRequest, lang_code: str = "en") -> AdminSectionResponse | None:
     section = db.scalar(
         select(ChecklistSection).where(ChecklistSection.id == section_id, ChecklistSection.checklist_id == checklist_id)
     )
@@ -738,7 +736,7 @@ def list_questions(db: Session, *, checklist_id, section_id) -> list[AdminQuesti
     return [_to_question_response_nested(q, db) for q in top_level]
 
 
-def get_question(db: Session, *, checklist_id, section_id, question_id) -> AdminQuestionResponse | None:
+def get_question(db: Session, *, checklist_id, section_id, question_id, lang_code: str = "en") -> AdminQuestionResponse | None:
     question = db.scalar(
         select(ChecklistQuestion).where(
             ChecklistQuestion.id == question_id,
@@ -751,7 +749,7 @@ def get_question(db: Session, *, checklist_id, section_id, question_id) -> Admin
     question._translation = _latest_question_translation(db, question.id)
     return _to_question_response(question)
 
-def create_question(db: Session, *, checklist_id, section_id, payload: AdminQuestionCreateRequest) -> AdminQuestionResponse:
+def create_question(db: Session, *, checklist_id, section_id, payload: AdminQuestionCreateRequest, lang_code: str = "en") -> AdminQuestionResponse:
     # Check if question_code already exists in this checklist
     existing_question = db.scalar(
         select(ChecklistQuestion)
@@ -850,6 +848,7 @@ def update_question(
     section_id,
     question_id,
     payload: AdminQuestionUpdateRequest,
+    lang_code: str = "en",
 ) -> AdminQuestionResponse | None:
     question = db.scalar(
         select(ChecklistQuestion).where(

@@ -82,7 +82,7 @@ def is_strong_password(password: str) -> bool:
     return get_password_validation_error(password) is None
 
 
-def register_user(db: Session, *, email: str, password: str) -> AuthResponse:
+def register_user(db: Session, *, email: str, password: str, lang_code: str = "en") -> AuthResponse:
     validation_error = get_password_validation_error(password)
     if validation_error is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=validation_error)
@@ -185,7 +185,7 @@ def verify_mfa_challenge(db: Session, *, challenge_token: str, code: str, lang_c
     return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=True)
 
 
-def start_mfa_enrollment(db: Session, *, user: User) -> MfaSetupDetailsResponse:
+def start_mfa_enrollment(db: Session, *, user: User, lang_code: str = "en") -> MfaSetupDetailsResponse:
     secret = generate_totp_secret()
     encrypted_secret = encrypt_secret(secret)
     record = _get_mfa_record(db, user.id)
