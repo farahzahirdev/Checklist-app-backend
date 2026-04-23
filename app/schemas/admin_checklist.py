@@ -49,6 +49,10 @@ class AdminSectionUpdateRequest(BaseModel):
     order: int | None = Field(default=None, ge=1)
 
 
+class AdminSectionReorderRequest(BaseModel):
+    section_orders: list[dict] = Field(..., description="List of section_id and new order pairs")
+
+
 class AdminSectionResponse(BaseModel):
     id: UUID
     checklist_id: UUID

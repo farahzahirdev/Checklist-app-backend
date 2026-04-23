@@ -14,6 +14,7 @@ from app.schemas.admin_checklist import (
     AdminQuestionUpdateRequest,
     AdminQuestionResponse,
     AdminSectionCreateRequest,
+    AdminSectionReorderRequest,
     AdminSectionUpdateRequest,
     AdminSectionResponse,
     PublishChecklistRequest,
@@ -31,6 +32,7 @@ from app.services.admin_checklist import (
     list_questions,
     list_sections,
     publish_checklist,
+    reorder_sections,
     update_checklist,
     update_question,
     update_section,
@@ -202,6 +204,24 @@ def admin_delete_section(
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="section_not_found")
     return {"message": "section_deleted"}
+
+
+@router.patch(
+    "/{checklist_id}/sections/reorder",
+    response_model=list[AdminSectionResponse],
+    summary="Reorder Sections",
+    description="Updates the order of multiple sections for drag-and-drop functionality.",
+)
+def admin_reorder_sections(
+    checklist_id: UUID,
+    request: AdminSectionReorderRequest,
+    _admin=Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> list[AdminSectionResponse]:
+    try:
+        return reorder_sections(db, checklist_id=checklist_id, section_orders=request.section_orders)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get(

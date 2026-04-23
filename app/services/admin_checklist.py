@@ -27,6 +27,7 @@ from app.schemas.admin_checklist import (
     AdminQuestionUpdateRequest,
     AdminQuestionResponse,
     AdminSectionCreateRequest,
+    AdminSectionReorderRequest,
     AdminSectionUpdateRequest,
     AdminSectionResponse,
     EvidenceRuleResponse,
@@ -457,6 +458,52 @@ def delete_section(db: Session, *, checklist_id, section_id) -> bool:
     db.delete(section)
     db.commit()
     return True
+
+
+def reorder_sections(db: Session, *, checklist_id, section_orders: list[dict]) -> list[AdminSectionResponse]:
+    # Validate all sections exist and belong to the checklist
+    section_ids = [item["section_id"] for item in section_orders]
+    sections = db.scalars(
+        select(ChecklistSection).where(
+            ChecklistSection.id.in_(section_ids),
+            ChecklistSection.checklist_id == checklist_id
+        )
+    ).all()
+    
+    if len(sections) != len(section_ids):
+        raise ValueError("One or more sections not found")
+    
+    # Create a mapping of section_id to section object
+    section_map = {section.id: section for section in sections}
+    
+    # Validate orders are unique and positive
+    orders = [item["order"] for item in section_orders]
+    if len(set(orders)) != len(orders):
+        raise ValueError("Orders must be unique")
+    if any(order < 1 for order in orders):
+        raise ValueError("Orders must be positive")
+    
+    # Update the display order for each section
+    for item in section_orders:
+        section = section_map[item["section_id"]]
+        section.display_order = item["order"]
+    
+    # Auto-increment checklist version since sections were reordered
+    checklist = db.get(Checklist, checklist_id)
+    if checklist:
+        checklist.increment_version()
+    
+    db.commit()
+    
+    # Return updated sections in order
+    updated_sections = db.scalars(
+        select(ChecklistSection).where(ChecklistSection.checklist_id == checklist_id).order_by(asc(ChecklistSection.display_order))
+    ).all()
+    
+    for section in updated_sections:
+        section._translation = _latest_section_translation(db, section.id)
+    
+    return [_to_section_response(section) for section in updated_sections]
 
 
 def list_questions(db: Session, *, checklist_id, section_id) -> list[AdminQuestionResponse]:
