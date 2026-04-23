@@ -8,6 +8,11 @@ class ChecklistTypeInfo(BaseModel):
     name: str
     description: str | None
 
+class ChecklistPricingInfo(BaseModel):
+    price_id: str | None = None
+    amount_cents: int | None = None
+    currency: str | None = None
+
 class CustomerChecklistResponse(BaseModel):
     id: UUID
     title: str
@@ -16,3 +21,4 @@ class CustomerChecklistResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+    pricing: ChecklistPricingInfo | None = None

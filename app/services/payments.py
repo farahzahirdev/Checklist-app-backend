@@ -16,6 +16,7 @@ from app.models.checklist import Checklist
 from app.models.payment import Payment, PaymentStatus
 from app.models.user import User
 from app.schemas.payment import PaymentState
+from app.services.stripe_products import get_stripe_price_for_checklist
 
 def _stripe_required() -> Any:
     settings = get_settings()
@@ -50,6 +51,7 @@ def create_checkout_session_for_user(
     cancel_url: str,
     checklist_id: UUID | None = None,
     quantity: int = 1,
+    db: Session | None = None,
 ) -> str:
     settings = get_settings()
     stripe_client = _stripe_required()
@@ -57,7 +59,9 @@ def create_checkout_session_for_user(
     from sqlalchemy.orm import Session
     from app.db.session import get_db
 
-    db: Session = next(get_db())
+    if db is None:
+        db: Session = next(get_db())
+    
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
@@ -70,14 +74,37 @@ def create_checkout_session_for_user(
         db.commit()
         db.refresh(user)
 
-    # Use price/product from config
-    line_items = [
-        {
-            "price": settings.stripe_price_id,
-            "quantity": quantity,
+    # Handle checklist-specific checkout
+    if checklist_id:
+        checklist = db.get(Checklist, checklist_id)
+        if checklist is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_not_found")
+        
+        # Get price for this specific checklist from Stripe
+        price_data = get_stripe_price_for_checklist(db, checklist_id=checklist_id)
+        if not price_data:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="checklist_price_not_available")
+        
+        line_items = [
+            {
+                "price": price_data["price_id"],
+                "quantity": quantity,
+            }
+        ]
+        metadata = {
+            "user_id": str(user_id),
+            "checklist_id": str(checklist_id)
         }
-    ]
-    metadata = {"user_id": str(user_id)}
+    else:
+        # Fallback to default product from config (legacy behavior)
+        line_items = [
+            {
+                "price": settings.stripe_price_id,
+                "quantity": quantity,
+            }
+        ]
+        metadata = {"user_id": str(user_id)}
+    
     session = stripe_client.checkout.Session.create(
         payment_method_types=["card"],
         line_items=line_items,
@@ -152,6 +179,7 @@ def _ensure_access_window(db: Session, payment: Payment, paid_at: datetime) -> A
     access_window = AccessWindow(
         user_id=payment.user_id,
         payment_id=payment.id,
+        checklist_id=payment.checklist_id,  # Link to checklist if payment is checklist-specific
         activated_at=paid_at,
         expires_at=paid_at + timedelta(days=settings.access_unlock_days),
     )
@@ -187,10 +215,13 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
     if payment is None:
         metadata = data.get("metadata") or {}
         user_id_raw = metadata.get("user_id")
+        checklist_id_raw = metadata.get("checklist_id")
+        
         if user_id_raw is None:
             return None
         try:
             user_id = UUID(user_id_raw)
+            checklist_id = UUID(checklist_id_raw) if checklist_id_raw else None
         except ValueError:
             return None
         
@@ -200,9 +231,15 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
             # User was deleted or doesn't exist - skip payment creation
             return None
         
+        # Verify checklist exists if provided
+        if checklist_id:
+            checklist = db.get(Checklist, checklist_id)
+            if checklist is None:
+                return None
+        
         payment = Payment(
             user_id=user_id,
-            checklist_id=None,
+            checklist_id=checklist_id,
             stripe_payment_intent_id=intent_id,
             amount_cents=int(data.get("amount") or data.get("amount_total") or 0),
             currency=str(data.get("currency") or data.get("currency_total") or "USD").upper(),
