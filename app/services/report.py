@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
+from app.utils.i18n_messages import translate
 from sqlalchemy.orm import Session
 
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentStatus, PriorityLevel
@@ -78,10 +79,10 @@ def _serialize_report(db: Session, report: Report) -> ReportResponse:
     )
 
 
-def _get_report(db: Session, report_id: UUID) -> Report:
+def _get_report(db: Session, report_id: UUID, lang_code: str = "en") -> Report:
     report = db.get(Report, report_id)
     if report is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="report_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("report_not_found", lang_code))
     return report
 
 
@@ -89,12 +90,12 @@ def _create_review_event(db: Session, *, report_id: UUID, actor_user_id: UUID, e
     db.add(ReportReviewEvent(report_id=report_id, actor_user_id=actor_user_id, event_type=event_type, event_note=note))
 
 
-def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User) -> ReportResponse:
+def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User, lang_code: str = "en") -> ReportResponse:
     assessment = db.get(Assessment, assessment_id)
     if assessment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="assessment_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("assessment_not_found", lang_code))
     if assessment.status != AssessmentStatus.submitted:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="assessment_not_submitted")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("assessment_not_submitted", lang_code))
 
     existing = db.scalar(select(Report).where(Report.assessment_id == assessment_id))
     if existing is not None:
@@ -136,19 +137,19 @@ def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User) -> R
     return _serialize_report(db, report)
 
 
-def get_report_by_assessment(db: Session, *, assessment_id: UUID) -> ReportResponse:
+def get_report_by_assessment(db: Session, *, assessment_id: UUID, lang_code: str = "en") -> ReportResponse:
     report = db.scalar(select(Report).where(Report.assessment_id == assessment_id))
     if report is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="report_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("report_not_found", lang_code))
     return _serialize_report(db, report)
 
 
-def get_report(db: Session, *, report_id: UUID) -> ReportResponse:
-    return _serialize_report(db, _get_report(db, report_id))
+def get_report(db: Session, *, report_id: UUID, lang_code: str = "en") -> ReportResponse:
+    return _serialize_report(db, _get_report(db, report_id, lang_code))
 
 
-def start_review(db: Session, *, report_id: UUID, actor: User, payload: ReviewActionRequest) -> ReportResponse:
-    report = _get_report(db, report_id)
+def start_review(db: Session, *, report_id: UUID, actor: User, payload: ReviewActionRequest, lang_code: str = "en") -> ReportResponse:
+    report = _get_report(db, report_id, lang_code)
     report.status = ReportStatus.under_review
     report.reviewed_by = actor.id
     report.reviewed_at = _now()
@@ -158,8 +159,8 @@ def start_review(db: Session, *, report_id: UUID, actor: User, payload: ReviewAc
     return _serialize_report(db, report)
 
 
-def request_changes(db: Session, *, report_id: UUID, actor: User, payload: ReviewActionRequest) -> ReportResponse:
-    report = _get_report(db, report_id)
+def request_changes(db: Session, *, report_id: UUID, actor: User, payload: ReviewActionRequest, lang_code: str = "en") -> ReportResponse:
+    report = _get_report(db, report_id, lang_code)
     report.status = ReportStatus.changes_requested
     _create_review_event(
         db,
@@ -173,8 +174,8 @@ def request_changes(db: Session, *, report_id: UUID, actor: User, payload: Revie
     return _serialize_report(db, report)
 
 
-def approve_report(db: Session, *, report_id: UUID, actor: User, payload: ReviewActionRequest) -> ReportResponse:
-    report = _get_report(db, report_id)
+def approve_report(db: Session, *, report_id: UUID, actor: User, payload: ReviewActionRequest, lang_code: str = "en") -> ReportResponse:
+    report = _get_report(db, report_id, lang_code)
     report.status = ReportStatus.approved
     report.approved_by = actor.id
     report.approved_at = _now()
@@ -184,10 +185,10 @@ def approve_report(db: Session, *, report_id: UUID, actor: User, payload: Review
     return _serialize_report(db, report)
 
 
-def publish_report(db: Session, *, report_id: UUID, actor: User, final_pdf_storage_key: str) -> ReportResponse:
-    report = _get_report(db, report_id)
+def publish_report(db: Session, *, report_id: UUID, actor: User, final_pdf_storage_key: str, lang_code: str = "en") -> ReportResponse:
+    report = _get_report(db, report_id, lang_code)
     if report.status != ReportStatus.approved:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="report_not_approved")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("report_not_approved", lang_code))
 
     report.status = ReportStatus.published
     report.final_pdf_storage_key = final_pdf_storage_key
@@ -210,8 +211,9 @@ def upsert_report_summary(
     report_id: UUID,
     actor: User,
     payload: UpsertReportSummaryRequest,
+    lang_code: str = "en",
 ) -> ReportSummaryItem:
-    report = _get_report(db, report_id)
+    report = _get_report(db, report_id, lang_code)
     summary = db.scalar(
         select(ReportSectionSummary).where(
             ReportSectionSummary.report_id == report_id,
@@ -253,8 +255,8 @@ def upsert_report_summary(
     )
 
 
-def list_report_summaries(db: Session, *, report_id: UUID) -> list[ReportSummaryItem]:
-    _get_report(db, report_id)
+def list_report_summaries(db: Session, *, report_id: UUID, lang_code: str = "en") -> list[ReportSummaryItem]:
+    _get_report(db, report_id, lang_code)
     rows = db.scalars(select(ReportSectionSummary).where(ReportSectionSummary.report_id == report_id).order_by(desc(ReportSectionSummary.updated_at))).all()
     return [
         ReportSummaryItem(
@@ -269,8 +271,8 @@ def list_report_summaries(db: Session, *, report_id: UUID) -> list[ReportSummary
     ]
 
 
-def list_report_findings(db: Session, *, report_id: UUID) -> list[ReportFindingItem]:
-    _get_report(db, report_id)
+def list_report_findings(db: Session, *, report_id: UUID, lang_code: str = "en") -> list[ReportFindingItem]:
+    _get_report(db, report_id, lang_code)
     rows = db.scalars(select(ReportFinding).where(ReportFinding.report_id == report_id).order_by(desc(ReportFinding.created_at))).all()
     return [
         ReportFindingItem(

@@ -154,16 +154,16 @@ class UserManagementService:
         # Get target user
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            raise ValueError("User not found")
+            raise ValueError("user_not_found")
         
         # Get admin user
         admin_user = db.query(User).filter(User.id == admin_user_id).first()
         if not admin_user or admin_user.role != UserRole.admin:
-            raise PermissionError("Only admins can change user roles")
+            raise PermissionError("only_admins_can_change_user_roles")
         
         # Cannot change own role
         if user_id == admin_user_id:
-            raise ValueError("Cannot change your own role through this endpoint")
+            raise ValueError("cannot_change_your_own_role")
         
         # Cannot change customer role except for testing (and must be done explicitly)
         if user.role == UserRole.customer.value and new_role_code != "customer":
@@ -286,12 +286,12 @@ class UserManagementService:
         # Verify target is auditor
         user = db.query(User).filter(User.id == auditor_id).first()
         if not user or user.role != UserRole.auditor.value:
-            raise ValueError("Target user is not an auditor")
+            raise ValueError("target_user_not_auditor")
         
         # Verify admin
         admin = db.query(User).filter(User.id == admin_user_id).first()
         if not admin or admin.role != UserRole.admin.value:
-            raise PermissionError("Only admins can assign permissions")
+            raise PermissionError("only_admins_can_assign_permissions")
         
         # Get or create permissions and assign to user's role
         user_roles = db.query(UserRoleAssignment).filter(
@@ -330,12 +330,12 @@ class UserManagementService:
         # Get user
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
-            raise ValueError("User not found")
+            raise ValueError("user_not_found")
         
         # Verify admin
         admin = db.query(User).filter(User.id == admin_user_id).first()
         if not admin or admin.role != UserRole.admin.value:
-            raise PermissionError("Only admins can reset permissions")
+            raise PermissionError("only_admins_can_reset_permissions")
         
         # Determine permission set based on role
         permission_set_map = {
@@ -346,7 +346,7 @@ class UserManagementService:
         
         permission_set = permission_set_map.get(user.role)
         if not permission_set:
-            raise ValueError(f"Unknown user role: {user.role}")
+            raise ValueError("unknown_user_role")
         
         # Get user's roles and clear permissions
         user_role_assignments = db.query(UserRoleAssignment).filter(

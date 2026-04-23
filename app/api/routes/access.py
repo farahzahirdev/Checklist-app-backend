@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.api.dependencies.auth import get_current_user
@@ -10,6 +10,8 @@ from app.models.payment import Payment, PaymentStatus
 from app.models.user import User
 from app.schemas.db import AccessWindowRead
 from datetime import datetime, timezone, timedelta
+from app.utils.i18n import get_language_code
+from app.utils.i18n_messages import translate
 
 router = APIRouter(prefix="/access", tags=["access"])
 
@@ -21,9 +23,11 @@ router = APIRouter(prefix="/access", tags=["access"])
 )
 def select_checklist(
     checklist_id: UUID,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    lang_code = get_language_code(request, db)
     now = datetime.now(timezone.utc)
     # Check for active access window (from payment, not yet bound to a checklist)
     access_window = db.scalar(
@@ -34,14 +38,14 @@ def select_checklist(
         .where(AccessWindow.payment_id.isnot(None))
     )
     if not access_window:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no_active_payment_window")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("no_active_payment_window", lang_code))
     # Check if already bound to a checklist
     if getattr(access_window, "checklist_id", None):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="checklist_already_selected")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("checklist_already_selected", lang_code))
     # Validate checklist
     checklist = db.get(Checklist, checklist_id)
     if not checklist or checklist.status != ChecklistStatus.published:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="invalid_checklist")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("invalid_checklist", lang_code))
     # Bind checklist to access window
     access_window.checklist_id = checklist_id
     # Also update the payment record

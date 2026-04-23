@@ -16,3 +16,10 @@ class CustomerChecklistResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+
+
+class CustomerChecklistListResponse(BaseModel):
+    total: int
+    checklists: list[CustomerChecklistResponse]
+    skip: int
+    limit: int

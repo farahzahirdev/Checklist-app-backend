@@ -25,6 +25,7 @@ from app.schemas.auth import AuthResponse, AuthUserResponse, MfaSetupDetailsResp
 from app.services.rbac import RBACService
 from app.services.user_management import UserManagementService
 import re
+from app.utils.i18n_messages import translate
 
 
 def _role_to_code(role: UserRole | str) -> UserRoleCode:
@@ -87,7 +88,7 @@ def register_user(db: Session, *, email: str, password: str) -> AuthResponse:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=validation_error)
     existing_user = _get_user_by_email(db, email)
     if existing_user is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email_already_registered")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("email_already_registered", lang_code))
 
     # Use UserManagementService to create user with default customer role and auto-assigned permissions
     user = UserManagementService.create_user_with_role(
@@ -106,18 +107,18 @@ def register_user(db: Session, *, email: str, password: str) -> AuthResponse:
     return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=True, mfa_enabled=False)
 
 
-def authenticate_user(db: Session, *, email: str, password: str) -> AuthResponse:
+def authenticate_user(db: Session, *, email: str, password: str, lang_code: str = "en") -> AuthResponse:
     user = _get_user_by_email(db, email)
     if user is None or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("invalid_credentials", lang_code))
 
     try:
         password_is_valid = verify_password(password, user.password_hash)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials") from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("invalid_credentials", lang_code)) from exc
 
     if not password_is_valid:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("invalid_credentials", lang_code))
 
     mfa_record = _get_mfa_record(db, user.id)
     mfa_enabled = bool(mfa_record and mfa_record.is_verified)
@@ -154,28 +155,28 @@ def authenticate_user(db: Session, *, email: str, password: str) -> AuthResponse
     return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=True, mfa_enabled=False)
 
 
-def verify_mfa_challenge(db: Session, *, challenge_token: str, code: str) -> AuthResponse:
+def verify_mfa_challenge(db: Session, *, challenge_token: str, code: str, lang_code: str = "en") -> AuthResponse:
     claims = verify_signed_token(challenge_token, token_type="mfa_challenge")
     try:
         user_id = UUID(str(claims.get("sub", "")))
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token_subject") from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("invalid_token_subject", lang_code)) from exc
 
     user = db.get(User, user_id)
     if user is None or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_credentials")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("invalid_credentials", lang_code))
 
     mfa_record = _get_mfa_record(db, user.id)
     if mfa_record is None or not mfa_record.is_verified:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="mfa_not_enabled")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("mfa_not_enabled", lang_code))
 
     code = code.strip()
     if not code:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_mfa_code")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("invalid_mfa_code", lang_code))
 
     secret = decrypt_secret(mfa_record.secret_encrypted)
     if not verify_totp_code(secret, code):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_mfa_code")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("invalid_mfa_code", lang_code))
 
     token = create_access_token(user_id=str(user.id), role=str(user.role))
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
@@ -221,18 +222,18 @@ def start_mfa_enrollment(db: Session, *, user: User) -> MfaSetupDetailsResponse:
     )
 
 
-def confirm_mfa_enrollment(db: Session, *, user: User, code: str) -> AuthResponse:
+def confirm_mfa_enrollment(db: Session, *, user: User, code: str, lang_code: str = "en") -> AuthResponse:
     record = _get_mfa_record(db, user.id)
     if record is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="mfa_not_initialized")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("mfa_not_initialized", lang_code))
 
     code = code.strip()
     if not code:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_mfa_code")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalid_mfa_code", lang_code))
 
     secret = decrypt_secret(record.secret_encrypted)
     if not verify_totp_code(secret, code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_mfa_code")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalid_mfa_code", lang_code))
 
     record.is_verified = True
     db.commit()
@@ -244,13 +245,13 @@ def confirm_mfa_enrollment(db: Session, *, user: User, code: str) -> AuthRespons
     return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=True)
 
 
-def update_user_role(db: Session, *, actor_user: User, user_id: UUID, role_code: UserRoleCode) -> AuthResponse:
+def update_user_role(db: Session, *, actor_user: User, user_id: UUID, role_code: UserRoleCode, lang_code: str = "en") -> AuthResponse:
     if actor_user.role != UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="insufficient_permissions")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("insufficient_permissions", lang_code))
 
     user = db.get(User, user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("user_not_found", lang_code))
 
     user.role = _code_to_role(role_code)
     _audit(db, actor_user=actor_user, action=AuditAction.user_role_change, target_entity="user", target_id=user.id)

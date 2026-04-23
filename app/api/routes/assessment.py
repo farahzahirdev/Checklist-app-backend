@@ -1,8 +1,9 @@
 from uuid import UUID
+
 import uuid
 import os
 from datetime import datetime
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import get_current_user
@@ -22,6 +23,7 @@ from app.services.assessment import (
     submit_assessment,
     upsert_assessment_answer,
 )
+from app.utils.i18n import get_language_code
 from app.utils.file_upload import allowed_file, validate_file_type, get_file_size, compute_sha256, basic_malware_scan, encrypt_file_data
 from app.models.assessment import AssessmentEvidenceFile, MalwareScanStatus
 from app.models.media import Media, MediaType
@@ -41,10 +43,12 @@ router = APIRouter(prefix="/assessment", tags=["assessment"])
 )
 def start_assessment_route(
     request: StartAssessmentRequest,
+    http_request: Request,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentSessionResponse:
-    return start_assessment(db, user=current_user, checklist_id=request.checklist_id)
+    lang_code = get_language_code(http_request, db)
+    return start_assessment(db, user=current_user, checklist_id=request.checklist_id, lang_code=lang_code)
 
 
 @router.get(
@@ -58,10 +62,12 @@ def start_assessment_route(
 )
 def get_current_assessment_route(
     checklist_id: UUID | None = None,
+    http_request: Request = None,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentSessionResponse:
-    return get_current_assessment(db, user=current_user, checklist_id=checklist_id)
+    lang_code = get_language_code(http_request, db) if http_request else None
+    return get_current_assessment(db, user=current_user, checklist_id=checklist_id, lang_code=lang_code)
 
 
 @router.get(
@@ -93,9 +99,11 @@ def get_current_assessment_detail_route(
 def upsert_answer_route(
     assessment_id: UUID,
     request: AssessmentAnswerUpsertRequest,
+    http_request: Request,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentAnswerResponse:
+    lang_code = get_language_code(http_request, db)
     return upsert_assessment_answer(
         db,
         user=current_user,
@@ -103,6 +111,7 @@ def upsert_answer_route(
         question_id=request.question_id,
         answer=request.answer,
         note_text=request.note_text,
+        lang_code=lang_code,
     )
 
 
@@ -116,11 +125,12 @@ def upsert_answer_route(
 )
 def submit_assessment_route(
     assessment_id: UUID,
+    http_request: Request,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentSubmitResponse:
-    return submit_assessment(db, user=current_user, assessment_id=assessment_id)
-
+    lang_code = get_language_code(http_request, db)
+    return submit_assessment(db, user=current_user, assessment_id=assessment_id, lang_code=lang_code)
 
 @router.post(
     "/{assessment_id}/evidence",

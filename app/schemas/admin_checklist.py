@@ -39,6 +39,13 @@ class AdminChecklistResponse(BaseModel):
     updated_at: datetime
 
 
+class AdminChecklistListResponse(BaseModel):
+    total: int
+    checklists: list[AdminChecklistResponse]
+    skip: int
+    limit: int
+
+
 class AdminSectionCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     order: int = Field(ge=1)
@@ -65,6 +72,13 @@ class AdminSectionResponse(BaseModel):
     order: int
 
 
+class AdminSectionListResponse(BaseModel):
+    total: int
+    sections: list[AdminSectionResponse]
+    skip: int
+    limit: int
+      
+      
 class AdminQuestionAnswerOptionRequest(BaseModel):
     position: int = Field(ge=1, le=4)
     label: str = Field(min_length=1, max_length=255)
@@ -163,3 +177,10 @@ class AdminQuestionResponse(BaseModel):
     note: str | None = None
     evidence_rule: EvidenceRuleResponse
     sub_questions: list['AdminQuestionResponse'] = Field(default_factory=list)  # Recursive nesting
+
+      
+class AdminQuestionListResponse(BaseModel):
+    total: int
+    questions: list[AdminQuestionResponse]
+    skip: int
+    limit: int
