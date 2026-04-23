@@ -461,6 +461,10 @@ def delete_section(db: Session, *, checklist_id, section_id) -> bool:
 
 
 def reorder_sections(db: Session, *, checklist_id, section_orders: list[dict]) -> list[AdminSectionResponse]:
+    # Convert SectionOrderItem objects to dicts if needed
+    if section_orders and hasattr(section_orders[0], 'section_id'):
+        section_orders = [{"section_id": item.section_id, "order": item.order} for item in section_orders]
+    
     # Validate all sections exist and belong to the checklist
     section_ids = [item["section_id"] for item in section_orders]
     sections = db.scalars(
