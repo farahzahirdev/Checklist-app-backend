@@ -239,6 +239,23 @@ def admin_reorder_sections(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from exc
 
 
+@router.patch(
+    "/{checklist_id}/sections/reorder/",
+    response_model=list[AdminSectionResponse],
+    summary="Reorder Sections (with trailing slash)",
+    description="Updates the order of multiple sections for drag-and-drop functionality. Handles URLs with trailing slash.",
+    include_in_schema=False,  # Hide from OpenAPI docs to avoid duplication
+)
+def admin_reorder_sections_trailing_slash(
+    checklist_id: UUID,
+    request: AdminSectionReorderRequest,
+    _admin=Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> list[AdminSectionResponse]:
+    # Redirect to the main endpoint to avoid code duplication
+    return admin_reorder_sections(checklist_id, request, _admin, db)
+
+
 @router.get(
     "/{checklist_id}/sections/{section_id}/questions",
     response_model=list[AdminQuestionResponse],
