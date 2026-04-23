@@ -25,6 +25,7 @@ from app.schemas.admin_checklist import (
     AdminQuestionUpdateRequest,
     AdminQuestionResponse,
     AdminSectionCreateRequest,
+    AdminSectionReorderRequest,
     AdminSectionUpdateRequest,
     AdminSectionResponse,
     EvidenceRuleResponse,
@@ -269,7 +270,9 @@ def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> Ad
         security_level=severity,
         points=_question_points(question),
         answer_logic=question.answer_logic or DEFAULT_ANSWER_LOGIC,
-        legal_requirement=legal_requirement,
+        audit_type=question.audit_type or "compliance",
+        legal_requirement_title=translation.legal_requirement_title if translation else "",
+        legal_requirement_description=translation.legal_requirement_description if translation else "",
         explanation=explanation,
         expected_implementation=expected_implementation,
         how_it_works=how_it_works,
@@ -590,6 +593,98 @@ def list_questions(
     for row in rows:
         row._translation = _latest_question_translation(db, row.id)
     return total, [_to_question_response(row) for row in rows]
+  
+def reorder_sections(db: Session, *, checklist_id, section_orders: list[dict]) -> list[AdminSectionResponse]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"SERVICE REORDER - Starting reordering for checklist {checklist_id}")
+    
+    # Convert SectionOrderItem objects to dicts if needed
+    if section_orders and hasattr(section_orders[0], 'section_id'):
+        logger.info("SERVICE REORDER - Converting SectionOrderItem objects to dicts")
+        section_orders = [{"section_id": item.section_id, "order": item.order} for item in section_orders]
+    
+    logger.info(f"SERVICE REORDER - Processing {len(section_orders)} section orders")
+    
+    # Validate all sections exist and belong to the checklist
+    section_ids = [item["section_id"] for item in section_orders]
+    sections = db.scalars(
+        select(ChecklistSection).where(
+            ChecklistSection.id.in_(section_ids),
+            ChecklistSection.checklist_id == checklist_id
+        )
+    ).all()
+    
+    if len(sections) != len(section_ids):
+        raise ValueError("One or more sections not found")
+    
+    # Create a mapping of section_id to section object
+    section_map = {section.id: section for section in sections}
+    
+    # Validate orders are unique and positive
+    orders = [item["order"] for item in section_orders]
+    if len(set(orders)) != len(orders):
+        raise ValueError("Orders must be unique")
+    if any(order < 1 for order in orders):
+        raise ValueError("Orders must be positive")
+    
+    # Update the display order for each section using temporary values to avoid constraint violations
+    # Step 1: Assign temporary negative orders to avoid conflicts
+    temp_order = -1
+    for item in section_orders:
+        section = section_map[item["section_id"]]
+        section.display_order = temp_order
+        temp_order -= 1
+    
+    db.flush()  # Apply temporary orders
+    
+    # Step 2: Now assign the final orders
+    for item in section_orders:
+        section = section_map[item["section_id"]]
+        section.display_order = item["order"]
+    
+    # Auto-increment checklist version since sections were reordered
+    checklist = db.get(Checklist, checklist_id)
+    if checklist:
+        checklist.increment_version()
+    
+    db.commit()
+    
+    # Return updated sections in order
+    updated_sections = db.scalars(
+        select(ChecklistSection).where(ChecklistSection.checklist_id == checklist_id).order_by(asc(ChecklistSection.display_order))
+    ).all()
+    
+    for section in updated_sections:
+        section._translation = _latest_section_translation(db, section.id)
+    
+    return [_to_section_response(section) for section in updated_sections]
+
+
+def list_questions(db: Session, *, checklist_id, section_id) -> list[AdminQuestionResponse]:
+    # Fetch all questions for the section
+    all_questions = db.scalars(
+        select(ChecklistQuestion)
+        .where(ChecklistQuestion.checklist_id == checklist_id, ChecklistQuestion.section_id == section_id)
+        .order_by(asc(ChecklistQuestion.display_order))
+    ).all()
+    # Build a map of id -> question
+    question_map = {q.id: q for q in all_questions}
+    # Attach translations
+    for q in all_questions:
+        q._translation = _latest_question_translation(db, q.id)
+    # Build tree: parent_id -> list of sub-questions
+    children_map = {}
+    for q in all_questions:
+        if q.parent_question_id:
+            children_map.setdefault(q.parent_question_id, []).append(q)
+    # Attach sub_questions to each question
+    for q in all_questions:
+        q.sub_questions = children_map.get(q.id, [])
+    # Only return top-level questions (no parent)
+    top_level = [q for q in all_questions if q.parent_question_id is None]
+    return [_to_question_response_nested(q, db) for q in top_level]
 
 
 def get_question(db: Session, *, checklist_id, section_id, question_id) -> AdminQuestionResponse | None:
@@ -606,6 +701,20 @@ def get_question(db: Session, *, checklist_id, section_id, question_id) -> Admin
     return _to_question_response(question)
 
 def create_question(db: Session, *, checklist_id, section_id, payload: AdminQuestionCreateRequest) -> AdminQuestionResponse:
+    # Check if question_code already exists in this checklist
+    existing_question = db.scalar(
+        select(ChecklistQuestion)
+        .where(
+            ChecklistQuestion.checklist_id == checklist_id,
+            ChecklistQuestion.question_code == payload.question_id
+        )
+    )
+    if existing_question:
+        if payload.parent_question_id:
+            raise ValueError(f"Question code '{payload.question_id}' already exists in this checklist. Child questions must have unique identifiers (e.g., '{payload.question_id}_1', '{payload.question_id}_2').")
+        else:
+            raise ValueError(f"Question code '{payload.question_id}' already exists in this checklist")
+    
     last_order = db.scalar(
         select(ChecklistQuestion.display_order)
         .where(ChecklistQuestion.section_id == section_id)

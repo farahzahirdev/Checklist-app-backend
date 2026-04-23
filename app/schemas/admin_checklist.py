@@ -56,6 +56,15 @@ class AdminSectionUpdateRequest(BaseModel):
     order: int | None = Field(default=None, ge=1)
 
 
+class SectionOrderItem(BaseModel):
+    section_id: UUID = Field(..., description="Section ID to reorder")
+    order: int = Field(..., ge=1, description="New display order (must be positive)")
+
+
+class AdminSectionReorderRequest(BaseModel):
+    section_orders: list[SectionOrderItem] = Field(..., description="List of section_id and new order pairs")
+
+
 class AdminSectionResponse(BaseModel):
     id: UUID
     checklist_id: UUID
