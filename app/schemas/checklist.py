@@ -22,3 +22,10 @@ class CustomerChecklistResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     pricing: ChecklistPricingInfo | None = None
+
+
+class CustomerChecklistListResponse(BaseModel):
+    total: int
+    checklists: list[CustomerChecklistResponse]
+    skip: int
+    limit: int

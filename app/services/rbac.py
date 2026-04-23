@@ -142,7 +142,33 @@ class RBACService:
             if not RBACService.has_permission(db, user_id, resource, action):
                 return False
         return True
-    
+
+    @staticmethod
+    def check_permission(
+        db: Session,
+        user_id: uuid.UUID,
+        resource: str,
+        action: str,
+    ) -> bool:
+        """
+        Check if a user has a specific permission.
+        """
+        return RBACService.has_permission(db, user_id, resource, action)
+
+    @staticmethod
+    def check_multiple_permissions(
+        db: Session,
+        user_id: uuid.UUID,
+        permissions: list[tuple[str, str]],
+    ) -> dict[str, bool]:
+        """
+        Check if a user has multiple permissions.
+        """
+        return {
+            f"{resource}:{action}": RBACService.has_permission(db, user_id, resource, action)
+            for resource, action in permissions
+        }
+
     @staticmethod
     def assign_role_to_user(
         db: Session,

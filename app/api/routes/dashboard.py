@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
 from app.db.session import get_db
 from app.models.user import UserRole
+from app.utils.i18n import get_language_code
 from app.schemas.dashboard import (
     AdminActivityItemResponse,
     AdminAssessmentDistributionResponse,
@@ -35,10 +36,12 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
     description="Admin-only endpoint returning top KPI cards for users, checklists, assessments, reports, and payments.",
 )
 def admin_dashboard(
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminDashboardResponse:
-    return get_admin_dashboard(db)
+    lang_code = get_language_code(request, db)
+    return get_admin_dashboard(db, lang_code=lang_code)
 
 
 @router.get(
@@ -48,10 +51,12 @@ def admin_dashboard(
     description="Admin-only endpoint returning latest submitted assessments waiting for review triage.",
 )
 def admin_awaiting_review(
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> list[AdminAwaitingReviewItemResponse]:
-    return get_admin_awaiting_review(db)
+    lang_code = get_language_code(request, db)
+    return get_admin_awaiting_review(db, lang_code=lang_code)
 
 
 @router.get(
@@ -61,10 +66,12 @@ def admin_awaiting_review(
     description="Admin-only endpoint returning recent system events from audit logs, report workflow events, and successful payments.",
 )
 def admin_activity(
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> list[AdminActivityItemResponse]:
-    return get_admin_activity_feed(db)
+    lang_code = get_language_code(request, db)
+    return get_admin_activity_feed(db, lang_code=lang_code)
 
 
 @router.get(
@@ -74,10 +81,12 @@ def admin_activity(
     description="Admin-only endpoint returning assessment lifecycle distribution counters.",
 )
 def admin_distribution(
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminAssessmentDistributionResponse:
-    return get_admin_assessment_distribution(db)
+    lang_code = get_language_code(request, db)
+    return get_admin_assessment_distribution(db, lang_code=lang_code)
 
 
 @router.get(
@@ -87,10 +96,12 @@ def admin_distribution(
     description="Admin-only endpoint returning retention purge queue summary and next eligible items.",
 )
 def admin_retention(
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminRetentionStatusResponse:
-    return get_admin_retention_status(db)
+    lang_code = get_language_code(request, db)
+    return get_admin_retention_status(db, lang_code=lang_code)
 
 
 @router.get(
@@ -100,10 +111,12 @@ def admin_retention(
     description="Admin-only endpoint returning lightweight status indicators for payment, storage, and reporting subsystems.",
 )
 def admin_system_health(
+    request: Request,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminSystemHealthResponse:
-    return get_admin_system_health(db)
+    lang_code = get_language_code(request, db)
+    return get_admin_system_health(db, lang_code=lang_code)
 
 
 @router.get(
@@ -113,10 +126,12 @@ def admin_system_health(
     description="Auditor and admin endpoint returning report queue counters and findings totals.",
 )
 def auditor_dashboard(
+    request: Request,
     _auditor=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> AuditorDashboardResponse:
-    return get_auditor_dashboard(db)
+    lang_code = get_language_code(request, db)
+    return get_auditor_dashboard(db, lang_code=lang_code)
 
 
 @router.get(
@@ -126,7 +141,9 @@ def auditor_dashboard(
     description="Customer endpoint returning purchase coverage, assessment activity, and latest report status.",
 )
 def customer_dashboard(
+    request: Request,
     customer=Depends(require_roles(UserRole.customer)),
     db: Session = Depends(get_db),
 ) -> CustomerDashboardResponse:
-    return get_customer_dashboard(db, user_id=customer.id)
+    lang_code = get_language_code(request, db)
+    return get_customer_dashboard(db, user_id=customer.id, lang_code=lang_code)
