@@ -495,7 +495,17 @@ def reorder_sections(db: Session, *, checklist_id, section_orders: list[dict]) -
     if any(order < 1 for order in orders):
         raise ValueError("Orders must be positive")
     
-    # Update the display order for each section
+    # Update the display order for each section using temporary values to avoid constraint violations
+    # Step 1: Assign temporary negative orders to avoid conflicts
+    temp_order = -1
+    for item in section_orders:
+        section = section_map[item["section_id"]]
+        section.display_order = temp_order
+        temp_order -= 1
+    
+    db.flush()  # Apply temporary orders
+    
+    # Step 2: Now assign the final orders
     for item in section_orders:
         section = section_map[item["section_id"]]
         section.display_order = item["order"]
