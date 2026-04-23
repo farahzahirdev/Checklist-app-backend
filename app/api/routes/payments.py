@@ -118,12 +118,13 @@ def get_user_payment_status(
 @router.post(
     "/stripe/checkout-session",
     summary="Create Stripe Checkout Session",
-    description="Creates a Stripe Checkout Session for the configured product/price and returns the session URL. Uses a single product for all checklists. Checklist selection is after payment.",
+    description="Creates a Stripe Checkout Session for a specific checklist and returns the session URL. If checklist_id is provided, uses checklist-specific pricing. Otherwise falls back to default product.",
 )
 def create_checkout_session(
     request: Request,
     success_url: str = Query(..., description="URL to redirect after successful payment"),
     cancel_url: str = Query(..., description="URL to redirect if payment is cancelled"),
+    checklist_id: UUID | None = Query(None, description="Optional checklist ID to purchase specific checklist"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -132,7 +133,9 @@ def create_checkout_session(
         user_id=current_user.id,
         success_url=success_url,
         cancel_url=cancel_url,
+        checklist_id=checklist_id,
         lang_code=lang_code,
+        db=db
     )
     return {"checkout_url": url}
 

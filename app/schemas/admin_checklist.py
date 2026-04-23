@@ -28,6 +28,15 @@ class PublishChecklistRequest(BaseModel):
     status: ChecklistStatus = ChecklistStatus.published
 
 
+class AdminStripeInfo(BaseModel):
+    product_id: str | None = None
+    price_id: str | None = None
+    price_amount_cents: int | None = None
+    price_currency: str | None = None
+    price_available: bool = False
+    price_status: str = "not_set"  # not_set, available, error
+
+
 class AdminChecklistResponse(BaseModel):
     id: UUID
     title: str
@@ -37,6 +46,7 @@ class AdminChecklistResponse(BaseModel):
     status: ChecklistStatus
     created_at: datetime
     updated_at: datetime
+    stripe_info: AdminStripeInfo
 
 
 class AdminChecklistListResponse(BaseModel):

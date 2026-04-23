@@ -3,7 +3,8 @@ from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.checklist import Checklist, ChecklistStatus, ChecklistType, ChecklistTranslation
-from app.schemas.checklist import CustomerChecklistListResponse, CustomerChecklistResponse, ChecklistTypeInfo
+from app.services.stripe_products import get_stripe_price_for_checklist
+from app.schemas.checklist import CustomerChecklistListResponse, CustomerChecklistResponse, ChecklistTypeInfo, ChecklistPricingInfo
 from typing import List
 from app.utils.i18n import get_language_code
 from app.utils.i18n_messages import translate
@@ -53,6 +54,27 @@ def list_customer_checklists(
         checklist_type = db.query(ChecklistType).filter(ChecklistType.id == checklist.checklist_type_id).first()
         translation = db.query(ChecklistTranslation).filter(ChecklistTranslation.checklist_id == checklist.id, ChecklistTranslation.language == lang_code).first()
         title = translation.title if translation else f"Checklist v{checklist.version}"
+        
+        # Get pricing from Stripe - only include checklist if it has an active price
+        pricing_info = None
+        has_price = False
+        try:
+            price_data = get_stripe_price_for_checklist(db, checklist_id=checklist.id)
+            if price_data:
+                pricing_info = ChecklistPricingInfo(
+                    price_id=price_data["price_id"],
+                    amount_cents=price_data["amount_cents"],
+                    currency=price_data["currency"]
+                )
+                has_price = True
+        except Exception as e:
+            # Log error but don't fail the response
+            print(f"Error fetching price for checklist {checklist.id}: {e}")
+        
+        # Skip this checklist if it doesn't have an active price
+        if not has_price:
+            continue
+        
         result.append(CustomerChecklistResponse(
             id=checklist.id,
             title=title,
@@ -66,6 +88,7 @@ def list_customer_checklists(
             status=checklist.status.value if checklist.status else "",
             created_at=checklist.created_at,
             updated_at=checklist.updated_at,
+            pricing=pricing_info,
         ))
 
     return {"total": total, "checklists": result, "skip": skip, "limit": limit}

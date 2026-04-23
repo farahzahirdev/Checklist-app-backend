@@ -17,6 +17,7 @@ from app.models.checklist import (
 )
 from app.models.reference import Language
 from app.models.user import User
+from app.services.stripe_products import create_stripe_product_for_checklist, get_stripe_price_for_checklist
 from app.schemas.admin_checklist import (
     AdminChecklistCreateRequest,
     AdminChecklistResponse,
@@ -28,6 +29,7 @@ from app.schemas.admin_checklist import (
     AdminSectionReorderRequest,
     AdminSectionUpdateRequest,
     AdminSectionResponse,
+    AdminStripeInfo,
     EvidenceRuleResponse,
     PublishChecklistRequest,
 )
@@ -51,7 +53,7 @@ def _format_version(version: int) -> str:
     return f"v{version}.0"
 
 
-def _to_checklist_response(checklist: Checklist) -> AdminChecklistResponse:
+def _to_checklist_response(checklist: Checklist, db: Session | None = None) -> AdminChecklistResponse:
     # Get translation for title/description
     translation = None
     if hasattr(checklist, 'translations'):
@@ -61,9 +63,11 @@ def _to_checklist_response(checklist: Checklist) -> AdminChecklistResponse:
         # Fallback: query translation
         from app.models.checklist import ChecklistTranslation
         from app.db.session import SessionLocal
-        db = SessionLocal()
+        if db is None:
+            db = SessionLocal()
         translation = db.query(ChecklistTranslation).filter_by(checklist_id=checklist.id).first()
-        db.close()
+        if db is None:
+            db.close()
 
     title = translation.title if translation else f"Checklist v{checklist.version}"
     # Get ChecklistType for description
@@ -71,10 +75,40 @@ def _to_checklist_response(checklist: Checklist) -> AdminChecklistResponse:
     if not checklist_type:
         from app.models.checklist import ChecklistType
         from app.db.session import SessionLocal
-        db = SessionLocal()
+        if db is None:
+            db = SessionLocal()
         checklist_type = db.query(ChecklistType).filter_by(id=checklist.checklist_type_id).first()
-        db.close()
+        if db is None:
+            db.close()
     decree = (translation.description if translation and translation.description else (checklist_type.description if checklist_type else title))
+    
+    # Get Stripe information
+    stripe_info = AdminStripeInfo()
+    if checklist.stripe_product_id:
+        stripe_info.product_id = checklist.stripe_product_id
+        
+        # Try to get price information
+        if db is not None:
+            try:
+                price_data = get_stripe_price_for_checklist(db, checklist_id=checklist.id)
+                if price_data:
+                    stripe_info.price_id = price_data["price_id"]
+                    stripe_info.price_amount_cents = price_data["amount_cents"]
+                    stripe_info.price_currency = price_data["currency"]
+                    stripe_info.price_available = True
+                    stripe_info.price_status = "available"
+                else:
+                    stripe_info.price_status = "not_set"
+            except Exception as e:
+                # Log error but don't fail the response
+                print(f"Error fetching price for checklist {checklist.id}: {e}")
+                stripe_info.price_available = False
+                stripe_info.price_status = "error"
+        else:
+            stripe_info.price_status = "not_set"
+    else:
+        stripe_info.price_status = "not_set"
+    
     return AdminChecklistResponse(
         id=checklist.id,
         title=title,
@@ -83,6 +117,7 @@ def _to_checklist_response(checklist: Checklist) -> AdminChecklistResponse:
         status=checklist.status,
         created_at=checklist.created_at,
         updated_at=checklist.updated_at,
+        stripe_info=stripe_info,
     )
 
 
@@ -292,13 +327,16 @@ def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> Ad
     )
 
 
+def list_checklists(db: Session) -> list[AdminChecklistResponse]:
+    rows = db.scalars(select(Checklist).order_by(asc(Checklist.created_at))).all()
+    return [_to_checklist_response(row, db) for row in rows]
 
 
 def get_checklist(db: Session, *, checklist_id) -> AdminChecklistResponse | None:
     checklist = db.get(Checklist, checklist_id)
     if checklist is None:
         return None
-    return _to_checklist_response(checklist)
+    return _to_checklist_response(checklist, db)
 
 
 def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateRequest) -> AdminChecklistResponse:
@@ -339,7 +377,20 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
         )
     db.commit()
     db.refresh(checklist)
-    return _to_checklist_response(checklist)
+    
+    # Create Stripe product for the checklist
+    try:
+        create_stripe_product_for_checklist(
+            db,
+            checklist_id=checklist.id,
+            title=payload.title,
+            description=payload.law_decree
+        )
+    except Exception as e:
+        # Log error but don't fail checklist creation
+        print(f"Error creating Stripe product for checklist {checklist.id}: {e}")
+    
+    return _to_checklist_response(checklist, db)
 
 
 def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminChecklistUpdateRequest) -> AdminChecklistResponse | None:
@@ -389,7 +440,7 @@ def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminCh
 
     db.commit()
     db.refresh(checklist)
-    return _to_checklist_response(checklist)
+    return _to_checklist_response(checklist, db)
 
 
 def publish_checklist(db: Session, *, actor: User, checklist_id, payload: PublishChecklistRequest) -> AdminChecklistResponse | None:
