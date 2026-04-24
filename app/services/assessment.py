@@ -107,7 +107,7 @@ def _get_active_assessment(
     return assessment
 
 
-def get_current_assessment(db: Session, *, user: User, checklist_id: UUID | None = None) -> AssessmentSessionResponse:
+                                                                                                                                                        def get_current_assessment(db: Session, *, user: User, checklist_id: UUID | None = None, lang_code: str = "en") -> AssessmentSessionResponse:
     assessment = _get_active_assessment(db, user=user, checklist_id=checklist_id)
     return _serialize_assessment(assessment, is_new=False)
 
@@ -369,7 +369,7 @@ def _serialize_assessment_detail(db: Session, assessment: Assessment) -> Assessm
     )
 
 
-def get_current_assessment_detail(db: Session, *, user: User, checklist_id: UUID | None = None) -> AssessmentDetailResponse:
+def get_current_assessment_detail(db: Session, *, user: User, checklist_id: UUID | None = None, lang_code: str = "en") -> AssessmentDetailResponse:
     assessment = _get_active_assessment(db, user=user, checklist_id=checklist_id)
     return _serialize_assessment_detail(db, assessment)
 

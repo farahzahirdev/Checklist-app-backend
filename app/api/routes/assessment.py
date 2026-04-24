@@ -81,10 +81,12 @@ def get_current_assessment_route(
 )
 def get_current_assessment_detail_route(
     checklist_id: UUID | None = None,
+    http_request: Request = None,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentDetailResponse:
-    return get_current_assessment_detail(db, user=current_user, checklist_id=checklist_id)
+    lang_code = get_language_code(http_request, db) if http_request else None
+    return get_current_assessment_detail(db, user=current_user, checklist_id=checklist_id, lang_code=lang_code)
 
 
 @router.put(
