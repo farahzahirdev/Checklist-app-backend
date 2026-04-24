@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from sqlalchemy import asc, desc, func, or_, select, delete
+from sqlalchemy import asc, case, desc, func, or_, select, delete, update
 from sqlalchemy.orm import Session
 from app.models.checklist import (
     Checklist,
@@ -669,19 +669,51 @@ def reorder_sections(db: Session, *, checklist_id, section_orders: list[dict]) -
         raise ValueError("Orders must be positive")
     
     # Update the display order for each section using temporary values to avoid constraint violations
-    # Step 1: Assign temporary negative orders to avoid conflicts
+    # Step 1: Assign temporary negative orders to avoid conflicts using bulk update
     temp_order = -1
+    temp_updates = []
     for item in section_orders:
-        section = section_map[item["section_id"]]
-        section.display_order = temp_order
+        temp_updates.append({
+            "id": item["section_id"],
+            "display_order": temp_order
+        })
         temp_order -= 1
+    
+    # Bulk update with temporary orders
+    if temp_updates:
+        db.execute(
+            update(ChecklistSection)
+            .where(ChecklistSection.id.in_([item["id"] for item in temp_updates]))
+            .values(display_order=case(
+                *((
+                    ChecklistSection.id == item["id"], 
+                    item["display_order"]
+                ) for item in temp_updates)
+            ))
+        )
     
     db.flush()  # Apply temporary orders
     
-    # Step 2: Now assign the final orders
+    # Step 2: Now assign the final orders using bulk update
+    final_updates = []
     for item in section_orders:
-        section = section_map[item["section_id"]]
-        section.display_order = item["order"]
+        final_updates.append({
+            "id": item["section_id"],
+            "display_order": item["order"]
+        })
+    
+    # Bulk update with final orders
+    if final_updates:
+        db.execute(
+            update(ChecklistSection)
+            .where(ChecklistSection.id.in_([item["id"] for item in final_updates]))
+            .values(display_order=case(
+                *((
+                    ChecklistSection.id == item["id"], 
+                    item["display_order"]
+                ) for item in final_updates)
+            ))
+        )
     
     # Auto-increment checklist version since sections were reordered
     checklist = db.get(Checklist, checklist_id)
