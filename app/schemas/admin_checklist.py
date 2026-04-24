@@ -75,6 +75,15 @@ class AdminSectionReorderRequest(BaseModel):
     section_orders: list[SectionOrderItem] = Field(..., description="List of section_id and new order pairs")
 
 
+class QuestionOrderItem(BaseModel):
+    question_id: UUID = Field(..., description="Question ID to reorder")
+    order: int = Field(..., ge=1, description="New display order (must be positive)")
+
+
+class AdminQuestionReorderRequest(BaseModel):
+    question_orders: list[QuestionOrderItem] = Field(..., description="List of question_id and new order pairs")
+
+
 class AdminSectionResponse(BaseModel):
     id: UUID
     checklist_id: UUID

@@ -20,6 +20,7 @@ from app.schemas.admin_checklist import (
     AdminQuestionListResponse,
     AdminQuestionResponse,
     AdminQuestionUpdateRequest,
+    AdminQuestionReorderRequest,
     AdminSectionCreateRequest,
     AdminSectionListResponse,
     AdminSectionReorderRequest,
@@ -41,6 +42,7 @@ from app.services.admin_checklist import (
     list_questions,
     list_sections,
     publish_checklist,
+    reorder_questions,
     reorder_sections,
     update_checklist,
     update_question,
@@ -292,6 +294,58 @@ def admin_reorder_sections_trailing_slash(
 ) -> list[AdminSectionResponse]:
     # Redirect to the main endpoint to avoid code duplication
     return admin_reorder_sections(checklist_id, request, _admin, db)
+
+
+@router.patch(
+    "/{checklist_id}/sections/{section_id}/questions/reorder",
+    response_model=list[AdminQuestionResponse],
+    summary="Reorder Questions",
+    description="Updates order of multiple questions for drag-and-drop functionality. Child questions cannot be ordered above their parent questions.",
+)
+def admin_reorder_questions(
+    checklist_id: UUID,
+    section_id: UUID,
+    request: AdminQuestionReorderRequest,
+    _admin=Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> list[AdminQuestionResponse]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Log the incoming request for debugging
+    logger.info(f"QUESTION REORDER REQUEST - Checklist ID: {checklist_id}, Section ID: {section_id}")
+    logger.info(f"QUESTION REORDER REQUEST - Question orders count: {len(request.question_orders)}")
+    for i, item in enumerate(request.question_orders):
+        logger.info(f"QUESTION REORDER REQUEST - Question {i+1}: ID={item.question_id}, Order={item.order}")
+    
+    try:
+        result = reorder_questions(db, checklist_id=checklist_id, section_id=section_id, question_orders=request.question_orders)
+        logger.info(f"QUESTION REORDER SUCCESS - Returned {len(result)} questions")
+        return result
+    except ValueError as exc:
+        logger.error(f"QUESTION REORDER ERROR - ValueError: {exc}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(f"QUESTION REORDER ERROR - Unexpected error: {exc}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error") from exc
+
+
+@router.patch(
+    "/{checklist_id}/sections/{section_id}/questions/reorder/",
+    response_model=list[AdminQuestionResponse],
+    summary="Reorder Questions (with trailing slash)",
+    description="Updates order of multiple questions for drag-and-drop functionality. Child questions cannot be ordered above their parent questions. Handles URLs with trailing slash.",
+    include_in_schema=False,  # Hide from OpenAPI docs to avoid duplication
+)
+def admin_reorder_questions_trailing_slash(
+    checklist_id: UUID,
+    section_id: UUID,
+    request: AdminQuestionReorderRequest,
+    _admin=Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> list[AdminQuestionResponse]:
+    # Redirect to main endpoint to avoid code duplication
+    return admin_reorder_questions(checklist_id, section_id, request, _admin, db)
 
 
 @router.patch(

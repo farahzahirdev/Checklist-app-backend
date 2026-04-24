@@ -733,29 +733,133 @@ def reorder_sections(db: Session, *, checklist_id, section_orders: list[dict]) -
     return [_to_section_response(section) for section in updated_sections]
 
 
-def list_questions(db: Session, *, checklist_id, section_id) -> list[AdminQuestionResponse]:
-    # Fetch all questions for the section
-    all_questions = db.scalars(
+def reorder_questions(db: Session, *, checklist_id, section_id, question_orders: list[dict]) -> list[AdminQuestionResponse]:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"QUESTION REORDER - Starting reordering for checklist {checklist_id}, section {section_id}")
+    
+    # Convert QuestionOrderItem objects to dicts if needed
+    if question_orders and hasattr(question_orders[0], 'question_id'):
+        logger.info("QUESTION REORDER - Converting QuestionOrderItem objects to dicts")
+        question_orders = [{"question_id": item.question_id, "order": item.order} for item in question_orders]
+    
+    logger.info(f"QUESTION REORDER - Processing {len(question_orders)} question orders")
+    
+    # Validate all questions exist and belong to checklist/section
+    question_ids = [item["question_id"] for item in question_orders]
+    questions = db.scalars(
+        select(ChecklistQuestion).where(
+            ChecklistQuestion.id.in_(question_ids),
+            ChecklistQuestion.checklist_id == checklist_id,
+            ChecklistQuestion.section_id == section_id
+        )
+    ).all()
+    
+    if len(questions) != len(question_ids):
+        raise ValueError("One or more questions not found")
+    
+    # Create a mapping of question_id to question object
+    question_map = {question.id: question for question in questions}
+    
+    # Validate orders are unique and positive
+    orders = [item["order"] for item in question_orders]
+    if len(set(orders)) != len(orders):
+        raise ValueError("Orders must be unique")
+    if any(order < 1 for order in orders):
+        raise ValueError("Orders must be positive")
+    
+    # Build parent-child relationships for validation
+    parent_child_map = {}
+    for question in questions:
+        if question.parent_question_id:
+            if question.parent_question_id not in parent_child_map:
+                parent_child_map[question.parent_question_id] = []
+            parent_child_map[question.parent_question_id].append(question.id)
+    
+    # Validate parent-child ordering constraints
+    for item in question_orders:
+        question_id = item["question_id"]
+        new_order = item["order"]
+        question = question_map[question_id]
+        
+        # Check if this question has children
+        if question_id in parent_child_map:
+            child_ids = parent_child_map[question_id]
+            
+            # Ensure all children have higher order numbers than parent
+            for child_id in child_ids:
+                child_order = next((q["order"] for q in question_orders if q["question_id"] == child_id), None)
+                if child_order is not None and child_order <= new_order:
+                    raise ValueError(f"Child question cannot be ordered above its parent question (parent order: {new_order}, child order: {child_order})")
+    
+    # Update display order for each question using temporary values to avoid constraint violations
+    # Step 1: Assign temporary negative orders to avoid conflicts using bulk update
+    temp_order = -1
+    temp_updates = []
+    for item in question_orders:
+        temp_updates.append({
+            "id": item["question_id"],
+            "display_order": temp_order
+        })
+        temp_order -= 1
+    
+    # Bulk update with temporary orders
+    if temp_updates:
+        db.execute(
+            update(ChecklistQuestion)
+            .where(ChecklistQuestion.id.in_([item["id"] for item in temp_updates]))
+            .values(display_order=case(
+                *((
+                    ChecklistQuestion.id == item["id"], 
+                    item["display_order"]
+                ) for item in temp_updates)
+            ))
+        )
+    
+    db.flush()  # Apply temporary orders
+    
+    # Step 2: Now assign final orders using bulk update
+    final_updates = []
+    for item in question_orders:
+        final_updates.append({
+            "id": item["question_id"],
+            "display_order": item["order"]
+        })
+    
+    # Bulk update with final orders
+    if final_updates:
+        db.execute(
+            update(ChecklistQuestion)
+            .where(ChecklistQuestion.id.in_([item["id"] for item in final_updates]))
+            .values(display_order=case(
+                *((
+                    ChecklistQuestion.id == item["id"], 
+                    item["display_order"]
+                ) for item in final_updates)
+            ))
+        )
+    
+    # Auto-increment checklist version since questions were reordered
+    checklist = db.get(Checklist, checklist_id)
+    if checklist:
+        checklist.increment_version()
+    
+    db.commit()
+    
+    # Return updated questions in order
+    updated_questions = db.scalars(
         select(ChecklistQuestion)
         .where(ChecklistQuestion.checklist_id == checklist_id, ChecklistQuestion.section_id == section_id)
         .order_by(asc(ChecklistQuestion.display_order))
     ).all()
-    # Build a map of id -> question
-    question_map = {q.id: q for q in all_questions}
-    # Attach translations
-    for q in all_questions:
-        q._translation = _latest_question_translation(db, q.id)
-    # Build tree: parent_id -> list of sub-questions
-    children_map = {}
-    for q in all_questions:
-        if q.parent_question_id:
-            children_map.setdefault(q.parent_question_id, []).append(q)
-    # Attach sub_questions to each question
-    for q in all_questions:
-        q.sub_questions = children_map.get(q.id, [])
-    # Only return top-level questions (no parent)
-    top_level = [q for q in all_questions if q.parent_question_id is None]
-    return [_to_question_response_nested(q, db) for q in top_level]
+    
+    for question in updated_questions:
+        question._translation = _latest_question_translation(db, question.id)
+    
+    return [_to_question_response(question) for question in updated_questions]
+
+
 
 
 def get_question(db: Session, *, checklist_id, section_id, question_id, lang_code: str = "en") -> AdminQuestionResponse | None:
