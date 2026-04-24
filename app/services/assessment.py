@@ -275,6 +275,21 @@ def _to_assessment_question_response(
         for subq in sorted(children_map.get(question.id, []), key=lambda q: q.display_order)
     ]
 
+    # Get admin note (pre-populated by admin) and add evidence guidance
+    admin_note = question.note_for_user
+    if question.evidence_enabled:
+        evidence_note = "Upload supporting evidence to strengthen your assessment (PDF, PNG, JPG - max 10MB). You can upload evidence before or after answering the question."
+        if admin_note:
+            admin_note = f"{admin_note}\n\n{evidence_note}"
+        else:
+            admin_note = evidence_note
+
+    # Get user note (added during assessment)
+    user_note = None
+    answer = answer_map.get(question.id)
+    if answer is not None and answer.note_text:
+        user_note = answer.note_text
+
     return AssessmentQuestionResponse(
         id=question.id,
         checklist_id=question.checklist_id,
@@ -295,7 +310,8 @@ def _to_assessment_question_response(
         evidence_enabled=question.evidence_enabled,
         customer_answer=customer_answer,
         customer_answer_status=customer_answer_status,
-        note=question.note_for_user,
+        admin_note=admin_note,
+        user_note=user_note,
         evidence_rule=EvidenceRuleResponse(
             allowed_mime_types=["application/pdf", "image/png", "image/jpeg"],
             max_file_size_bytes=10 * 1024 * 1024,
@@ -432,7 +448,8 @@ def submit_assessment(db: Session, *, user: User, assessment_id: UUID, lang_code
     assessment = _get_owned_active_assessment(db, user=user, assessment_id=assessment_id, lang_code=lang_code)
     completion = _recompute_completion(db, assessment=assessment)
 
-    _validate_assessment_completion(db, assessment)
+    # Validation removed - users can submit assessment at any completion level
+    # _validate_assessment_completion(db, assessment)
 
     assessment.status = AssessmentStatus.submitted
     assessment.submitted_at = _now_utc()
@@ -472,52 +489,10 @@ def _get_section_and_question_order(db: Session, checklist_id: UUID):
 
 def _validate_assessment_completion(db: Session, assessment: Assessment):
     """
-    Enforces:
-    - Only allow next section if previous is complete
-    - Only allow next question if previous is complete
-    - All parent questions must be answered before submission
-    - Sub-questions can be answered anytime, but parent must be answered for assessment to be valid
-    Raises HTTPException if validation fails.
+    Validation disabled - users can submit assessments at any completion level.
+    This function is kept for backward compatibility but does not enforce any restrictions.
     """
-    from app.models.checklist import ChecklistSection, ChecklistQuestion
-    from app.models.assessment import AssessmentAnswer
-    checklist_id = assessment.checklist_id
-    sections, section_questions = _get_section_and_question_order(db, checklist_id)
-    # Get all answers for this assessment
-    answers = db.execute(
-        select(AssessmentAnswer.question_id)
-        .where(AssessmentAnswer.assessment_id == assessment.id)
-    ).scalars().all()
-    answered_set = set(answers)
-
-    # 1. Parent question validation (sub-question answered but parent not answered)
-    for section_id in sections:
-        for qid, parent_id in section_questions[section_id]:
-            if parent_id and parent_id not in answered_set and qid in answered_set:
-                raise HTTPException(status_code=400, detail="parent questions must be answered before sub-question.")
-
-    # 2. Question order validation (answering later question before previous)
-    for section_id in sections:
-        questions = section_questions[section_id]
-        for j, (qid, parent_id) in enumerate(questions):
-            if j > 0:
-                prev_qid, _ = questions[j-1]
-                if prev_qid not in answered_set and qid in answered_set:
-                    raise HTTPException(status_code=400, detail="Question order violated")
-
-    # 3. Section-by-section validation (only allow next section if previous is complete)
-    for i, section_id in enumerate(sections):
-        if i > 0:
-            prev_section_id = sections[i-1]
-            prev_questions = section_questions[prev_section_id]
-            if not all(qid in answered_set for qid, _ in prev_questions):
-                raise HTTPException(status_code=400, detail=f"Section {i+1} cannot be started until previous section is complete")
-
-    # 4. Final check: all parent questions must be answered before submission
-    for section_id in sections:
-        for qid, parent_id in section_questions[section_id]:
-            if parent_id is None and qid not in answered_set:
-                raise HTTPException(status_code=400, detail="parent questions must be answered")
+    pass
 
 
 def _ensure_access_window(db: Session, *, user: User, payment: Payment | None, now: datetime) -> AccessWindow:

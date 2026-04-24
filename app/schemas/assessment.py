@@ -69,7 +69,8 @@ class AssessmentQuestionResponse(BaseModel):
     evidence_enabled: bool = True
     customer_answer: AnswerChoice | None = None
     customer_answer_status: Literal["not_started", "answered"] = "not_started"
-    note: str | None = None
+    admin_note: str | None = None
+    user_note: str | None = None
     evidence_rule: EvidenceRuleResponse
     sub_questions: list[AssessmentQuestionResponse] = []
 

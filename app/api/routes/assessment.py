@@ -153,7 +153,7 @@ def upload_evidence_file(
     if not validate_file_type(contents, file.filename):
         raise HTTPException(status_code=400, detail="invalid_file_content")
     size = get_file_size(contents)
-    if size > 5 * 1024 * 1024:
+    if size > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="file_too_large")
     
     # Determine media type
