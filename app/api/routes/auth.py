@@ -98,8 +98,8 @@ def me(http_request: Request, current_user=Depends(get_current_user)) -> AuthRes
     summary="Logout",
     description="Stateless logout acknowledgement. Client should delete the stored bearer token.",
 )
-def logout(http_request: Request) -> MessageResponse:
-    lang_code = get_language_code(http_request, None)
+def logout(http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
+    lang_code = get_language_code(http_request, db)
     return MessageResponse(message=translate("logged_out", lang_code))
 
 
