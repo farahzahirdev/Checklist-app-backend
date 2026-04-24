@@ -245,48 +245,6 @@ def admin_create_section(
 
 
 @router.patch(
-    "/{checklist_id}/sections/{section_id}",
-    response_model=AdminSectionResponse,
-    summary="Update Section",
-    description="Updates section title, chapter code, ordering, and descriptive fields.",
-)
-def admin_update_section(
-    checklist_id: UUID,
-    section_id: UUID,
-    request: AdminSectionUpdateRequest,
-    http_request: Request,
-    _admin=Depends(require_roles(UserRole.admin)),
-    db: Session = Depends(get_db),
-) -> AdminSectionResponse:
-    lang_code = get_language_code(http_request, db)
-    section = update_section(
-        db, checklist_id=checklist_id, section_id=section_id, payload=request, lang_code=lang_code
-    )
-    if section is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("section_not_found", lang_code))
-    return section
-
-
-@router.delete(
-    "/{checklist_id}/sections/{section_id}",
-    response_model=dict[str, str],
-    summary="Delete Section",
-    description="Deletes a section from the checklist when no longer needed.",
-)
-def admin_delete_section(
-    checklist_id: UUID,
-    section_id: UUID,
-    _admin=Depends(require_roles(UserRole.admin)),
-    db: Session = Depends(get_db),
-) -> dict[str, str]:
-    lang_code = "en"  # No request object, fallback to English or refactor for lang_code
-    deleted = delete_section(db, checklist_id=checklist_id, section_id=section_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("section_not_found", lang_code))
-    return {"message": translate("section_deleted", lang_code)}
-
-
-@router.patch(
     "/{checklist_id}/sections/reorder",
     response_model=list[AdminSectionResponse],
     summary="Reorder Sections",
@@ -334,6 +292,48 @@ def admin_reorder_sections_trailing_slash(
 ) -> list[AdminSectionResponse]:
     # Redirect to the main endpoint to avoid code duplication
     return admin_reorder_sections(checklist_id, request, _admin, db)
+
+
+@router.patch(
+    "/{checklist_id}/sections/{section_id}",
+    response_model=AdminSectionResponse,
+    summary="Update Section",
+    description="Updates section title, chapter code, ordering, and descriptive fields.",
+)
+def admin_update_section(
+    checklist_id: UUID,
+    section_id: UUID,
+    request: AdminSectionUpdateRequest,
+    http_request: Request,
+    _admin=Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> AdminSectionResponse:
+    lang_code = get_language_code(http_request, db)
+    section = update_section(
+        db, checklist_id=checklist_id, section_id=section_id, payload=request, lang_code=lang_code
+    )
+    if section is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("section_not_found", lang_code))
+    return section
+
+
+@router.delete(
+    "/{checklist_id}/sections/{section_id}",
+    response_model=dict[str, str],
+    summary="Delete Section",
+    description="Deletes a section from the checklist when no longer needed.",
+)
+def admin_delete_section(
+    checklist_id: UUID,
+    section_id: UUID,
+    _admin=Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    lang_code = "en"  # No request object, fallback to English or refactor for lang_code
+    deleted = delete_section(db, checklist_id=checklist_id, section_id=section_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("section_not_found", lang_code))
+    return {"message": translate("section_deleted", lang_code)}
 
 
 @router.get(
