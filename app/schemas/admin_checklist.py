@@ -136,6 +136,8 @@ class AdminQuestionCreateRequest(BaseModel):
     guidance_score_1: str | None = None
     recommendation_template: str | None = None
     illustrative_image_id: UUID | None = Field(default=None, description="Media ID for question illustrative image")
+    note_enabled: bool = True
+    evidence_enabled: bool = True
     answer_options: list[AdminQuestionAnswerOptionRequest] = Field(min_length=4, max_length=4, description="Exactly 4 answer options required")
 
 
@@ -159,6 +161,8 @@ class AdminQuestionUpdateRequest(BaseModel):
     guidance_score_1: str | None = None
     recommendation_template: str | None = None
     illustrative_image_id: UUID | None = Field(default=None, description="Media ID for question illustrative image")
+    note_enabled: bool | None = None
+    evidence_enabled: bool | None = None
     answer_options: list[AdminQuestionAnswerOptionRequest] | None = None
     order: int | None = Field(default=None, ge=1)
 
@@ -190,6 +194,8 @@ class AdminQuestionResponse(BaseModel):
     guidance_score_1: str | None = None
     recommendation_template: str | None = None
     illustrative_image_id: UUID | None = None
+    note_enabled: bool = True
+    evidence_enabled: bool = True
     answer_options: list[AdminQuestionAnswerOptionResponse] = Field(default_factory=list)
     customer_answer: str | None = None
     customer_answer_status: Literal["not_started"] = "not_started"

@@ -218,6 +218,8 @@ def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
         guidance_score_1=translation.guidance_score_1 if translation else None,
         recommendation_template=translation.recommendation_template if translation else None,
         illustrative_image_id=question.illustrative_image_id,
+        note_enabled=question.note_enabled,
+        evidence_enabled=question.evidence_enabled,
         answer_options=[_answer_option_response(option) for option in sorted(getattr(question, 'answer_options', []), key=lambda o: o.position)],
         note=question.note_for_user,
         evidence_rule=EvidenceRuleResponse(
@@ -307,6 +309,8 @@ def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> Ad
         guidance_score_1=translation.guidance_score_1 if translation else None,
         recommendation_template=translation.recommendation_template if translation else None,
         illustrative_image_id=question.illustrative_image_id,
+        note_enabled=question.note_enabled,
+        evidence_enabled=question.evidence_enabled,
         answer_options=[_answer_option_response(option) for option in sorted(getattr(question, 'answer_options', []), key=lambda o: o.position)],
         note=question.note_for_user,
         evidence_rule=EvidenceRuleResponse(
@@ -936,8 +940,8 @@ def create_question(db: Session, *, checklist_id, section_id, payload: AdminQues
         report_chapter=None,
         illustrative_image_id=payload.illustrative_image_id,
         note_for_user=payload.note,
-        note_enabled=True,
-        evidence_enabled=True,
+        note_enabled=payload.note_enabled,
+        evidence_enabled=payload.evidence_enabled,
         display_order=next_order,
         is_active=True,
     )
@@ -1030,6 +1034,10 @@ def update_question(
         question.note_for_user = payload.note
     if "illustrative_image_id" in payload.model_fields_set:
         question.illustrative_image_id = payload.illustrative_image_id
+    if "note_enabled" in payload.model_fields_set:
+        question.note_enabled = payload.note_enabled
+    if "evidence_enabled" in payload.model_fields_set:
+        question.evidence_enabled = payload.evidence_enabled
     if payload.order is not None:
         question.display_order = payload.order
     if payload.answer_options is not None:
