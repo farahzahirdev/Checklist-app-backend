@@ -10,7 +10,7 @@ class ChecklistInfo(BaseModel):
     """Information about the checklist the user has access to."""
     id: UUID = Field(description="Checklist ID.")
     title: str = Field(description="Checklist title (translated to default language).")
-    version: int = Field(description="Checklist version.")
+    version: str = Field(description="Checklist version.")
 
 
 class PaymentState(BaseModel):

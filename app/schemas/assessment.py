@@ -56,11 +56,17 @@ class AssessmentQuestionResponse(BaseModel):
     parent_question_id: UUID | None = None
     question_id: str
     security_level: SeverityLevel
-    audit_type: Literal["compliance"] = "compliance"
+    audit_type: str = "compliance"
+    answer_logic: str = "answer_only"
     legal_requirement: str
     explanation: str
     expected_implementation: str
     points: int
+    report_domain: str | None = None
+    report_chapter: str | None = None
+    illustrative_image_id: UUID | None = None
+    note_enabled: bool = True
+    evidence_enabled: bool = True
     customer_answer: AnswerChoice | None = None
     customer_answer_status: Literal["not_started", "answered"] = "not_started"
     note: str | None = None
