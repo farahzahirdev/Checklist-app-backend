@@ -205,3 +205,61 @@ def download_media(
         filename=media.original_filename,
         media_type=media.mime_type,
     )
+
+
+@router.get(
+    "/{media_id}/preview",
+    summary="Preview Media File",
+    description="Preview a media file (publicly accessible for illustrative images in assessments).",
+)
+def preview_media(
+    media_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Public endpoint for previewing media files used in assessments."""
+    media = db.get(Media, media_id)
+    if media is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media not found"
+        )
+    
+    # Only allow preview of active media that are images and clean
+    if not media.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media is not active"
+        )
+    
+    if media.media_type != MediaType.image:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Preview is only available for image files"
+        )
+    
+    if media.scan_status != MalwareScanStatus.clean:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Media cannot be previewed due to scan status"
+        )
+    
+    # Check if file exists
+    file_path = Path(media.file_path)
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found on disk"
+        )
+    
+    from fastapi.responses import FileResponse
+    
+    return FileResponse(
+        path=file_path,
+        filename=media.original_filename,
+        media_type=media.mime_type,
+        # Add cache headers for better performance
+        headers={
+            "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+            "Content-Disposition": "inline",  # Show inline instead of download
+        }
+    )
