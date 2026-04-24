@@ -20,6 +20,10 @@ engine = create_engine(
     database_url,
     echo=settings.db_echo,
     pool_pre_ping=True,
+    pool_size=20,
+    max_overflow=30,
+    pool_timeout=30,
+    pool_recycle=3600,
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, class_=Session)

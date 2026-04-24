@@ -53,7 +53,7 @@ def _format_version(version: int) -> str:
     return f"v{version}.0"
 
 
-def _to_checklist_response(checklist: Checklist, db: Session | None = None) -> AdminChecklistResponse:
+def _to_checklist_response(checklist: Checklist, db: Session) -> AdminChecklistResponse:
     # Get translation for title/description
     translation = None
     if hasattr(checklist, 'translations'):
@@ -62,24 +62,14 @@ def _to_checklist_response(checklist: Checklist, db: Session | None = None) -> A
     else:
         # Fallback: query translation
         from app.models.checklist import ChecklistTranslation
-        from app.db.session import SessionLocal
-        if db is None:
-            db = SessionLocal()
         translation = db.query(ChecklistTranslation).filter_by(checklist_id=checklist.id).first()
-        if db is None:
-            db.close()
 
     title = translation.title if translation else f"Checklist v{checklist.version}"
     # Get ChecklistType for description
     checklist_type = getattr(checklist, "checklist_type", None)
     if not checklist_type:
         from app.models.checklist import ChecklistType
-        from app.db.session import SessionLocal
-        if db is None:
-            db = SessionLocal()
         checklist_type = db.query(ChecklistType).filter_by(id=checklist.checklist_type_id).first()
-        if db is None:
-            db.close()
     decree = (translation.description if translation and translation.description else (checklist_type.description if checklist_type else title))
     
     # Get Stripe information
@@ -280,7 +270,7 @@ def list_checklists(
 
     total = db.scalar(count_query) or 0
     rows = db.scalars(query.offset(skip).limit(limit)).all()
-    return total, [_to_checklist_response(row) for row in rows]
+    return total, [_to_checklist_response(row, db) for row in rows]
   
 def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> AdminQuestionResponse:
     translation = getattr(question, "_translation", None)
