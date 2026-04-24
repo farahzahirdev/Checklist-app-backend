@@ -217,27 +217,38 @@ def preview_media(
     db: Session = Depends(get_db),
 ):
     """Public endpoint for previewing media files used in assessments."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"Media preview requested for ID: {media_id}")
+    
     media = db.get(Media, media_id)
     if media is None:
+        logger.warning(f"Media not found in database: {media_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Media not found"
         )
     
+    logger.info(f"Media found: {media.filename}, type: {media.media_type}, active: {media.is_active}, scan: {media.scan_status}")
+    
     # Only allow preview of active media that are images and clean
     if not media.is_active:
+        logger.warning(f"Media is not active: {media_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Media is not active"
         )
     
     if media.media_type != MediaType.image:
+        logger.warning(f"Media is not an image: {media_id}, type: {media.media_type}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Preview is only available for image files"
         )
     
     if media.scan_status != MalwareScanStatus.clean:
+        logger.warning(f"Media scan status not clean: {media_id}, status: {media.scan_status}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Media cannot be previewed due to scan status"
@@ -245,21 +256,98 @@ def preview_media(
     
     # Check if file exists
     file_path = Path(media.file_path)
+    logger.info(f"Checking file path: {file_path}")
+    
     if not file_path.exists():
+        logger.error(f"File not found on disk: {file_path} for media: {media_id}")
+        # Instead of 404, return a placeholder image or error message
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found on disk"
+            detail="Preview not available - media file not found on disk. The media exists in the database but the actual file is missing."
         )
     
-    from fastapi.responses import FileResponse
+    try:
+        from fastapi.responses import FileResponse
+        
+        logger.info(f"Returning file response for: {file_path}")
+        return FileResponse(
+            path=file_path,
+            filename=media.original_filename,
+            media_type=media.mime_type,
+            # Add cache headers for better performance
+            headers={
+                "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+                "Content-Disposition": "inline",  # Show inline instead of download
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error serving file {file_path}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error serving media file"
+        )
+
+
+@router.get(
+    "/{media_id}/debug",
+    summary="Debug Media Info",
+    description="Debug endpoint to check media details and file status (admin only).",
+)
+def debug_media(
+    media_id: uuid.UUID,
+    admin=Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    """Admin debug endpoint to investigate media issues."""
+    import logging
+    logger = logging.getLogger(__name__)
     
-    return FileResponse(
-        path=file_path,
-        filename=media.original_filename,
-        media_type=media.mime_type,
-        # Add cache headers for better performance
-        headers={
-            "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
-            "Content-Disposition": "inline",  # Show inline instead of download
+    logger.info(f"Debug media requested for ID: {media_id}")
+    
+    media = db.get(Media, media_id)
+    if media is None:
+        return {
+            "media_id": str(media_id),
+            "found": False,
+            "error": "Media not found in database"
         }
-    )
+    
+    # Check file existence
+    file_path = Path(media.file_path)
+    file_exists = file_path.exists()
+    
+    # Get file info if exists
+    file_info = None
+    if file_exists:
+        try:
+            stat = file_path.stat()
+            file_info = {
+                "size": stat.st_size,
+                "modified": stat.st_mtime,
+                "readable": os.access(file_path, os.R_OK)
+            }
+        except Exception as e:
+            file_info = {"error": str(e)}
+    
+    return {
+        "media_id": str(media_id),
+        "found": True,
+        "database_info": {
+            "filename": media.filename,
+            "original_filename": media.original_filename,
+            "mime_type": media.mime_type,
+            "media_type": media.media_type.value,
+            "file_size_bytes": media.file_size_bytes,
+            "file_path": media.file_path,
+            "scan_status": media.scan_status.value,
+            "encryption_status": media.encryption_status,
+            "is_active": media.is_active,
+            "created_at": media.created_at.isoformat() if media.created_at else None,
+            "uploaded_by": str(media.uploaded_by)
+        },
+        "file_status": {
+            "exists": file_exists,
+            "path": str(file_path),
+            "info": file_info
+        }
+    }
