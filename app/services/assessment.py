@@ -89,9 +89,9 @@ def _ensure_access_window(db: Session, *, user: User, payment: Payment | None, n
     return access_window
 
 
-def get_current_assessment(
+def _get_active_assessment(
     db: Session, *, user: User, checklist_id: UUID | None = None, lang_code: str = "en"
-) -> AssessmentSessionResponse:
+) -> Assessment:
     now = _now_utc()
     conditions = [Assessment.user_id == user.id, Assessment.expires_at > now]
     if checklist_id is not None:
