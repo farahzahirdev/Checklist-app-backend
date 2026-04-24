@@ -189,10 +189,14 @@ def admin_delete_checklist(
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
     lang_code = "en"  # No request object, fallback to English or refactor for lang_code
-    deleted = delete_checklist(db, checklist_id=checklist_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
-    return {"message": translate("checklist_deleted", lang_code)}
+    try:
+        deleted = delete_checklist(db, checklist_id=checklist_id)
+        if not deleted:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
+        return {"message": translate("checklist_deleted", lang_code)}
+    except ValueError as exc:
+        # Handle foreign key constraint violations
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get(

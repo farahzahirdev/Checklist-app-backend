@@ -13,8 +13,8 @@ from app.models.checklist import (
     ChecklistStatus,
     ChecklistTranslation,
     ChecklistType,
-    SeverityLevel,
 )
+from app.models.assessment import Assessment
 from app.models.reference import Language
 from app.models.user import User
 from app.services.stripe_products import create_stripe_product_for_checklist, get_stripe_price_for_checklist
@@ -444,6 +444,23 @@ def delete_checklist(db: Session, *, checklist_id) -> bool:
     checklist = db.get(Checklist, checklist_id)
     if checklist is None:
         return False
+    
+    # Check if checklist has any assessments (RESTRICT constraint)
+    assessment_count = db.scalar(
+        select(func.count(Assessment.id)).where(Assessment.checklist_id == checklist_id)
+    )
+    if assessment_count > 0:
+        raise ValueError(f"Cannot delete checklist with {assessment_count} associated assessments. Delete assessments first.")
+    
+    # Check if checklist has any payments (RESTRICT constraint)
+    from app.models.payment import Payment
+    payment_count = db.scalar(
+        select(func.count(Payment.id)).where(Payment.checklist_id == checklist_id)
+    )
+    if payment_count > 0:
+        raise ValueError(f"Cannot delete checklist with {payment_count} associated payments. Delete payments first.")
+    
+    # Delete the checklist (CASCADE will handle sections, questions, and translations)
     db.delete(checklist)
     db.commit()
     return True
