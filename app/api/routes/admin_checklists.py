@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, F
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.api.dependencies.auth import require_roles
+from app.api.dependencies.auth import require_roles, require_admin_or_auditor_for_read, require_admin_only
 from app.db.session import get_db
 from app.models.user import UserRole
 from app.schemas.admin_checklist import (
@@ -72,7 +72,7 @@ router = APIRouter(prefix="/admin/checklists", tags=["admin-checklists"])
     "",
     response_model=AdminChecklistListResponse,
     summary="List Checklists",
-    description="Admin-only list of all checklists available for publishing and assessment delivery.",
+    description="Admin and auditor list of all checklists available for publishing and assessment delivery.",
 )
 def admin_list_checklists(
     request: Request,
@@ -81,7 +81,7 @@ def admin_list_checklists(
     sort_by: str | None = Query(None, description="Field to sort by"),
     sort_order: str = Query("asc", regex="^(asc|desc)$"),
     search: str | None = Query(None, description="Search text for titles or law decree"),
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_or_auditor_for_read()),
     db: Session = Depends(get_db),
 ) -> AdminChecklistListResponse:
     lang_code = get_language_code(request, db)
@@ -107,7 +107,7 @@ def admin_list_checklists(
 def admin_create_checklist(
     request: AdminChecklistCreateRequest,
     http_request: Request,
-    admin=Depends(require_roles(UserRole.admin)),
+    admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> AdminChecklistResponse:
     lang_code = get_language_code(http_request, db)
@@ -123,7 +123,7 @@ def admin_create_checklist(
 def admin_get_checklist(
     checklist_id: UUID,
     request: Request,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_or_auditor_for_read()),
     db: Session = Depends(get_db),
 ) -> AdminChecklistResponse:
     lang_code = get_language_code(request, db)
@@ -143,7 +143,7 @@ def admin_update_checklist(
     checklist_id: UUID,
     request: AdminChecklistUpdateRequest,
     http_request: Request,
-    admin=Depends(require_roles(UserRole.admin)),
+    admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> AdminChecklistResponse:
     lang_code = get_language_code(http_request, db)
@@ -165,7 +165,7 @@ def admin_publish_checklist(
     checklist_id: UUID,
     request: PublishChecklistRequest,
     http_request: Request,
-    admin=Depends(require_roles(UserRole.admin)),
+    admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> AdminChecklistResponse:
     lang_code = get_language_code(http_request, db)
@@ -185,7 +185,7 @@ def admin_publish_checklist(
 )
 def admin_delete_checklist(
     checklist_id: UUID,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
     lang_code = "en"  # No request object, fallback to English or refactor for lang_code
@@ -213,7 +213,7 @@ def admin_list_sections(
     sort_by: str | None = Query(None, description="Field to sort by"),
     sort_order: str = Query("asc", regex="^(asc|desc)$"),
     search: str | None = Query(None, description="Search text for section titles"),
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_or_auditor_for_read()),
     db: Session = Depends(get_db),
 ) -> AdminSectionListResponse:
     lang_code = get_language_code(request, db)
@@ -241,7 +241,7 @@ def admin_create_section(
     checklist_id: UUID,
     request: AdminSectionCreateRequest,
     http_request: Request,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> AdminSectionResponse:
     lang_code = get_language_code(http_request, db)
@@ -259,7 +259,7 @@ def admin_create_section(
 def admin_reorder_sections(
     checklist_id: UUID,
     request: AdminSectionReorderRequest,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> list[AdminSectionResponse]:
     import logging
@@ -293,7 +293,7 @@ def admin_reorder_sections(
 def admin_reorder_sections_trailing_slash(
     checklist_id: UUID,
     request: AdminSectionReorderRequest,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> list[AdminSectionResponse]:
     # Redirect to the main endpoint to avoid code duplication
@@ -310,7 +310,7 @@ def admin_reorder_questions(
     checklist_id: UUID,
     section_id: UUID,
     request: AdminQuestionReorderRequest,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> list[AdminQuestionResponse]:
     import logging
@@ -345,7 +345,7 @@ def admin_reorder_questions_trailing_slash(
     checklist_id: UUID,
     section_id: UUID,
     request: AdminQuestionReorderRequest,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> list[AdminQuestionResponse]:
     # Redirect to main endpoint to avoid code duplication
@@ -363,7 +363,7 @@ def admin_update_section(
     section_id: UUID,
     request: AdminSectionUpdateRequest,
     http_request: Request,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> AdminSectionResponse:
     lang_code = get_language_code(http_request, db)
@@ -384,7 +384,7 @@ def admin_update_section(
 def admin_delete_section(
     checklist_id: UUID,
     section_id: UUID,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
     lang_code = "en"  # No request object, fallback to English or refactor for lang_code
@@ -409,7 +409,7 @@ def admin_list_questions(
     sort_by: str | None = Query(None, description="Field to sort by"),
     sort_order: str = Query("asc", regex="^(asc|desc)$"),
     search: str | None = Query(None, description="Search text for question text/code"),
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_or_auditor_for_read()),
     db: Session = Depends(get_db),
 ) -> AdminQuestionListResponse:
     lang_code = get_language_code(request, db)
@@ -438,7 +438,7 @@ def admin_get_question(
     section_id: UUID,
     question_id: UUID,
     request: Request,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_or_auditor_for_read()),
     db: Session = Depends(get_db),
 ) -> AdminQuestionResponse:
     lang_code = get_language_code(request, db)
@@ -462,7 +462,7 @@ def admin_create_question(
     section_id: UUID,
     request: AdminQuestionCreateRequest,
     http_request: Request,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> AdminQuestionResponse:
     lang_code = get_language_code(http_request, db)
@@ -486,7 +486,7 @@ def admin_update_question(
     question_id: UUID,
     request: AdminQuestionUpdateRequest,
     http_request: Request,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> AdminQuestionResponse:
     lang_code = get_language_code(http_request, db)
@@ -516,7 +516,7 @@ def admin_delete_question(
     checklist_id: UUID,
     section_id: UUID,
     question_id: UUID,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
     lang_code = "en"  # No request object, fallback to English or refactor for lang_code
@@ -539,7 +539,7 @@ def admin_delete_question(
     description="Returns the column mapping template for Excel/CSV import.",
 )
 def get_column_mapping_spec(
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_or_auditor_for_read()),
 ) -> ColumnMappingResponse:
     """Get the column mapping specification template."""
     template = ColumnMapping(
@@ -610,7 +610,7 @@ def get_column_mapping_spec(
 )
 def download_template(
     format: str = "csv",
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_or_auditor_for_read()),
 ):
     """Download sample template in CSV or XLSX format."""
     
@@ -770,7 +770,7 @@ def download_template(
 )
 def verify_column_mapping(
     request: VerifyMappingRequest,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
 ) -> VerifyMappingResponse:
     """Verify column mapping by parsing file and showing preview."""
     try:
@@ -806,7 +806,7 @@ def verify_column_mapping(
 )
 def create_from_file(
     request: BulkChecklistCreateRequest,
-    admin=Depends(require_roles(UserRole.admin)),
+    admin=Depends(require_admin_only()),
 ) -> BulkChecklistTaskResponse:
     """Queue checklist creation by parsing uploaded Excel/CSV file in the background."""
     try:
@@ -850,7 +850,7 @@ def create_from_file(
 )
 def get_bulk_import_task_status(
     task_id: str,
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_or_auditor_for_read()),
 ) -> BulkChecklistTaskStatusResponse:
     async_result = celery_app.AsyncResult(task_id)
     state = async_result.state
@@ -904,7 +904,7 @@ async def upload_and_verify(
     legal_req_col: str = "F",
     question_text_col: str = "H",
     severity_col: str = "I",
-    _admin=Depends(require_roles(UserRole.admin)),
+    _admin=Depends(require_admin_only()),
 ) -> VerifyMappingResponse:
     """Upload file as form-data and verify column mapping."""
     try:

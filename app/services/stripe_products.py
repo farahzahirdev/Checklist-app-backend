@@ -83,21 +83,22 @@ def get_stripe_price_for_checklist(
         return None
     
     try:
-        # List active prices for the product
+        # List active prices for the product, filtering for one-time prices only
         prices = stripe_client.Price.list(
             product=checklist.stripe_product_id,
             active=True,
-            limit=1
+            limit=100  # Get more prices to filter for one-time
         )
         
-        if prices.data:
-            price = prices.data[0]
-            return {
-                "price_id": price.id,
-                "amount_cents": price.unit_amount,
-                "currency": price.currency.upper(),
-                "product_id": price.product
-            }
+        # Find the first one-time price (no recurring attribute)
+        for price in prices.data:
+            if not hasattr(price, 'recurring') or price.recurring is None:
+                return {
+                    "price_id": price.id,
+                    "amount_cents": price.unit_amount,
+                    "currency": price.currency.upper(),
+                    "product_id": price.product
+                }
     except Exception as e:
         # Log error but don't raise - we'll handle missing prices gracefully
         print(f"Error fetching price for checklist {checklist_id}: {e}")

@@ -53,10 +53,11 @@ def list_permissions(
     """
     List all permissions.
     
-    Requires: permission_management:manage
+    Requires: permission_management:read (for viewing) or permission_management:manage (for full access)
     """
     lang_code = get_language_code(request, db)
-    if not RBACService.has_permission(db, current_user.id, "permission_management", "manage"):
+    if not RBACService.has_permission(db, current_user.id, "permission_management", "read") and \
+       not RBACService.has_permission(db, current_user.id, "permission_management", "manage"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=translate("insufficient_permissions", lang_code)
@@ -74,7 +75,8 @@ def get_permission(
 ) -> Permission:
     """Get a specific permission."""
     lang_code = get_language_code(request, db)
-    if not RBACService.has_permission(db, current_user.id, "permission_management", "manage"):
+    if not RBACService.has_permission(db, current_user.id, "permission_management", "read") and \
+       not RBACService.has_permission(db, current_user.id, "permission_management", "manage"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=translate("insufficient_permissions", lang_code)
@@ -140,7 +142,8 @@ def list_roles(
 ) -> list[Role]:
     """List all roles."""
     lang_code = get_language_code(request, db)
-    if not RBACService.has_permission(db, current_user.id, "permission_management", "manage"):
+    if not RBACService.has_permission(db, current_user.id, "permission_management", "read") and \
+       not RBACService.has_permission(db, current_user.id, "permission_management", "manage"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=translate("insufficient_permissions", lang_code)
@@ -158,7 +161,8 @@ def get_role(
 ) -> dict:
     """Get a specific role with its permissions."""
     lang_code = get_language_code(request, db)
-    if not RBACService.has_permission(db, current_user.id, "permission_management", "manage"):
+    if not RBACService.has_permission(db, current_user.id, "permission_management", "read") and \
+       not RBACService.has_permission(db, current_user.id, "permission_management", "manage"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=translate("insufficient_permissions", lang_code)
@@ -393,7 +397,8 @@ def get_user_roles(
 ) -> list[UserRoleAssignment]:
     """Get all roles assigned to a user."""
     lang_code = get_language_code(request, db)
-    if not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
+    if not RBACService.has_permission(db, current_user.id, "user_management", "read") and \
+       not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
         # Users can see their own roles
         if current_user.id != user_id:
             raise HTTPException(
@@ -415,7 +420,8 @@ def get_user_permissions(
 ) -> dict:
     """Get all permissions available to a user."""
     lang_code = get_language_code(request, db)
-    if not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
+    if not RBACService.has_permission(db, current_user.id, "user_management", "read") and \
+       not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
         # Users can see their own permissions
         if current_user.id != user_id:
             raise HTTPException(
