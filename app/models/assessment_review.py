@@ -1,6 +1,6 @@
 """Assessment Review models for admin feedback and suggestions."""
 from datetime import datetime, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import ForeignKey, Text, DateTime, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
@@ -33,7 +33,7 @@ class AssessmentReview(Base):
     __tablename__ = "assessment_reviews"
 
     id: Mapped[UUID] = mapped_column(
-        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4
     )
     assessment_id: Mapped[UUID] = mapped_column(
         PostgreSQLUUID(as_uuid=True), 
@@ -47,7 +47,7 @@ class AssessmentReview(Base):
         nullable=True
     )
     status: Mapped[str] = mapped_column(
-        SQLEnum(ReviewStatus, name="review_status", native_enum=True),
+        SQLEnum('pending', 'in_progress', 'completed', 'rejected', name="review_status", native_enum=True),
         nullable=False,
         default=ReviewStatus.PENDING,
     )
@@ -73,7 +73,7 @@ class AnswerReview(Base):
     __tablename__ = "answer_reviews"
 
     id: Mapped[UUID] = mapped_column(
-        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4
     )
     assessment_review_id: Mapped[UUID] = mapped_column(
         PostgreSQLUUID(as_uuid=True), 
@@ -114,7 +114,7 @@ class ReviewHistory(Base):
     __tablename__ = "review_history"
 
     id: Mapped[UUID] = mapped_column(
-        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+        PostgreSQLUUID(as_uuid=True), primary_key=True, default=uuid4
     )
     assessment_review_id: Mapped[UUID] = mapped_column(
         PostgreSQLUUID(as_uuid=True), 
