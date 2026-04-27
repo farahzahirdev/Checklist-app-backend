@@ -92,7 +92,7 @@ class AnswerReview(Base):
         nullable=True
     )
     suggestion_type: Mapped[str] = mapped_column(
-        SQLEnum(SuggestionType, name="suggestion_type", native_enum=True),
+        SQLEnum('improvement', 'required_change', 'best_practice', 'reference', 'clarification', name="suggestion_type", native_enum=True),
         nullable=False,
         default=SuggestionType.IMPROVEMENT,
     )
