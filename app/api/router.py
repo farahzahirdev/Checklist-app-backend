@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes.admin_checklists import router as admin_checklists_router
 from app.api.routes.assessment import router as assessment_router
 from app.api.routes.auth import router as auth_router
+from app.api.routes.customer_reports import router as customer_reports_router
 from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.health import router as health_router
 from app.api.routes.media import router as media_router
@@ -27,4 +28,5 @@ api_router.include_router(user_management_router)
 api_router.include_router(report_router)
 api_router.include_router(access_router)
 api_router.include_router(customer_checklists_router)
+api_router.include_router(customer_reports_router)
 api_router.include_router(media_router)
