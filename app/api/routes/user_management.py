@@ -64,13 +64,14 @@ def list_users(
     
     Notes:
     - Customers are managed via separate API
-    - Only admins can call this endpoint
+    - Admins and auditors can call this endpoint
     """
     lang_code = get_language_code(request, db)
-    if not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
+    if not RBACService.has_permission(db, current_user.id, "user_management", "read") and \
+       not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=translate("only_admins_can_manage_users", lang_code)
+            detail=translate("insufficient_permissions", lang_code)
         )
 
     query = db.query(User).filter(
