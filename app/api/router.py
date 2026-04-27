@@ -6,6 +6,7 @@ from app.api.routes.assessment_review import router as assessment_review_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.audit_logs import router as audit_logs_router
 from app.api.routes.customer_assessments import router as customer_assessments_router
+from app.api.routes.customer_payments import router as customer_payments_router
 from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.health import router as health_router
 from app.api.routes.media import router as media_router
@@ -26,6 +27,7 @@ api_router.include_router(assessment_router)
 api_router.include_router(assessment_review_router)
 api_router.include_router(audit_logs_router)
 api_router.include_router(customer_assessments_router)
+api_router.include_router(customer_payments_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(admin_checklists_router)
 api_router.include_router(rbac_router)
