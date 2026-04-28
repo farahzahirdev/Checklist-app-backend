@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models.payment import Payment, PaymentStatus
 from app.models.checklist import Checklist
+from app.models.checklist import ChecklistTranslation
 from app.models.access_window import AccessWindow
 from app.models.user import User
 from app.schemas.customer_payments import (
@@ -318,7 +319,7 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
                 Payment.status == PaymentStatus.succeeded
             )
         )
-        .group_by(func.date_trunc('month', Payment.created_at), Payment.created_at)
+        .group_by(func.date_trunc('month', Payment.created_at))
         .order_by('month')
         .all()
     )
@@ -555,7 +556,7 @@ def get_customer_payment_analytics(db: Session, user_id: UUID) -> PaymentAnalyti
                 Payment.status == PaymentStatus.succeeded
             )
         )
-        .group_by(func.date_trunc('month', Payment.created_at), Payment.created_at)
+        .group_by(func.date_trunc('month', Payment.created_at))
         .order_by('month')
         .all()
     )
@@ -574,22 +575,24 @@ def get_customer_payment_analytics(db: Session, user_id: UUID) -> PaymentAnalyti
     spending_by_checklist_query = (
         db.query(
             Checklist.id,
-            Checklist.title,
-            Checklist.description,
+            func.coalesce(ChecklistTranslation.title, f"Checklist v{Checklist.version}").label('title'),
+            func.coalesce(ChecklistTranslation.description, "").label('description'),
             func.count(Payment.id).label('payment_count'),
             func.sum(Payment.amount_cents).label('total_amount'),
             func.avg(Payment.amount_cents).label('avg_amount'),
             func.max(Payment.created_at).label('last_payment'),
         )
         .join(Payment, Checklist.id == Payment.checklist_id)
+        .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .filter(
             and_(
                 Payment.user_id == user_id,
                 Payment.status == PaymentStatus.succeeded
             )
         )
-        .group_by(Checklist.id, Checklist.title, Checklist.description)
+        .group_by(Checklist.id, ChecklistTranslation.title, ChecklistTranslation.description, Checklist.version)
         .order_by(desc('total_amount'))
+        .limit(10)
         .all()
     )
     

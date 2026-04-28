@@ -82,7 +82,6 @@ def get_customer_assessments(
         .join(ChecklistType, Checklist.checklist_type_id == ChecklistType.id)
         .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .outerjoin(Language, ChecklistTranslation.language_id == Language.id)
-        .outerjoin(Report, Assessment.id == Report.assessment_id)
         .filter(Assessment.user_id == user_id)
         .filter(Language.code == lang_code if lang_code != "en" else True)
     )
@@ -176,19 +175,9 @@ def get_assessment_detail(
 ) -> AssessmentDetail:
     """Get detailed assessment information."""
     
+    # Get assessment first
     assessment = (
         db.query(Assessment)
-        .options(
-            joinedload(Assessment.checklist)
-            .joinedload(Checklist.checklist_type),
-            joinedload(Assessment.checklist)
-            .joinedload(Checklist.translations)
-            .joinedload(ChecklistTranslation.language),
-            joinedload(Assessment.checklist)
-            .joinedload(Checklist.sections)
-            .joinedload(ChecklistSection.translations)
-            .joinedload(ChecklistSectionTranslation.language),
-        )
         .filter(Assessment.id == assessment_id, Assessment.user_id == user_id)
         .first()
     )
@@ -196,21 +185,35 @@ def get_assessment_detail(
     if not assessment:
         raise ValueError("Assessment not found")
     
+    # Get checklist with all related data
+    checklist = (
+        db.query(Checklist)
+        .join(ChecklistType, Checklist.checklist_type_id == ChecklistType.id)
+        .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
+        .outerjoin(Language, ChecklistTranslation.language_id == Language.id)
+        .outerjoin(ChecklistSection, Checklist.id == ChecklistSection.checklist_id)
+        .outerjoin(ChecklistSectionTranslation, ChecklistSection.id == ChecklistSectionTranslation.section_id)
+        .outerjoin(ChecklistQuestion, Checklist.id == ChecklistQuestion.checklist_id)
+        .filter(Checklist.id == assessment.checklist_id)
+        .filter(Language.code == lang_code if lang_code != "en" else True)
+        .first()
+    )
+    
     # Get translation
     translation = next(
-        (t for t in assessment.checklist.translations 
+        (t for t in checklist.translations 
          if t.language.code == lang_code), 
         None
     )
-    title = translation.title if translation else f"Checklist v{assessment.checklist.version}"
+    title = translation.title if translation else f"Checklist v{checklist.version}"
     
     # Calculate section progress
-    sections = assessment.checklist.sections
+    sections = checklist.sections
     total_sections = len(sections)
     sections_completed = 0
     
     for section in sections:
-        section_questions = [q for q in assessment.checklist.questions if q.section_id == section.id]
+        section_questions = [q for q in checklist.questions if q.section_id == section.id]
         answered_questions = (
             db.query(AssessmentAnswer)
             .filter(
@@ -223,7 +226,7 @@ def get_assessment_detail(
             sections_completed += 1
     
     # Estimate time remaining (rough calculation: 2 minutes per unanswered question)
-    total_questions = len(assessment.checklist.questions)
+    total_questions = len(checklist.questions)
     answered_questions = (
         db.query(AssessmentAnswer)
         .filter(AssessmentAnswer.assessment_id == assessment_id)
@@ -236,9 +239,9 @@ def get_assessment_detail(
         id=assessment.id,
         checklist_id=assessment.checklist_id,
         checklist_title=title,
-        checklist_type_code=assessment.checklist.checklist_type.code,
-        checklist_type_name=assessment.checklist.checklist_type.name,
-        checklist_version=f"v{assessment.checklist.version}",
+        checklist_type_code=checklist.checklist_type.code,
+        checklist_type_name=checklist.checklist_type.name,
+        checklist_version=f"v{checklist.version}",
         status=assessment.status,
         completion_percent=float(assessment.completion_percent),
         started_at=assessment.started_at,
@@ -267,11 +270,12 @@ def get_assessment_progress(
     
     assessment = (
         db.query(Assessment)
+        .join(Checklist, Assessment.checklist_id == Checklist.id)
         .options(
-            joinedload(Assessment.checklist)
-            .joinedload(Checklist.sections)
+            joinedload(Checklist.sections)
             .joinedload(ChecklistSection.translations)
             .joinedload(ChecklistSectionTranslation.language),
+            joinedload(Checklist.questions)
         )
         .filter(Assessment.id == assessment_id, Assessment.user_id == user_id)
         .first()
@@ -418,6 +422,11 @@ def get_customer_dashboard_enhanced(
     active_assessments_query = (
         db.query(Assessment)
         .join(Checklist, Assessment.checklist_id == Checklist.id)
+        .options(
+            joinedload(Checklist.translations)
+            .joinedload(ChecklistTranslation.language),
+            joinedload(Checklist.checklist_type)
+        )
         .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .outerjoin(Language, ChecklistTranslation.language_id == Language.id)
         .filter(
@@ -459,6 +468,11 @@ def get_customer_dashboard_enhanced(
     recent_submissions_query = (
         db.query(Assessment)
         .join(Checklist, Assessment.checklist_id == Checklist.id)
+        .options(
+            joinedload(Checklist.translations)
+            .joinedload(ChecklistTranslation.language),
+            joinedload(Checklist.checklist_type)
+        )
         .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .outerjoin(Language, ChecklistTranslation.language_id == Language.id)
         .filter(
@@ -467,7 +481,7 @@ def get_customer_dashboard_enhanced(
         )
         .filter(Language.code == lang_code if lang_code != "en" else True)
         .order_by(Assessment.submitted_at.desc())
-        .limit(3)
+        .limit(5)
     )
     
     recent_submissions = []
@@ -501,16 +515,21 @@ def get_customer_dashboard_enhanced(
     expiring_soon_query = (
         db.query(Assessment)
         .join(Checklist, Assessment.checklist_id == Checklist.id)
+        .options(
+            joinedload(Checklist.translations)
+            .joinedload(ChecklistTranslation.language),
+            joinedload(Checklist.checklist_type)
+        )
         .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .outerjoin(Language, ChecklistTranslation.language_id == Language.id)
         .filter(
             Assessment.user_id == user_id,
-            Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
             Assessment.expires_at <= seven_days_from_now,
+            Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
         )
         .filter(Language.code == lang_code if lang_code != "en" else True)
         .order_by(Assessment.expires_at.asc())
-        .limit(3)
+        .limit(5)
     )
     
     expiring_soon = []
