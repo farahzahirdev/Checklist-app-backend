@@ -89,6 +89,23 @@ def get_customer_payment_records(
                     ChecklistTranslation.description.ilike(search_term),
                 )
             )
+        
+        if filters.has_active_access is not None:
+            if filters.has_active_access:
+                # Filter for payments with active access
+                now = _now_utc()
+                query = query.join(AccessWindow, Payment.id == AccessWindow.payment_id).filter(
+                    AccessWindow.activated_at <= now,
+                    AccessWindow.expires_at >= now
+                )
+            else:
+                # Filter for payments without active access
+                now = _now_utc()
+                active_payment_ids = db.query(AccessWindow.payment_id).filter(
+                    AccessWindow.activated_at <= now,
+                    AccessWindow.expires_at >= now
+                ).subquery()
+                query = query.filter(~Payment.id.in_(active_payment_ids))
     
     # Count total
     total = query.count()
@@ -127,9 +144,9 @@ def get_customer_payment_records(
             id=payment.id,
             user_id=payment.user_id,
             checklist_id=payment.checklist_id,
-            checklist_title=translation.title if translation else f"Checklist v{checklist.version}",
+            checklist_title=translation.title if translation else (f"Checklist v{checklist.version}" if checklist else "Unknown Checklist"),
             checklist_description=translation.description if translation else None,
-            checklist_version=f"v{checklist.version}",
+            checklist_version=f"v{checklist.version}" if checklist else None,
             stripe_payment_intent_id=payment.stripe_payment_intent_id,
             amount_cents=payment.amount_cents,
             amount_formatted=_format_currency(payment.amount_cents, payment.currency),
