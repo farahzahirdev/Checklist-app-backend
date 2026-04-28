@@ -352,14 +352,15 @@ def quick_extend_assessment(
 @router.get(
     "/summary/stats",
     summary="Get Assessment Statistics",
-    description="Get quick statistics about assessments.",
+    description="Get quick statistics about assessments including review status.",
 )
 def get_assessment_statistics(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Get quick assessment statistics."""
+    """Get quick assessment statistics with review status."""
     from app.models.assessment import Assessment
+    from app.models.assessment_review import AssessmentReview
     
     stats = {}
     
@@ -381,6 +382,35 @@ def get_assessment_statistics(
             ) or 0
         )
     
+    # Review status for submitted assessments
+    submitted_assessments = (
+        db.execute(
+            select(Assessment.id, AssessmentReview.status)
+            .join(AssessmentReview, Assessment.id == AssessmentReview.assessment_id, isouter=True)
+            .where(Assessment.user_id == current_user.id, Assessment.status == AssessmentStatus.submitted)
+        ).all()
+    )
+    
+    # Count by review status
+    review_stats = {
+        "pending": 0,
+        "in_progress": 0, 
+        "completed": 0,
+        "rejected": 0,
+        "changes_requested": 0,
+        "not_reviewed": 0  # Submitted but no review created yet
+    }
+    
+    for assessment_id, review_status in submitted_assessments:
+        if review_status:
+            if review_status in review_stats:
+                review_stats[review_status] += 1
+        else:
+            review_stats["not_reviewed"] += 1
+    
+    # Add review stats to main stats
+    stats.update({f"review_{k}": v for k, v in review_stats.items()})
+    
     # Expiring soon (within 7 days)
     from datetime import timedelta, timezone
     seven_days_from_now = datetime.now(timezone.utc) + timedelta(days=7)
@@ -396,3 +426,63 @@ def get_assessment_statistics(
     )
     
     return stats
+
+
+@router.get(
+    "/review-status",
+    summary="Get Assessment Review Status",
+    description="Get detailed review status information for submitted assessments.",
+)
+def get_assessment_review_status(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Get detailed review status for customer's submitted assessments."""
+    from app.models.assessment import Assessment
+    from app.models.assessment_review import AssessmentReview
+    
+    # Get submitted assessments with their review details
+    submitted_assessments = (
+        db.execute(
+            select(
+                Assessment.id,
+                Assessment.submitted_at,
+                AssessmentReview.status.label("review_status"),
+                AssessmentReview.reviewed_at,
+                AssessmentReview.submitted_at.label("review_submitted_at"),
+                AssessmentReview.overall_score,
+                AssessmentReview.reviewer_id
+            )
+            .join(AssessmentReview, Assessment.id == AssessmentReview.assessment_id, isouter=True)
+            .where(Assessment.user_id == current_user.id, Assessment.status == AssessmentStatus.submitted)
+            .order_by(Assessment.submitted_at.desc())
+        ).all()
+    )
+    
+    # Format the response
+    assessments = []
+    for assessment in submitted_assessments:
+        review_status = assessment.review_status or "not_reviewed"
+        
+        assessments.append({
+            "assessment_id": str(assessment.id),
+            "submitted_at": assessment.submitted_at.isoformat() if assessment.submitted_at else None,
+            "review_status": review_status,
+            "reviewed_at": assessment.reviewed_at.isoformat() if assessment.reviewed_at else None,
+            "review_submitted_at": assessment.review_submitted_at.isoformat() if assessment.review_submitted_at else None,
+            "overall_score": assessment.overall_score,
+            "has_reviewer": assessment.reviewer_id is not None
+        })
+    
+    # Summary statistics
+    total_submitted = len(assessments)
+    status_counts = {}
+    for assessment in assessments:
+        status = assessment["review_status"]
+        status_counts[status] = status_counts.get(status, 0) + 1
+    
+    return {
+        "total_submitted": total_submitted,
+        "status_breakdown": status_counts,
+        "assessments": assessments
+    }

@@ -3,6 +3,7 @@ from uuid import UUID
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import get_current_user, require_roles
