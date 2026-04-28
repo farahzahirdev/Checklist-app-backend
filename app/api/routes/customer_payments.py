@@ -125,6 +125,32 @@ def get_payment_dashboard_endpoint(
     return get_customer_payment_dashboard(db, current_user.id)
 
 
+# Quick access endpoints for common customer payment scenarios
+
+@router.get(
+    "/recent",
+    response_model=PaymentRecordListResponse,
+    summary="Get Recent Payments",
+    description="Get customer's most recent payments.",
+)
+def get_recent_payments_endpoint(
+    request: Request,
+    limit: int = Query(10, ge=1, le=50, description="Number of recent payments to return"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PaymentRecordListResponse:
+    """Get customer's recent payments."""
+    
+    return get_customer_payment_records(
+        db=db,
+        user_id=current_user.id,
+        skip=0,
+        limit=limit,
+        order_by="created_at",
+        order_direction="desc"
+    )
+
+
 @router.get(
     "/{payment_id}",
     response_model=PaymentDetailResponse,
@@ -162,30 +188,6 @@ def get_payment_analytics_endpoint(
     return get_customer_payment_analytics(db, current_user.id)
 
 
-# Quick access endpoints for common customer payment scenarios
-
-@router.get(
-    "/recent",
-    response_model=PaymentRecordListResponse,
-    summary="Get Recent Payments",
-    description="Get customer's most recent payments.",
-)
-def get_recent_payments_endpoint(
-    request: Request,
-    limit: int = Query(10, ge=1, le=50, description="Number of recent payments to return"),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> PaymentRecordListResponse:
-    """Get customer's recent payments."""
-    
-    return get_customer_payment_records(
-        db=db,
-        user_id=current_user.id,
-        skip=0,
-        limit=limit,
-        order_by="created_at",
-        order_direction="desc"
-    )
 
 
 @router.get(
