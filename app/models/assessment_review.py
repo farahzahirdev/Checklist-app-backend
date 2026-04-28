@@ -22,6 +22,7 @@ class ReviewStatus(str):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     REJECTED = "rejected"
+    CHANGES_REQUESTED = "changes_requested"
 
 
 class SuggestionType(str):
@@ -52,7 +53,7 @@ class AssessmentReview(Base):
         nullable=True
     )
     status: Mapped[str] = mapped_column(
-        SQLEnum('pending', 'in_progress', 'completed', 'rejected', name="review_status", native_enum=True),
+        SQLEnum('pending', 'in_progress', 'completed', 'rejected', 'changes_requested', name="review_status", native_enum=True),
         nullable=False,
         default=ReviewStatus.PENDING,
     )
