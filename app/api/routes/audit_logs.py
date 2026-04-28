@@ -57,7 +57,7 @@ def get_audit_logs_endpoint(
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(50, ge=1, le=200, description="Maximum number of items to return"),
     order_by: str = Query("created_at", description="Field to sort by"),
-    order_direction: str = Query("desc", regex="^(asc|desc)$", description="Sort direction"),
+    order_direction: str = Query("desc", pattern="^(asc|desc)$", description="Sort direction"),
     admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> AuditLogListResponse:
@@ -152,7 +152,7 @@ def get_audit_summary_endpoint(
 )
 def get_recent_changes_endpoint(
     request: Request,
-    time_period: str = Query("last_24_hours", regex="^(last_24_hours|last_7_days|last_30_days)$", description="Time period for changes"),
+    time_period: str = Query("last_24_hours", pattern="^(last_24_hours|last_7_days|last_30_days)$", description="Time period for changes"),
     limit: int = Query(50, ge=1, le=200, description="Maximum number of changes to return"),
     admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),

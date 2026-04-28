@@ -18,7 +18,7 @@ def list_customer_checklists(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     sort_by: str | None = Query(None, description="Field to sort by"),
-    sort_order: str = Query("asc", regex="^(asc|desc)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     search: str | None = Query(None, description="Search text for titles"),
     db: Session = Depends(get_db),
 ):

@@ -50,7 +50,7 @@ def list_customer_assessments(
     checklist_type: Optional[list[str]] = Query(None, description="Filter by checklist type codes"),
     search: Optional[str] = Query(None, description="Search in checklist titles and types"),
     sort_by: str = Query("updated_at", description="Field to sort by"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$", description="Sort order"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$", description="Sort order"),
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(50, ge=1, le=200, description="Maximum number of items to return"),
     current_user=Depends(get_current_user),
