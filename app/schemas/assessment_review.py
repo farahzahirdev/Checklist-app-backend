@@ -48,6 +48,8 @@ class AnswerReviewResponse(BaseModel):
     customer_score: Optional[int] = None
     section_name: Optional[str] = None
 
+    model_config = {"from_attributes": True}
+
 
 class AssessmentReviewCreate(BaseModel):
     """Schema for creating assessment review."""
@@ -99,6 +101,8 @@ class AssessmentReviewResponse(BaseModel):
     submitted_at: Optional[datetime] = None
     answer_reviews_count: int = 0
     action_required_count: int = 0
+
+    model_config = {"from_attributes": True}
 
 
 class AnswerWithReview(BaseModel):
@@ -154,6 +158,8 @@ class ReviewSummary(BaseModel):
     total_action_required: int
     average_review_time_hours: Optional[float]
     recent_reviews: List[AssessmentReviewResponse]
+
+    model_config = {"from_attributes": True}
 
 
 class BulkAnswerReviewCreate(BaseModel):
