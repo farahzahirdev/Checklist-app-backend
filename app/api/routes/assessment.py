@@ -4,6 +4,7 @@ import uuid
 import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import get_current_user
@@ -25,7 +26,7 @@ from app.services.assessment import (
 )
 from app.utils.i18n import get_language_code
 from app.utils.file_upload import allowed_file, validate_file_type, get_file_size, compute_sha256, basic_malware_scan, encrypt_file_data
-from app.models.assessment import AssessmentEvidenceFile, MalwareScanStatus
+from app.models.assessment import Assessment, AssessmentEvidenceFile, MalwareScanStatus
 from app.models.media import Media, MediaType
 import shutil
 
@@ -141,8 +142,9 @@ def get_assessment_answers_route(
     response_model=AssessmentAnswerResponse,
     summary="Save Assessment Answer",
     description=(
-        "Creates a new answer for a question in an assessment. "
-        "Use this endpoint when first answering a question."
+        "Saves an answer for a question in an assessment. "
+        "Creates new answer or updates existing one. "
+        "Users can call this multiple times to change their answers before submission."
     ),
 )
 def save_answer_route(
@@ -164,13 +166,16 @@ def save_answer_route(
     )
 
 
+
+
 @router.put(
     "/{assessment_id}/answers",
     response_model=AssessmentAnswerResponse,
     summary="Update Assessment Answer",
     description=(
         "Updates an existing answer for a question in an assessment. "
-        "This endpoint is idempotent per assessment_id + question_id."
+        "This endpoint is idempotent per assessment_id + question_id. "
+        "Users can update their answers multiple times before submitting the assessment."
     ),
 )
 def upsert_answer_route(
