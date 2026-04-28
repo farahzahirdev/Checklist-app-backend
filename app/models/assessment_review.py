@@ -2,13 +2,14 @@
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
+from app.models.user import User
 from sqlalchemy import ForeignKey, Text, DateTime, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.base import Base
-from app.models.assessment import AssessmentStatus
+from app.models.assessment import Assessment, AssessmentAnswer, AssessmentStatus
 
 
 class ReviewStatus(str):
@@ -67,6 +68,16 @@ class AssessmentReview(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+    # Relationships
+    assessment: Mapped["Assessment"] = relationship("Assessment", back_populates="review")
+    reviewer: Mapped["User"] = relationship("User", foreign_keys=[reviewer_id])
+    answer_reviews: Mapped[list["AnswerReview"]] = relationship(
+        "AnswerReview", back_populates="assessment_review", cascade="all, delete-orphan"
+    )
+    review_history: Mapped[list["ReviewHistory"]] = relationship(
+        "ReviewHistory", back_populates="assessment_review", cascade="all, delete-orphan"
+    )
+
 
 class AnswerReview(Base):
     """Review and suggestions for specific assessment answers."""
@@ -108,6 +119,11 @@ class AnswerReview(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+    # Relationships
+    assessment_review: Mapped["AssessmentReview"] = relationship("AssessmentReview", back_populates="answer_reviews")
+    answer: Mapped["AssessmentAnswer"] = relationship("AssessmentAnswer", back_populates="review")
+    reviewer: Mapped["User"] = relationship("User", foreign_keys=[reviewer_id])
+
 
 class ReviewHistory(Base):
     """History of review changes and actions."""
@@ -133,3 +149,7 @@ class ReviewHistory(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+    # Relationships
+    assessment_review: Mapped["AssessmentReview"] = relationship("AssessmentReview", back_populates="review_history")
+    reviewer: Mapped["User"] = relationship("User", foreign_keys=[reviewer_id])

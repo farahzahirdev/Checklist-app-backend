@@ -2,6 +2,9 @@ from datetime import datetime
 from enum import StrEnum
 import uuid
 
+from app.models.assessment_review import AnswerReview, AssessmentReview
+from app.models.checklist import Checklist, ChecklistQuestion, ChecklistSection
+from app.models.media import Media
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -86,6 +89,7 @@ class Assessment(Base):
     section_scores: Mapped[list["AssessmentSectionScore"]] = relationship(
         "AssessmentSectionScore", back_populates="assessment", cascade="all, delete-orphan"
     )
+    review: Mapped["AssessmentReview"] = relationship("AssessmentReview", back_populates="assessment", uselist=False)
 
 
 class AssessmentAnswer(Base):
@@ -121,6 +125,7 @@ class AssessmentAnswer(Base):
     evidence_files: Mapped[list["AssessmentEvidenceFile"]] = relationship(
         "AssessmentEvidenceFile", back_populates="answer", cascade="all, delete-orphan"
     )
+    review: Mapped["AnswerReview"] = relationship("AnswerReview", back_populates="answer", uselist=False)
 
     @property
     def answer(self) -> AnswerChoice | None:
