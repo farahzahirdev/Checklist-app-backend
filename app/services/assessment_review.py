@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
 from app.models.assessment import Assessment, AssessmentAnswer, AssessmentStatus
+from app.models.checklist import ChecklistTranslation
 from app.models.assessment_review import (
     AssessmentReview, 
     AnswerReview, 
