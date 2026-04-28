@@ -1,4 +1,5 @@
 """Assessment Review models for admin feedback and suggestions."""
+from typing import TYPE_CHECKING
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
@@ -9,7 +10,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.base import Base
-from app.models.assessment import Assessment, AssessmentAnswer, AssessmentStatus
+from app.models.assessment import AssessmentStatus
+
+if TYPE_CHECKING:
+    from app.models.assessment import Assessment, AssessmentAnswer
 
 
 class ReviewStatus(str):

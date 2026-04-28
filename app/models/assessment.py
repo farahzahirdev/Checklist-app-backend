@@ -1,8 +1,8 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 import uuid
 
-from app.models.assessment_review import AnswerReview, AssessmentReview
 from app.models.checklist import Checklist, ChecklistQuestion, ChecklistSection
 from app.models.media import Media
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, SmallInteger, String, Text, UniqueConstraint, func
@@ -10,6 +10,9 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.assessment_review import AssessmentReview, AnswerReview
 
 
 class PriorityLevel(StrEnum):
