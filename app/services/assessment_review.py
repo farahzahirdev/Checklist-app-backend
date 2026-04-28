@@ -586,4 +586,27 @@ def get_assessment_reviews_for_admin(
         .all()
     )
     
-    return [AssessmentReviewResponse.from_orm(r) for r in reviews]
+    responses = []
+    for r in reviews:
+        response = AssessmentReviewResponse.from_orm(r)
+        
+        # Populate additional context fields
+        if r.assessment:
+            response.customer_email = r.assessment.user.email if r.assessment.user else None
+            response.customer_name = r.assessment.user.email if r.assessment.user else None
+            response.assessment_status = r.assessment.status.value if r.assessment.status else None
+            response.submitted_at = r.assessment.submitted_at
+            
+            # Get checklist title
+            if r.assessment.checklist and r.assessment.checklist.translations:
+                checklist_translation = next(
+                    (t for t in r.assessment.checklist.translations 
+                     if t.language.code == lang_code), 
+                    None
+                )
+                response.checklist_title = checklist_translation.title if checklist_translation else f"Checklist v{r.assessment.checklist.version}"
+                response.checklist_version = f"v{r.assessment.checklist.version}"
+        
+        responses.append(response)
+    
+    return responses
