@@ -389,6 +389,7 @@ def _serialize_assessment_detail(db: Session, assessment: Assessment) -> Assessm
 
 def get_current_assessment_detail(db: Session, *, user: User, checklist_id: UUID | None = None, lang_code: str | None = None) -> AssessmentDetailResponse:
     assessment = _get_active_assessment(db, user=user, checklist_id=checklist_id)
+    db.refresh(assessment)  # Ensure we have latest completion_percent
     return _serialize_assessment_detail(db, assessment)
 
 
@@ -442,6 +443,7 @@ def upsert_assessment_answer(
 
     completion = _recompute_completion(db, assessment=assessment)
     db.commit()
+    db.refresh(assessment)  # Refresh assessment to get updated completion_percent
     db.refresh(existing)
 
     return AssessmentAnswerResponse(

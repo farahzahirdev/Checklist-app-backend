@@ -137,6 +137,65 @@ def get_assessment_answers_route(
     ]
 
 
+@router.get(
+    "/{assessment_id}/debug",
+    summary="Debug Assessment Completion",
+    description="Debug endpoint to check completion calculation details.",
+)
+def debug_assessment_completion(
+    assessment_id: UUID,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.models.assessment import AssessmentAnswer
+    from app.models.checklist import ChecklistQuestion
+    from sqlalchemy import func
+    
+    # Verify assessment belongs to user
+    assessment = db.scalar(
+        select(Assessment).where(
+            Assessment.id == assessment_id,
+            Assessment.user_id == current_user.id
+        )
+    )
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    
+    # Get detailed counts
+    total_questions = db.scalar(
+        select(func.count(ChecklistQuestion.id)).where(
+            ChecklistQuestion.checklist_id == assessment.checklist_id,
+            ChecklistQuestion.is_active.is_(True),
+        )
+    )
+    
+    answered_questions = db.scalar(
+        select(func.count(AssessmentAnswer.id)).where(AssessmentAnswer.assessment_id == assessment_id)
+    )
+    
+    # Recalculate completion
+    from app.services.assessment import _recompute_completion
+    actual_completion = _recompute_completion(db, assessment=assessment)
+    
+    return {
+        "assessment_id": str(assessment_id),
+        "total_questions": total_questions,
+        "answered_questions": answered_questions,
+        "stored_completion_percent": float(assessment.completion_percent),
+        "calculated_completion_percent": actual_completion,
+        "expected_completion_percent": (answered_questions / total_questions) * 100 if total_questions > 0 else 0,
+        "answers": [
+            {
+                "question_id": str(answer.question_id),
+                "answer": str(answer.answer) if answer.answer else None,
+                "answer_option_code_id": answer.answer_option_code_id,
+                "note_text": answer.note_text
+            }
+            for answer in db.scalars(select(AssessmentAnswer).where(AssessmentAnswer.assessment_id == assessment_id)).all()
+        ]
+    }
+
+
 @router.post(
     "/{assessment_id}/answers",
     response_model=AssessmentAnswerResponse,
