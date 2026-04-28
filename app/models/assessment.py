@@ -31,20 +31,20 @@ class MalwareScanStatus(StrEnum):
 
 
 class AnswerChoice(StrEnum):
-    yes = "yes"
-    partially = "partially"
-    dont_know = "dont_know"
-    no = "no"
+    four = "4"      # 4 points - highest score
+    three = "3"     # 3 points
+    two = "2"       # 2 points  
+    one = "1"       # 1 point - lowest score
 
     @classmethod
     def to_id(cls, choice: "AnswerChoice | str") -> int:
         value = cls(choice)
-        mapping = {cls.yes: 1, cls.partially: 2, cls.dont_know: 3, cls.no: 4}
+        mapping = {cls.four: 4, cls.three: 3, cls.two: 2, cls.one: 1}
         return mapping[value]
 
     @classmethod
     def from_id(cls, answer_option_code_id: int | None) -> "AnswerChoice | None":
-        mapping = {1: cls.yes, 2: cls.partially, 3: cls.dont_know, 4: cls.no}
+        mapping = {4: cls.four, 3: cls.three, 2: cls.two, 1: cls.one}
         return mapping.get(answer_option_code_id)
 
 

@@ -158,10 +158,10 @@ def start_assessment(
 
 
 ANSWER_SCORES: dict[AnswerChoice, int] = {
-    AnswerChoice.yes: 4,
-    AnswerChoice.partially: 3,
-    AnswerChoice.dont_know: 2,
-    AnswerChoice.no: 1,
+    AnswerChoice.four: 4,
+    AnswerChoice.three: 3,
+    AnswerChoice.two: 2,
+    AnswerChoice.one: 1,
 }
 
 
@@ -196,9 +196,9 @@ def _question_for_assessment(
 
 
 def _priority_for_choice(choice: AnswerChoice) -> PriorityLevel:
-    if choice == AnswerChoice.no:
+    if choice == AnswerChoice.one:
         return PriorityLevel.high
-    if choice == AnswerChoice.dont_know:
+    if choice == AnswerChoice.two:
         return PriorityLevel.medium
     return PriorityLevel.low
 
