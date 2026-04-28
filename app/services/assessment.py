@@ -398,7 +398,7 @@ def upsert_assessment_answer(
     user: User,
     assessment_id: UUID,
     question_id: UUID,
-    answer: AnswerChoice,
+    answer: AnswerChoice | int,
     note_text: str | None,
     lang_code: str = "en",
 ) -> AssessmentAnswerResponse:
@@ -412,20 +412,28 @@ def upsert_assessment_answer(
         )
     )
 
+    # Convert integer to AnswerChoice if needed
+    if isinstance(answer, int):
+        answer_choice = AnswerChoice.from_id(answer)
+        if answer_choice is None:
+            raise HTTPException(status_code=400, detail=f"Invalid answer ID: {answer}")
+    else:
+        answer_choice = AnswerChoice(answer)
+
     if existing is None:
         existing = AssessmentAnswer(
             assessment_id=assessment.id,
             question_id=question_id,
-            answer=answer,
-            answer_score=ANSWER_SCORES[answer],
-            weighted_priority=_priority_for_choice(answer),
+            answer=answer_choice,
+            answer_score=ANSWER_SCORES[answer_choice],
+            weighted_priority=_priority_for_choice(answer_choice),
             note_text=note_text,
         )
         db.add(existing)
     else:
-        existing.answer = answer
-        existing.answer_score = ANSWER_SCORES[answer]
-        existing.weighted_priority = _priority_for_choice(answer)
+        existing.answer = answer_choice
+        existing.answer_score = ANSWER_SCORES[answer_choice]
+        existing.weighted_priority = _priority_for_choice(answer_choice)
         existing.note_text = note_text
 
     if assessment.status == AssessmentStatus.not_started:
@@ -439,7 +447,7 @@ def upsert_assessment_answer(
     return AssessmentAnswerResponse(
         assessment_id=assessment.id,
         question_id=question_id,
-        answer=existing.answer,
+        answer=answer_choice,
         answer_score=existing.answer_score,
         weighted_priority=existing.weighted_priority,
         completion_percent=completion,
