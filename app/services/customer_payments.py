@@ -111,13 +111,13 @@ def get_customer_payment_records(
         
         # Determine access status
         active_access = any(
-            window.start_date <= _now_utc() <= window.end_date 
+            window.activated_at <= _now_utc() <= window.expires_at 
             for window in access_windows
         )
         
         # Calculate days of access
         total_days = sum(
-            (window.end_date - window.start_date).days + 1
+            (window.expires_at - window.activated_at).days + 1
             for window in access_windows
         )
         
@@ -135,8 +135,8 @@ def get_customer_payment_records(
             status=payment.status,
             paid_at=payment.paid_at,
             created_at=payment.created_at,
-            access_window_start=min((w.start_date for w in access_windows), default=None),
-            access_window_end=max((w.end_date for w in access_windows), default=None),
+            access_window_start=min((w.activated_at for w in access_windows), default=None),
+            access_window_end=max((w.expires_at for w in access_windows), default=None),
             is_access_active=active_access,
             days_of_access=total_days if total_days > 0 else None,
         )
@@ -198,8 +198,8 @@ def get_customer_payment_summary(db: Session, user_id: UUID) -> PaymentSummary:
         .filter(
             and_(
                 Payment.user_id == user_id,
-                AccessWindow.start_date <= now,
-                AccessWindow.end_date >= now
+                AccessWindow.activated_at <= now,
+                AccessWindow.expires_at >= now
             )
         )
         .count()
@@ -239,27 +239,27 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
         .filter(
             and_(
                 Payment.user_id == user_id,
-                AccessWindow.start_date <= now,
-                AccessWindow.end_date >= now
+                AccessWindow.activated_at <= now,
+                AccessWindow.expires_at >= now
             )
         )
-        .order_by(AccessWindow.end_date)
+        .order_by(AccessWindow.expires_at)
         .all()
     )
     
     active_access_windows = []
     for access_window, payment, checklist in active_access_windows_query:
-        days_remaining = (access_window.end_date - now).days + 1
-        days_total = (access_window.end_date - access_window.start_date).days + 1
-        access_percentage = ((now - access_window.start_date).days + 1) / days_total * 100
+        days_remaining = (access_window.expires_at - now).days + 1
+        days_total = (access_window.expires_at - access_window.activated_at).days + 1
+        access_percentage = ((now - access_window.activated_at).days + 1) / days_total * 100
         
         active_access_windows.append(AccessWindowInfo(
             id=access_window.id,
             payment_id=payment.id,
             checklist_id=payment.checklist_id,
             checklist_title=checklist.title if checklist else None,
-            start_date=access_window.start_date,
-            end_date=access_window.end_date,
+            start_date=access_window.activated_at,
+            end_date=access_window.expires_at,
             is_active=True,
             days_remaining=days_remaining,
             days_total=days_total,
@@ -275,28 +275,29 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
         .filter(
             and_(
                 Payment.user_id == user_id,
-                AccessWindow.end_date > now,
-                AccessWindow.end_date <= upcoming_end_date,
-                AccessWindow.end_date > now  # Exclude currently active
+                AccessWindow.expires_at > now,
+                AccessWindow.expires_at <= upcoming_end_date,
+                AccessWindow.expires_at > now  # Exclude currently active
             )
         )
-        .order_by(AccessWindow.end_date)
+        .order_by(AccessWindow.expires_at)
         .all()
     )
     
     upcoming_expirations = []
     for access_window, payment, checklist in upcoming_expirations_query:
-        days_total = (access_window.end_date - access_window.start_date).days + 1
+        days_total = (access_window.expires_at - access_window.activated_at).days + 1
         
+        days_remaining = (access_window.expires_at - now).days + 1
         upcoming_expirations.append(AccessWindowInfo(
             id=access_window.id,
             payment_id=payment.id,
             checklist_id=payment.checklist_id,
             checklist_title=checklist.title if checklist else None,
-            start_date=access_window.start_date,
-            end_date=access_window.end_date,
+            start_date=access_window.activated_at,
+            end_date=access_window.expires_at,
             is_active=False,
-            days_remaining=(access_window.end_date - now).days + 1,
+            days_remaining=days_remaining,
             days_total=days_total,
             access_percentage=100,  # Will be 100% when expired
         ))
@@ -317,7 +318,7 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
                 Payment.status == PaymentStatus.succeeded
             )
         )
-        .group_by(func.date_trunc('month', Payment.created_at))
+        .group_by(func.date_trunc('month', Payment.created_at), Payment.created_at)
         .order_by('month')
         .all()
     )
@@ -408,21 +409,21 @@ def get_customer_payment_detail(
     access_windows_query = (
         db.query(AccessWindow)
         .filter(AccessWindow.payment_id == payment_id)
-        .order_by(AccessWindow.start_date)
+        .order_by(AccessWindow.activated_at)
         .all()
     )
     
     access_windows = []
     for access_window in access_windows_query:
-        days_total = (access_window.end_date - access_window.start_date).days + 1
+        days_total = (access_window.expires_at - access_window.activated_at).days + 1
         now = _now_utc()
-        days_remaining = max(0, (access_window.end_date - now).days + 1)
+        days_remaining = max(0, (access_window.expires_at - now).days + 1)
         access_percentage = 0
         
-        if access_window.start_date <= now <= access_window.end_date:
-            elapsed = (now - access_window.start_date).days + 1
+        if access_window.activated_at <= now <= access_window.expires_at:
+            elapsed = (now - access_window.activated_at).days + 1
             access_percentage = (elapsed / days_total) * 100
-        elif now > access_window.end_date:
+        elif now > access_window.expires_at:
             access_percentage = 100
         
         access_windows.append(AccessWindowInfo(
@@ -430,10 +431,10 @@ def get_customer_payment_detail(
             payment_id=payment.id,
             checklist_id=payment.checklist_id,
             checklist_title=checklist.title if checklist else None,
-            start_date=access_window.start_date,
-            end_date=access_window.end_date,
-            is_active=access_window.start_date <= now <= access_window.end_date,
-            days_remaining=days_remaining if access_window.end_date > now else 0,
+            start_date=access_window.activated_at,
+            end_date=access_window.expires_at,
+            is_active=access_window.activated_at <= now <= access_window.expires_at,
+            days_remaining=days_remaining if access_window.expires_at > now else 0,
             days_total=days_total,
             access_percentage=min(access_percentage, 100),
         ))
@@ -458,7 +459,7 @@ def get_customer_payment_detail(
     
     # Build payment record
     active_access = any(
-        window.start_date <= _now_utc() <= window.end_date 
+        window.activated_at <= _now_utc() <= window.expires_at 
         for window in access_windows_query
     )
     
@@ -476,11 +477,11 @@ def get_customer_payment_detail(
         status=payment.status,
         paid_at=payment.paid_at,
         created_at=payment.created_at,
-        access_window_start=min((w.start_date for w in access_windows_query), default=None),
-        access_window_end=max((w.end_date for w in access_windows_query), default=None),
+        access_window_start=min((w.activated_at for w in access_windows_query), default=None),
+        access_window_end=max((w.expires_at for w in access_windows_query), default=None),
         is_access_active=active_access,
         days_of_access=sum(
-            (w.end_date - w.start_date).days + 1 for w in access_windows_query
+            (w.expires_at - w.activated_at).days + 1 for w in access_windows_query
         ) if access_windows_query else None,
     )
     
@@ -554,7 +555,7 @@ def get_customer_payment_analytics(db: Session, user_id: UUID) -> PaymentAnalyti
                 Payment.status == PaymentStatus.succeeded
             )
         )
-        .group_by(func.date_trunc('month', Payment.created_at))
+        .group_by(func.date_trunc('month', Payment.created_at), Payment.created_at)
         .order_by('month')
         .all()
     )
@@ -624,7 +625,7 @@ def get_customer_payment_analytics(db: Session, user_id: UUID) -> PaymentAnalyti
     )
     
     total_access_days = sum(
-        (aw.end_date - aw.start_date).days + 1 for aw in access_windows
+        (aw.expires_at - aw.activated_at).days + 1 for aw in access_windows
     )
     average_access_duration = total_access_days / len(access_windows) if access_windows else 0
     
