@@ -13,6 +13,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.assessment_review import AssessmentReview, AnswerReview
+    from app.models.user import User
 
 
 class PriorityLevel(StrEnum):
@@ -82,6 +83,7 @@ class Assessment(Base):
     )
 
     # Relationships
+    user: Mapped["User"] = relationship("User")
     checklist: Mapped["Checklist"] = relationship("Checklist")
     answers: Mapped[list["AssessmentAnswer"]] = relationship(
         "AssessmentAnswer", back_populates="assessment", cascade="all, delete-orphan"
