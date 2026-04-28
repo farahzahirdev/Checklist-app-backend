@@ -75,6 +75,18 @@ class Assessment(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+    # Relationships
+    checklist: Mapped["Checklist"] = relationship("Checklist")
+    answers: Mapped[list["AssessmentAnswer"]] = relationship(
+        "AssessmentAnswer", back_populates="assessment", cascade="all, delete-orphan"
+    )
+    evidence_files: Mapped[list["AssessmentEvidenceFile"]] = relationship(
+        "AssessmentEvidenceFile", back_populates="assessment", cascade="all, delete-orphan"
+    )
+    section_scores: Mapped[list["AssessmentSectionScore"]] = relationship(
+        "AssessmentSectionScore", back_populates="assessment", cascade="all, delete-orphan"
+    )
+
 
 class AssessmentAnswer(Base):
     __tablename__ = "assessment_answers"
@@ -102,6 +114,13 @@ class AssessmentAnswer(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    assessment: Mapped["Assessment"] = relationship("Assessment", back_populates="answers")
+    question: Mapped["ChecklistQuestion"] = relationship("ChecklistQuestion")
+    evidence_files: Mapped[list["AssessmentEvidenceFile"]] = relationship(
+        "AssessmentEvidenceFile", back_populates="answer", cascade="all, delete-orphan"
+    )
 
     @property
     def answer(self) -> AnswerChoice | None:
@@ -132,7 +151,10 @@ class AssessmentEvidenceFile(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # Relationship to Media model
+    # Relationships
+    assessment: Mapped["Assessment"] = relationship("Assessment", back_populates="evidence_files")
+    answer: Mapped["AssessmentAnswer | None"] = relationship("AssessmentAnswer", back_populates="evidence_files")
+    question: Mapped["ChecklistQuestion"] = relationship("ChecklistQuestion")
     media: Mapped["Media"] = relationship("Media", foreign_keys=[media_id])
 
 
@@ -151,3 +173,7 @@ class AssessmentSectionScore(Base):
     answered_count: Mapped[int] = mapped_column(Integer, nullable=False)
     total_count: Mapped[int] = mapped_column(Integer, nullable=False)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    # Relationships
+    assessment: Mapped["Assessment"] = relationship("Assessment", back_populates="section_scores")
+    section: Mapped["ChecklistSection"] = relationship("ChecklistSection")

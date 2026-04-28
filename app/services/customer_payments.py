@@ -305,9 +305,10 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
     
     # Get payment trends (last 6 months)
     six_months_ago = now - timedelta(days=180)
+    trends_month_trunc = func.date_trunc('month', Payment.created_at)
     payment_trends_query = (
         db.query(
-            func.date_trunc('month', Payment.created_at).label('month'),
+            trends_month_trunc.label('month'),
             func.count(Payment.id).label('payment_count'),
             func.sum(Payment.amount_cents).label('total_amount'),
             func.avg(Payment.amount_cents).label('average_amount'),
@@ -319,8 +320,8 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
                 Payment.status == PaymentStatus.succeeded
             )
         )
-        .group_by(func.date_trunc('month', Payment.created_at))
-        .order_by('month')
+        .group_by(trends_month_trunc)
+        .order_by(trends_month_trunc)
         .all()
     )
     
@@ -543,9 +544,10 @@ def get_customer_payment_analytics(db: Session, user_id: UUID) -> PaymentAnalyti
     payment_success_rate = len(successful_payments) / len(all_payments) if all_payments else 0
     
     # Spending by month
+    month_trunc = func.date_trunc('month', Payment.created_at)
     spending_by_month_query = (
         db.query(
-            func.date_trunc('month', Payment.created_at).label('month'),
+            month_trunc.label('month'),
             func.sum(Payment.amount_cents).label('amount'),
             func.count(Payment.id).label('count'),
             func.avg(Payment.amount_cents).label('avg_amount'),
@@ -556,8 +558,8 @@ def get_customer_payment_analytics(db: Session, user_id: UUID) -> PaymentAnalyti
                 Payment.status == PaymentStatus.succeeded
             )
         )
-        .group_by(func.date_trunc('month', Payment.created_at))
-        .order_by('month')
+        .group_by(month_trunc)
+        .order_by(month_trunc)
         .all()
     )
     
@@ -572,11 +574,13 @@ def get_customer_payment_analytics(db: Session, user_id: UUID) -> PaymentAnalyti
         ))
     
     # Spending by checklist
+    title_coalesce = func.coalesce(ChecklistTranslation.title, f"Checklist v{Checklist.version}")
+    description_coalesce = func.coalesce(ChecklistTranslation.description, "")
     spending_by_checklist_query = (
         db.query(
             Checklist.id,
-            func.coalesce(ChecklistTranslation.title, f"Checklist v{Checklist.version}").label('title'),
-            func.coalesce(ChecklistTranslation.description, "").label('description'),
+            title_coalesce.label('title'),
+            description_coalesce.label('description'),
             func.count(Payment.id).label('payment_count'),
             func.sum(Payment.amount_cents).label('total_amount'),
             func.avg(Payment.amount_cents).label('avg_amount'),
@@ -590,7 +594,7 @@ def get_customer_payment_analytics(db: Session, user_id: UUID) -> PaymentAnalyti
                 Payment.status == PaymentStatus.succeeded
             )
         )
-        .group_by(Checklist.id, ChecklistTranslation.title, ChecklistTranslation.description, Checklist.version)
+        .group_by(Checklist.id, title_coalesce, description_coalesce, Checklist.version)
         .order_by(desc('total_amount'))
         .limit(10)
         .all()

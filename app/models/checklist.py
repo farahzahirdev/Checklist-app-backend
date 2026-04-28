@@ -81,6 +81,18 @@ class Checklist(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+    # Relationships
+    checklist_type: Mapped["ChecklistType"] = relationship("ChecklistType")
+    translations: Mapped[list["ChecklistTranslation"]] = relationship(
+        "ChecklistTranslation", back_populates="checklist", cascade="all, delete-orphan"
+    )
+    sections: Mapped[list["ChecklistSection"]] = relationship(
+        "ChecklistSection", back_populates="checklist", cascade="all, delete-orphan"
+    )
+    questions: Mapped[list["ChecklistQuestion"]] = relationship(
+        "ChecklistQuestion", back_populates="checklist", cascade="all, delete-orphan"
+    )
+
     @property
     def status(self) -> ChecklistStatus | None:
         return ChecklistStatus.from_id(self.status_code_id)
@@ -124,6 +136,15 @@ class ChecklistSection(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+    # Relationships
+    checklist: Mapped["Checklist"] = relationship("Checklist", back_populates="sections")
+    translations: Mapped[list["ChecklistSectionTranslation"]] = relationship(
+        "ChecklistSectionTranslation", back_populates="section", cascade="all, delete-orphan"
+    )
+    questions: Mapped[list["ChecklistQuestion"]] = relationship(
+        "ChecklistQuestion", back_populates="section", cascade="all, delete-orphan"
+    )
+
 
 class ChecklistQuestion(Base):
     __tablename__ = "checklist_questions"
@@ -164,6 +185,13 @@ class ChecklistQuestion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    # Relationships
+    checklist: Mapped["Checklist"] = relationship("Checklist", back_populates="questions")
+    section: Mapped["ChecklistSection"] = relationship("ChecklistSection", back_populates="questions")
+    translations: Mapped[list["ChecklistQuestionTranslation"]] = relationship(
+        "ChecklistQuestionTranslation", back_populates="question", cascade="all, delete-orphan"
     )
     parent_question: Mapped["ChecklistQuestion | None"] = relationship(
         "ChecklistQuestion",
@@ -240,6 +268,10 @@ class ChecklistTranslation(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
+    # Relationships
+    checklist: Mapped["Checklist"] = relationship("Checklist", back_populates="translations")
+    language: Mapped["Language"] = relationship("Language")
+
 
 class ChecklistSectionTranslation(Base):
     __tablename__ = "checklist_section_translations"
@@ -256,6 +288,10 @@ class ChecklistSectionTranslation(Base):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    # Relationships
+    section: Mapped["ChecklistSection"] = relationship("ChecklistSection", back_populates="translations")
+    language: Mapped["Language"] = relationship("Language")
 
 
 class ChecklistQuestionTranslation(Base):
@@ -284,3 +320,7 @@ class ChecklistQuestionTranslation(Base):
     guidance_score_1: Mapped[str | None] = mapped_column(Text, nullable=True)
     recommendation_template: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    # Relationships
+    question: Mapped["ChecklistQuestion"] = relationship("ChecklistQuestion", back_populates="translations")
+    language: Mapped["Language"] = relationship("Language")
