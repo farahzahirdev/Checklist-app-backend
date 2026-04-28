@@ -91,7 +91,11 @@ def get_assessment_answers_with_reviews(
     assessment = (
         db.query(Assessment)
         .options(joinedload(Assessment.user))
-        .options(joinedload(Assessment.checklist))
+        .options(
+            joinedload(Assessment.checklist)
+            .joinedload(Checklist.translations)
+            .joinedload(ChecklistTranslation.language)
+        )
         .filter(Assessment.id == assessment_id)
         .first()
     )
@@ -187,13 +191,20 @@ def get_assessment_answers_with_reviews(
     
     # Calculate statistics
     average_score = total_score / len(answers) if answers else 0
+    # Get checklist title translation
+    checklist_translation = next(
+        (t for t in assessment.checklist.translations 
+         if t.language.code == lang_code), 
+        None
+    )
+    
     completion_percentage = assessment.completion_percent or 0
     
     return AssessmentAnswerListResponse(
         assessment_id=assessment_id,
         customer_email=assessment.user.email,
         customer_name=assessment.user.full_name or assessment.user.email,
-        checklist_title=assessment.checklist.title or f"Checklist v{assessment.checklist.version}",
+        checklist_title=checklist_translation.title if checklist_translation else f"Checklist v{assessment.checklist.version}",
         checklist_version=f"v{assessment.checklist.version}",
         assessment_status=assessment.status.value,
         submitted_at=assessment.submitted_at,

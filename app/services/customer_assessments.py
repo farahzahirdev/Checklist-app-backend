@@ -15,6 +15,7 @@ from app.models.assessment import (
     AssessmentStatus, 
     AssessmentEvidenceFile
 )
+from app.models.user import User
 from app.models.checklist import (
     Checklist,
     ChecklistQuestion,

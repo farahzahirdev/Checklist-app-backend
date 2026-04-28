@@ -55,8 +55,9 @@ def get_customer_payment_records(
     
     # Base query with joins to get checklist info
     query = (
-        db.query(Payment, Checklist)
+        db.query(Payment, Checklist, ChecklistTranslation)
         .outerjoin(Checklist, Payment.checklist_id == Checklist.id)
+        .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .filter(Payment.user_id == user_id)
     )
     
@@ -84,8 +85,8 @@ def get_customer_payment_records(
             search_term = f"%{filters.search}%"
             query = query.filter(
                 or_(
-                    Checklist.title.ilike(search_term),
-                    Checklist.description.ilike(search_term),
+                    ChecklistTranslation.title.ilike(search_term),
+                    ChecklistTranslation.description.ilike(search_term),
                 )
             )
     
@@ -104,7 +105,7 @@ def get_customer_payment_records(
     
     # Build payment records
     payment_records = []
-    for payment, checklist in results:
+    for payment, checklist, translation in results:
         # Get access windows for this payment
         access_windows = db.query(AccessWindow).filter(
             AccessWindow.payment_id == payment.id
@@ -126,9 +127,9 @@ def get_customer_payment_records(
             id=payment.id,
             user_id=payment.user_id,
             checklist_id=payment.checklist_id,
-            checklist_title=checklist.title if checklist else None,
-            checklist_description=checklist.description if checklist else None,
-            checklist_version=checklist.version if checklist else None,
+            checklist_title=translation.title if translation else f"Checklist v{checklist.version}",
+            checklist_description=translation.description if translation else None,
+            checklist_version=f"v{checklist.version}",
             stripe_payment_intent_id=payment.stripe_payment_intent_id,
             amount_cents=payment.amount_cents,
             amount_formatted=_format_currency(payment.amount_cents, payment.currency),
@@ -234,9 +235,10 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
     # Get active access windows
     now = _now_utc()
     active_access_windows_query = (
-        db.query(AccessWindow, Payment, Checklist)
+        db.query(AccessWindow, Payment, Checklist, ChecklistTranslation)
         .join(Payment, AccessWindow.payment_id == Payment.id)
         .outerjoin(Checklist, Payment.checklist_id == Checklist.id)
+        .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .filter(
             and_(
                 Payment.user_id == user_id,
@@ -249,7 +251,7 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
     )
     
     active_access_windows = []
-    for access_window, payment, checklist in active_access_windows_query:
+    for access_window, payment, checklist, translation in active_access_windows_query:
         days_remaining = (access_window.expires_at - now).days + 1
         days_total = (access_window.expires_at - access_window.activated_at).days + 1
         access_percentage = ((now - access_window.activated_at).days + 1) / days_total * 100
@@ -258,7 +260,7 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
             id=access_window.id,
             payment_id=payment.id,
             checklist_id=payment.checklist_id,
-            checklist_title=checklist.title if checklist else None,
+            checklist_title=translation.title if translation else f"Checklist v{checklist.version}",
             start_date=access_window.activated_at,
             end_date=access_window.expires_at,
             is_active=True,
@@ -270,9 +272,10 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
     # Get upcoming expirations (next 7 days)
     upcoming_end_date = now + timedelta(days=7)
     upcoming_expirations_query = (
-        db.query(AccessWindow, Payment, Checklist)
+        db.query(AccessWindow, Payment, Checklist, ChecklistTranslation)
         .join(Payment, AccessWindow.payment_id == Payment.id)
         .outerjoin(Checklist, Payment.checklist_id == Checklist.id)
+        .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .filter(
             and_(
                 Payment.user_id == user_id,
@@ -286,7 +289,7 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
     )
     
     upcoming_expirations = []
-    for access_window, payment, checklist in upcoming_expirations_query:
+    for access_window, payment, checklist, translation in upcoming_expirations_query:
         days_total = (access_window.expires_at - access_window.activated_at).days + 1
         
         days_remaining = (access_window.expires_at - now).days + 1
@@ -294,7 +297,7 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
             id=access_window.id,
             payment_id=payment.id,
             checklist_id=payment.checklist_id,
-            checklist_title=checklist.title if checklist else None,
+            checklist_title=translation.title if translation else f"Checklist v{checklist.version}",
             start_date=access_window.activated_at,
             end_date=access_window.expires_at,
             is_active=False,
@@ -335,11 +338,13 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
         ))
     
     # Get checklist breakdown
+    title_coalesce = func.coalesce(ChecklistTranslation.title, f"Checklist v{Checklist.version}")
+    description_coalesce = func.coalesce(ChecklistTranslation.description, "")
     checklist_breakdown_query = (
         db.query(
             Checklist.id,
-            Checklist.title,
-            Checklist.description,
+            title_coalesce.label('title'),
+            description_coalesce.label('description'),
             func.count(Payment.id).label('total_payments'),
             func.sum(Payment.amount_cents).label('total_amount'),
             func.avg(Payment.amount_cents).label('average_amount'),
@@ -348,8 +353,9 @@ def get_customer_payment_dashboard(db: Session, user_id: UUID) -> PaymentDashboa
         )
         .outerjoin(Payment, Checklist.id == Payment.checklist_id)
         .outerjoin(AccessWindow, Payment.id == AccessWindow.payment_id)
+        .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .filter(Payment.user_id == user_id)
-        .group_by(Checklist.id, Checklist.title, Checklist.description)
+        .group_by(Checklist.id, title_coalesce, description_coalesce, Checklist.version)
         .order_by(desc('total_payments'))
         .all()
     )
@@ -391,8 +397,9 @@ def get_customer_payment_detail(
     
     # Get payment with checklist info
     payment_query = (
-        db.query(Payment, Checklist)
+        db.query(Payment, Checklist, ChecklistTranslation)
         .outerjoin(Checklist, Payment.checklist_id == Checklist.id)
+        .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .filter(
             and_(
                 Payment.id == payment_id,
@@ -405,7 +412,7 @@ def get_customer_payment_detail(
     if not payment_query:
         return None
     
-    payment, checklist = payment_query
+    payment, checklist, translation = payment_query
     
     # Get access windows
     access_windows_query = (
@@ -432,7 +439,7 @@ def get_customer_payment_detail(
             id=access_window.id,
             payment_id=payment.id,
             checklist_id=payment.checklist_id,
-            checklist_title=checklist.title if checklist else None,
+            checklist_title=translation.title if translation else f"Checklist v{checklist.version}",
             start_date=access_window.activated_at,
             end_date=access_window.expires_at,
             is_active=access_window.activated_at <= now <= access_window.expires_at,
@@ -446,8 +453,8 @@ def get_customer_payment_detail(
     if checklist:
         checklist_info = ChecklistInfo(
             id=checklist.id,
-            title=checklist.title,
-            description=checklist.description,
+            title=translation.title if translation else f"Checklist v{checklist.version}",
+            description=translation.description if translation else None,
             version=checklist.version,
             price_cents=checklist.price_cents,
             price_formatted=_format_currency(checklist.price_cents),
@@ -469,9 +476,9 @@ def get_customer_payment_detail(
         id=payment.id,
         user_id=payment.user_id,
         checklist_id=payment.checklist_id,
-        checklist_title=checklist.title if checklist else None,
-        checklist_description=checklist.description if checklist else None,
-        checklist_version=checklist.version if checklist else None,
+        checklist_title=translation.title if translation else f"Checklist v{checklist.version}",
+        checklist_description=translation.description if translation else None,
+        checklist_version=f"v{checklist.version}",
         stripe_payment_intent_id=payment.stripe_payment_intent_id,
         amount_cents=payment.amount_cents,
         amount_formatted=_format_currency(payment.amount_cents, payment.currency),
@@ -639,14 +646,22 @@ def get_customer_payment_analytics(db: Session, user_id: UUID) -> PaymentAnalyti
     # Build most expensive payment record
     most_expensive_payment_record = None
     if most_expensive_payment:
-        checklist = db.query(Checklist).filter(Checklist.id == most_expensive_payment.checklist_id).first()
+        # Get checklist with translation
+        checklist_data = (
+            db.query(Checklist, ChecklistTranslation)
+            .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
+            .filter(Checklist.id == most_expensive_payment.checklist_id)
+            .first()
+        )
+        
+        checklist, translation = checklist_data if checklist_data else (None, None)
         most_expensive_payment_record = PaymentRecord(
             id=most_expensive_payment.id,
             user_id=most_expensive_payment.user_id,
             checklist_id=most_expensive_payment.checklist_id,
-            checklist_title=checklist.title if checklist else None,
-            checklist_description=checklist.description if checklist else None,
-            checklist_version=checklist.version if checklist else None,
+            checklist_title=translation.title if translation else f"Checklist v{checklist.version}" if checklist else None,
+            checklist_description=translation.description if translation else None,
+            checklist_version=f"v{checklist.version}" if checklist else None,
             stripe_payment_intent_id=most_expensive_payment.stripe_payment_intent_id,
             amount_cents=most_expensive_payment.amount_cents,
             amount_formatted=_format_currency(most_expensive_payment.amount_cents),
