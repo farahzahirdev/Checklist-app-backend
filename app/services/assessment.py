@@ -466,6 +466,20 @@ def submit_assessment(db: Session, *, user: User, assessment_id: UUID, lang_code
     assessment.status = AssessmentStatus.submitted
     assessment.submitted_at = _now_utc()
 
+    # Create assessment review for admin review
+    from app.models.assessment_review import AssessmentReview
+    existing_review = db.scalar(
+        select(AssessmentReview).where(AssessmentReview.assessment_id == assessment.id)
+    )
+    
+    if not existing_review:
+        review = AssessmentReview(
+            assessment_id=assessment.id,
+            status="pending",  # Use string instead of enum to avoid import issues
+            completion_percentage=completion,
+        )
+        db.add(review)
+
     db.commit()
     db.refresh(assessment)
 
