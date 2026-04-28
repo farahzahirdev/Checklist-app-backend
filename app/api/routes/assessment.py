@@ -89,12 +89,87 @@ def get_current_assessment_detail_route(
     return get_current_assessment_detail(db, user=current_user, checklist_id=checklist_id, lang_code=lang_code)
 
 
-@router.put(
+@router.get(
+    "/{assessment_id}/answers",
+    response_model=list[AssessmentAnswerResponse],
+    summary="Get Assessment Answers",
+    description=(
+        "Returns all answers for a specific assessment. "
+        "Useful for restoring progress and displaying current state."
+    ),
+)
+def get_assessment_answers_route(
+    assessment_id: UUID,
+    http_request: Request,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[AssessmentAnswerResponse]:
+    from app.models.assessment import AssessmentAnswer
+    
+    lang_code = get_language_code(http_request, db)
+    
+    # Verify assessment belongs to user and is active
+    assessment = db.scalar(
+        select(Assessment).where(
+            Assessment.id == assessment_id,
+            Assessment.user_id == current_user.id
+        )
+    )
+    if not assessment:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    
+    # Get all answers for this assessment
+    answers = db.scalars(
+        select(AssessmentAnswer).where(AssessmentAnswer.assessment_id == assessment_id)
+    ).all()
+    
+    return [
+        AssessmentAnswerResponse(
+            assessment_id=answer.assessment_id,
+            question_id=answer.question_id,
+            answer=answer.answer,
+            answer_score=answer.answer_score,
+            weighted_priority=answer.weighted_priority,
+            completion_percent=float(assessment.completion_percent),
+        )
+        for answer in answers
+    ]
+
+
+@router.post(
     "/{assessment_id}/answers",
     response_model=AssessmentAnswerResponse,
     summary="Save Assessment Answer",
     description=(
-        "Creates or updates an answer for a question in an assessment. "
+        "Creates a new answer for a question in an assessment. "
+        "Use this endpoint when first answering a question."
+    ),
+)
+def save_answer_route(
+    assessment_id: UUID,
+    request: AssessmentAnswerUpsertRequest,
+    http_request: Request,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AssessmentAnswerResponse:
+    lang_code = get_language_code(http_request, db)
+    return upsert_assessment_answer(
+        db,
+        user=current_user,
+        assessment_id=assessment_id,
+        question_id=request.question_id,
+        answer=request.answer,
+        note_text=request.note_text,
+        lang_code=lang_code,
+    )
+
+
+@router.put(
+    "/{assessment_id}/answers",
+    response_model=AssessmentAnswerResponse,
+    summary="Update Assessment Answer",
+    description=(
+        "Updates an existing answer for a question in an assessment. "
         "This endpoint is idempotent per assessment_id + question_id."
     ),
 )
@@ -115,6 +190,45 @@ def upsert_answer_route(
         note_text=request.note_text,
         lang_code=lang_code,
     )
+
+
+@router.post(
+    "/{assessment_id}/answers/bulk",
+    response_model=list[AssessmentAnswerResponse],
+    summary="Save Multiple Answers",
+    description=(
+        "Saves multiple answers for an assessment in a single request. "
+        "Useful for auto-save or bulk operations."
+    ),
+)
+def save_bulk_answers_route(
+    assessment_id: UUID,
+    requests: list[AssessmentAnswerUpsertRequest],
+    http_request: Request,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[AssessmentAnswerResponse]:
+    lang_code = get_language_code(http_request, db)
+    
+    results = []
+    for request in requests:
+        try:
+            result = upsert_assessment_answer(
+                db,
+                user=current_user,
+                assessment_id=assessment_id,
+                question_id=request.question_id,
+                answer=request.answer,
+                note_text=request.note_text,
+                lang_code=lang_code,
+            )
+            results.append(result)
+        except Exception as e:
+            # Log error but continue processing other answers
+            print(f"Error saving answer for question {request.question_id}: {e}")
+            continue
+    
+    return results
 
 
 @router.post(
