@@ -206,7 +206,7 @@ def get_assessment_answers_with_reviews(
     return AssessmentAnswerListResponse(
         assessment_id=assessment_id,
         customer_email=assessment.user.email,
-        customer_name=assessment.user.full_name or assessment.user.email,
+        customer_name=assessment.user.email,
         checklist_title=checklist_translation.title if checklist_translation else f"Checklist v{assessment.checklist.version}",
         checklist_version=f"v{assessment.checklist.version}",
         assessment_status=assessment.status.value,
@@ -570,7 +570,9 @@ def get_assessment_reviews_for_admin(
             joinedload(AssessmentReview.assessment)
             .joinedload(Assessment.user),
             joinedload(AssessmentReview.assessment)
-            .joinedload(Assessment.checklist),
+            .joinedload(Assessment.checklist)
+            .joinedload(Checklist.translations)
+            .joinedload(ChecklistTranslation.language),
         )
     )
     
