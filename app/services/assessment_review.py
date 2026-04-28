@@ -117,13 +117,15 @@ def get_assessment_answers_with_reviews(
             .joinedload(ChecklistSectionTranslation.language),
         )
         .filter(AssessmentAnswer.assessment_id == assessment_id)
-        .order_by(
-            ChecklistSection.display_order,
-            ChecklistQuestion.display_order
-        )
     )
     
     answers = answers_query.all()
+    
+    # Sort answers in Python by section order then question order
+    answers.sort(key=lambda a: (
+        a.question.section.display_order if a.question.section else 0,
+        a.question.display_order or 0
+    ))
     
     # Get existing reviews
     reviews_query = (
