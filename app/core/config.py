@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     assessment_completion_days: int = Field(default=7, alias="ASSESSMENT_COMPLETION_DAYS")
     celery_broker_url: str = Field(default="redis://localhost:6379/0", alias="CELERY_BROKER_URL")
     celery_result_backend: str = Field(default="redis://localhost:6379/1", alias="CELERY_RESULT_BACKEND")
+    # S3 storage settings
+    aws_access_key_id: str = Field(default="", alias="AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: str = Field(default="", alias="AWS_SECRET_ACCESS_KEY")
+    aws_default_region: str = Field(default="eu-north-1", alias="AWS_DEFAULT_REGION")
+    s3_bucket_arn: str = Field(default="", alias="S3_BUCKET_ARN")
+    # Deprecated: Local upload dir (not used for S3-only storage)
     upload_dir: str | None = Field(default=None, alias="UPLOAD_DIR")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

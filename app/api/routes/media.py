@@ -69,34 +69,32 @@ def upload_media(
             detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE_BYTES} bytes"
         )
     
-    # Get upload directory and generate unique filename
-    upload_dir = get_upload_dir()
+    # Generate unique filename for S3
     file_extension = Path(file.filename).suffix if file.filename else ""
     unique_filename = f"{uuid.uuid4()}{file_extension}"
-    file_path = upload_dir / unique_filename
-    
+
     # Read file content for scanning and hashing
     content = file.file.read()
     file.file.seek(0)
-    
+
     # Perform malware scan
     if not basic_malware_scan(file.file):
         scan_status = MalwareScanStatus.infected
     else:
         scan_status = MalwareScanStatus.clean
-    
+
     # Compute SHA256 hash
     sha256_hash = compute_sha256(file.file)
     file.file.seek(0)
-    
-    # Save file
+
+    # Upload file to S3
+    from app.utils.s3_upload import upload_file_to_s3
     try:
-        with open(file_path, "wb") as buffer:
-            buffer.write(content)
+        s3_key = upload_file_to_s3(file, unique_filename)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to save file"
+            detail=f"Failed to upload file to S3: {str(e)}"
         )
     
     # Determine media type
@@ -111,7 +109,7 @@ def upload_media(
         original_filename=file.filename or "unknown",
         mime_type=file.content_type,
         file_size_bytes=file_size,
-        file_path=str(file_path),
+        file_path=s3_key,  # Store S3 key instead of local path
         media_type=media_type,
         sha256=sha256_hash,
         scan_status=scan_status,
