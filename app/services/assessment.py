@@ -483,6 +483,14 @@ def submit_assessment(db: Session, *, user: User, assessment_id: UUID, lang_code
     db.commit()
     db.refresh(assessment)
 
+    # Auto-generate draft report when assessment is submitted
+    try:
+        from app.services.report import generate_draft_report
+        generate_draft_report(db, assessment_id=assessment_id, actor=user, lang_code=lang_code)
+    except Exception as e:
+        # Log error but don't fail the submission
+        print(f"Failed to auto-generate report for assessment {assessment_id}: {e}")
+
     return AssessmentSubmitResponse(
         assessment_id=assessment.id,
         status=assessment.status,

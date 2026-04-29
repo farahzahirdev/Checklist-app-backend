@@ -57,3 +57,49 @@ class UpsertReportSummaryRequest(BaseModel):
     section_id: UUID | None = None
     chapter_code: str | None = Field(default=None, max_length=120)
     summary_text: str = Field(min_length=1)
+
+
+class AdminSuggestionRequest(BaseModel):
+    suggestion_text: str = Field(min_length=1, max_length=2000)
+    is_public: bool = Field(default=True, description="Whether customer can see this suggestion")
+
+
+class AdminNoteRequest(BaseModel):
+    note_text: str = Field(min_length=1, max_length=2000)
+    note_type: str = Field(default="general", description="Type of note: general, priority, recommendation")
+
+
+class CustomerReportDataResponse(BaseModel):
+    """Comprehensive report data for customer-facing PDF generation"""
+    report_id: UUID
+    assessment_id: UUID
+    customer_name: str
+    customer_email: str
+    checklist_title: str
+    assessment_date: datetime
+    report_status: ReportStatus
+    
+    # Score data
+    overall_score: float
+    max_possible_score: int
+    completion_percentage: float
+    
+    # Section scores for radar chart
+    section_scores: list[dict] = Field(description="List of {section_name, score, max_score, percentage}")
+    
+    # Chapter overview
+    chapter_data: list[dict] = Field(description="List of {chapter_code, title, score, findings_count, recommendations}")
+    
+    # Findings (nonconformities/weak points)
+    findings: list[dict] = Field(description="List of {question_text, answer, priority, recommendation}")
+    
+    # Admin summaries
+    section_summaries: list[dict] = Field(description="Admin-written section summaries")
+    
+    # Public suggestions
+    public_suggestions: list[dict] = Field(description="Public admin suggestions for customer")
+    
+    # Metadata
+    generated_at: datetime
+    approved_at: datetime | None = None
+    published_at: datetime | None = None
