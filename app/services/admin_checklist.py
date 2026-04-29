@@ -154,7 +154,7 @@ def _latest_section_translation(db: Session, section_id: uuid.UUID) -> Checklist
 def _to_section_response(section: ChecklistSection) -> AdminSectionResponse:
     translation = getattr(section, "_translation", None)
     title = translation.title if translation else section.section_code
-    return AdminSectionResponse(id=section.id, checklist_id=section.checklist_id, title=title, order=section.display_order)
+    return AdminSectionResponse(id=section.id, checklist_id=section.checklist_id, title=title, order=section.display_order, source_ref=section.source_ref)
 
 
 def _default_language(db: Session) -> Language | None:
@@ -190,7 +190,6 @@ def _validate_parent_question(
 
 def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
     translation = getattr(question, "_translation", None)
-    question_title = translation.paragraph_title if translation else None
     legal_requirement = translation.question_text if translation else ""
     explanation = translation.explanation if translation and translation.explanation else ""
     expected_implementation = translation.expected_implementation if translation and translation.expected_implementation else ""
@@ -202,7 +201,7 @@ def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
         section_id=question.section_id,
         parent_question_id=question.parent_question_id,
         question_id=question.question_code,
-        question_title=question_title,
+        question_title=question.question_code,  # Set title to question_id
         security_level=severity,
         audit_type=question.audit_type or "compliance",
         points=_question_points(question),
@@ -276,7 +275,6 @@ def list_checklists(
   
 def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> AdminQuestionResponse:
     translation = getattr(question, "_translation", None)
-    question_title = translation.paragraph_title if translation else None
     legal_requirement = translation.question_text if translation else ""
     explanation = translation.explanation if translation and translation.explanation else ""
     expected_implementation = translation.expected_implementation if translation and translation.expected_implementation else ""
@@ -293,7 +291,7 @@ def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> Ad
         section_id=question.section_id,
         parent_question_id=question.parent_question_id,
         question_id=question.question_code,
-        question_title=question_title,
+        question_title=question.question_code,  # Set title to question_id
         security_level=severity,
         points=_question_points(question),
         answer_logic=question.answer_logic or DEFAULT_ANSWER_LOGIC,
@@ -517,7 +515,7 @@ def create_section(db: Session, *, checklist_id, payload: AdminSectionCreateRequ
     section = ChecklistSection(
         checklist_id=checklist_id,
         section_code=f"SEC-{payload.order}",
-        source_ref=None,
+        source_ref=payload.source_ref,
         display_order=payload.order,
     )
     db.add(section)
@@ -954,10 +952,10 @@ def create_question(db: Session, *, checklist_id, section_id, payload: AdminQues
             ChecklistQuestionTranslation(
                 question_id=question.id,
                 language_id=language.id,
-                paragraph_title=payload.question_title,
-                question_text=payload.legal_requirement_title,
-                legal_requirement_title=payload.legal_requirement_title,
-                legal_requirement_description=payload.legal_requirement_description,
+                paragraph_title=None,  # Removed question_title
+                question_text=payload.legal_requirement_title or "",
+                legal_requirement_title=payload.legal_requirement_title or "",
+                legal_requirement_description=payload.legal_requirement_description or "",
                 explanation=payload.explanation,
                 expected_implementation=payload.expected_implementation,
                 how_it_works=payload.how_it_works,
@@ -1067,7 +1065,7 @@ def update_question(
             translation = ChecklistQuestionTranslation(
                 question_id=question.id,
                 language_id=language.id,
-                paragraph_title=payload.question_title,
+                paragraph_title=None,  # Removed question_title
                 question_text=payload.legal_requirement_title or "",
                 legal_requirement_title=payload.legal_requirement_title or "",
                 legal_requirement_description=payload.legal_requirement_description or "",
@@ -1082,8 +1080,8 @@ def update_question(
             )
             db.add(translation)
     else:
-        if payload.question_title is not None:
-            translation.paragraph_title = payload.question_title
+        # Removed question_title update
+        pass
         if payload.legal_requirement_title is not None:
             translation.question_text = payload.legal_requirement_title
             translation.legal_requirement_title = payload.legal_requirement_title
