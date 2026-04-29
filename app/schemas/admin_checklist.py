@@ -59,6 +59,7 @@ class AdminChecklistListResponse(BaseModel):
 class AdminSectionCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     order: int = Field(ge=1)
+    source_ref: str | None = Field(default=None, max_length=255)
 
 
 class AdminSectionUpdateRequest(BaseModel):
@@ -89,6 +90,7 @@ class AdminSectionResponse(BaseModel):
     checklist_id: UUID
     title: str
     order: int
+    source_ref: str | None = None
 
 
 class AdminSectionListResponse(BaseModel):
@@ -118,15 +120,14 @@ class AdminQuestionAnswerOptionResponse(BaseModel):
 
 class AdminQuestionCreateRequest(BaseModel):
     question_id: str = Field(min_length=1, max_length=120)
-    question_title: str | None = Field(default=None, min_length=1)
     parent_question_id: UUID | None = None
     note: str | None = None
     security_level: SeverityLevel
     points: int | None = Field(default=None, ge=1, le=4)
     answer_logic: AnswerLogic = "answer_only"
     audit_type: str = Field(default="compliance", min_length=1, max_length=50)
-    legal_requirement_title: str = Field(min_length=1, max_length=500)
-    legal_requirement_description: str = Field(min_length=1)
+    legal_requirement_title: str | None = Field(default=None, min_length=1, max_length=500)
+    legal_requirement_description: str | None = Field(default=None)
     explanation: str = Field(default="")
     expected_implementation: str = Field(default="")
     how_it_works: str = Field(default="")
@@ -143,7 +144,6 @@ class AdminQuestionCreateRequest(BaseModel):
 
 class AdminQuestionUpdateRequest(BaseModel):
     question_id: str | None = Field(default=None, min_length=1, max_length=120)
-    question_title: str | None = Field(default=None, min_length=1)
     parent_question_id: UUID | None = None
     note: str | None = None
     security_level: SeverityLevel | None = None
@@ -151,7 +151,7 @@ class AdminQuestionUpdateRequest(BaseModel):
     answer_logic: AnswerLogic | None = None
     audit_type: str | None = Field(default=None, min_length=1, max_length=50)
     legal_requirement_title: str | None = Field(default=None, min_length=1, max_length=500)
-    legal_requirement_description: str | None = Field(default=None, min_length=1)
+    legal_requirement_description: str | None = Field(default=None)
     explanation: str | None = None
     expected_implementation: str | None = None
     how_it_works: str | None = None
@@ -178,7 +178,7 @@ class AdminQuestionResponse(BaseModel):
     section_id: UUID
     parent_question_id: UUID | None = None
     question_id: str
-    question_title: str | None = None
+    question_title: str
     security_level: SeverityLevel
     audit_type: str
     points: int

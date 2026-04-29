@@ -152,7 +152,7 @@ def authenticate_user(db: Session, *, email: str, password: str, lang_code: str 
     token = create_access_token(user_id=str(user.id), role=str(user.role))
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
     db.commit()
-    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=True, mfa_enabled=False)
+    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=False)
 
 
 def verify_mfa_challenge(db: Session, *, challenge_token: str, code: str, lang_code: str = "en") -> AuthResponse:

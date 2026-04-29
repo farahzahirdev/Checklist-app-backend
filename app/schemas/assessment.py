@@ -29,7 +29,7 @@ class AssessmentSessionResponse(BaseModel):
 
 class AssessmentAnswerUpsertRequest(BaseModel):
     question_id: UUID
-    answer: AnswerChoice
+    answer: AnswerChoice | int  # Accept both enum string and integer ID
     note_text: str | None = None
 
 

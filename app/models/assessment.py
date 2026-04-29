@@ -1,12 +1,19 @@
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 import uuid
 
+from app.models.checklist import Checklist, ChecklistQuestion, ChecklistSection
+from app.models.media import Media
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.assessment_review import AssessmentReview, AnswerReview
+    from app.models.user import User
 
 
 class PriorityLevel(StrEnum):
@@ -31,20 +38,20 @@ class MalwareScanStatus(StrEnum):
 
 
 class AnswerChoice(StrEnum):
-    yes = "yes"
-    partially = "partially"
-    dont_know = "dont_know"
-    no = "no"
+    four = "4"      # 4 points - highest score
+    three = "3"     # 3 points
+    two = "2"       # 2 points  
+    one = "1"       # 1 point - lowest score
 
     @classmethod
     def to_id(cls, choice: "AnswerChoice | str") -> int:
         value = cls(choice)
-        mapping = {cls.yes: 1, cls.partially: 2, cls.dont_know: 3, cls.no: 4}
+        mapping = {cls.four: 4, cls.three: 3, cls.two: 2, cls.one: 1}
         return mapping[value]
 
     @classmethod
     def from_id(cls, answer_option_code_id: int | None) -> "AnswerChoice | None":
-        mapping = {1: cls.yes, 2: cls.partially, 3: cls.dont_know, 4: cls.no}
+        mapping = {4: cls.four, 3: cls.three, 2: cls.two, 1: cls.one}
         return mapping.get(answer_option_code_id)
 
 
@@ -75,6 +82,20 @@ class Assessment(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+    # Relationships
+    user: Mapped["User"] = relationship("User")
+    checklist: Mapped["Checklist"] = relationship("Checklist")
+    answers: Mapped[list["AssessmentAnswer"]] = relationship(
+        "AssessmentAnswer", back_populates="assessment", cascade="all, delete-orphan"
+    )
+    evidence_files: Mapped[list["AssessmentEvidenceFile"]] = relationship(
+        "AssessmentEvidenceFile", back_populates="assessment", cascade="all, delete-orphan"
+    )
+    section_scores: Mapped[list["AssessmentSectionScore"]] = relationship(
+        "AssessmentSectionScore", back_populates="assessment", cascade="all, delete-orphan"
+    )
+    review: Mapped["AssessmentReview"] = relationship("AssessmentReview", back_populates="assessment", uselist=False)
+
 
 class AssessmentAnswer(Base):
     __tablename__ = "assessment_answers"
@@ -102,6 +123,14 @@ class AssessmentAnswer(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    assessment: Mapped["Assessment"] = relationship("Assessment", back_populates="answers")
+    question: Mapped["ChecklistQuestion"] = relationship("ChecklistQuestion")
+    evidence_files: Mapped[list["AssessmentEvidenceFile"]] = relationship(
+        "AssessmentEvidenceFile", back_populates="answer", cascade="all, delete-orphan"
+    )
+    review: Mapped["AnswerReview"] = relationship("AnswerReview", back_populates="answer", uselist=False)
 
     @property
     def answer(self) -> AnswerChoice | None:
@@ -132,7 +161,10 @@ class AssessmentEvidenceFile(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # Relationship to Media model
+    # Relationships
+    assessment: Mapped["Assessment"] = relationship("Assessment", back_populates="evidence_files")
+    answer: Mapped["AssessmentAnswer | None"] = relationship("AssessmentAnswer", back_populates="evidence_files")
+    question: Mapped["ChecklistQuestion"] = relationship("ChecklistQuestion")
     media: Mapped["Media"] = relationship("Media", foreign_keys=[media_id])
 
 
@@ -151,3 +183,7 @@ class AssessmentSectionScore(Base):
     answered_count: Mapped[int] = mapped_column(Integer, nullable=False)
     total_count: Mapped[int] = mapped_column(Integer, nullable=False)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    # Relationships
+    assessment: Mapped["Assessment"] = relationship("Assessment", back_populates="section_scores")
+    section: Mapped["ChecklistSection"] = relationship("ChecklistSection")

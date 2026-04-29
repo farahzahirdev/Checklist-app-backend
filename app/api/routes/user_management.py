@@ -53,7 +53,7 @@ def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     sort_by: str | None = Query(None, description="Field to sort by"),
-    sort_order: str = Query("asc", regex="^(asc|desc)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     search: str | None = Query(None, description="Filter by email or role"),
     role: str | None = Query(None, description="Filter by exact role"),
     current_user: Annotated[User, Depends(get_current_user)] = None,
@@ -64,13 +64,14 @@ def list_users(
     
     Notes:
     - Customers are managed via separate API
-    - Only admins can call this endpoint
+    - Admins and auditors can call this endpoint
     """
     lang_code = get_language_code(request, db)
-    if not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
+    if not RBACService.has_permission(db, current_user.id, "user_management", "read") and \
+       not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=translate("only_admins_can_manage_users", lang_code)
+            detail=translate("insufficient_permissions", lang_code)
         )
 
     query = db.query(User).filter(
@@ -292,7 +293,7 @@ def list_customers(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     sort_by: str | None = Query(None, description="Field to sort by"),
-    sort_order: str = Query("asc", regex="^(asc|desc)$"),
+    sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     search: str | None = Query(None, description="Filter by email"),
     is_active: bool | None = Query(None, description="Filter active/inactive customers"),
     current_user: Annotated[User, Depends(get_current_user)] = None,
@@ -303,13 +304,14 @@ def list_customers(
     
     Notes:
     - Customers have fixed permissions (cannot be modified)
-    - Only admins can view this list
+    - Admins and auditors can view this list
     """
     lang_code = get_language_code(request, db)
-    if not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
+    if not RBACService.has_permission(db, current_user.id, "user_management", "read") and \
+       not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=translate("only_admins_can_manage_users", lang_code)
+            detail=translate("insufficient_permissions", lang_code)
         )
 
     query = db.query(User).filter(User.role == UserRole.customer.value)
@@ -351,10 +353,11 @@ def get_customer(
 ) -> dict:
     """Get details of a specific customer."""
     lang_code = get_language_code(request, db)
-    if not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
+    if not RBACService.has_permission(db, current_user.id, "user_management", "read") and \
+       not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=translate("only_admins_can_manage_users", lang_code)
+            detail=translate("insufficient_permissions", lang_code)
         )
     
     customer = db.query(User).filter(User.id == customer_id).first()

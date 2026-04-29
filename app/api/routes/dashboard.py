@@ -15,6 +15,7 @@ from app.schemas.dashboard import (
     AuditorDashboardResponse,
     CustomerDashboardResponse,
 )
+from app.schemas.customer_assessments import CustomerAssessmentDashboardResponse
 from app.services.dashboard import (
     get_admin_activity_feed,
     get_admin_assessment_distribution,
@@ -147,3 +148,19 @@ def customer_dashboard(
 ) -> CustomerDashboardResponse:
     lang_code = get_language_code(request, db)
     return get_customer_dashboard(db, user_id=customer.id, lang_code=lang_code)
+
+
+@router.get(
+    "/customer/enhanced",
+    response_model=CustomerAssessmentDashboardResponse,
+    summary="Enhanced Customer Dashboard",
+    description="Enhanced customer dashboard with detailed multi-assessment management capabilities.",
+)
+def customer_dashboard_enhanced(
+    request: Request,
+    customer=Depends(require_roles(UserRole.customer)),
+    db: Session = Depends(get_db),
+) -> CustomerAssessmentDashboardResponse:
+    lang_code = get_language_code(request, db)
+    from app.services.customer_assessments import get_customer_dashboard_enhanced
+    return get_customer_dashboard_enhanced(db, user_id=customer.id, lang_code=lang_code)

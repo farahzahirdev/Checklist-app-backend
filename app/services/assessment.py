@@ -158,10 +158,10 @@ def start_assessment(
 
 
 ANSWER_SCORES: dict[AnswerChoice, int] = {
-    AnswerChoice.yes: 4,
-    AnswerChoice.partially: 3,
-    AnswerChoice.dont_know: 2,
-    AnswerChoice.no: 1,
+    AnswerChoice.four: 4,
+    AnswerChoice.three: 3,
+    AnswerChoice.two: 2,
+    AnswerChoice.one: 1,
 }
 
 
@@ -196,9 +196,9 @@ def _question_for_assessment(
 
 
 def _priority_for_choice(choice: AnswerChoice) -> PriorityLevel:
-    if choice == AnswerChoice.no:
+    if choice == AnswerChoice.one:
         return PriorityLevel.high
-    if choice == AnswerChoice.dont_know:
+    if choice == AnswerChoice.two:
         return PriorityLevel.medium
     return PriorityLevel.low
 
@@ -389,6 +389,7 @@ def _serialize_assessment_detail(db: Session, assessment: Assessment) -> Assessm
 
 def get_current_assessment_detail(db: Session, *, user: User, checklist_id: UUID | None = None, lang_code: str | None = None) -> AssessmentDetailResponse:
     assessment = _get_active_assessment(db, user=user, checklist_id=checklist_id)
+    db.refresh(assessment)  # Ensure we have latest completion_percent
     return _serialize_assessment_detail(db, assessment)
 
 
@@ -398,7 +399,7 @@ def upsert_assessment_answer(
     user: User,
     assessment_id: UUID,
     question_id: UUID,
-    answer: AnswerChoice,
+    answer: AnswerChoice | int,
     note_text: str | None,
     lang_code: str = "en",
 ) -> AssessmentAnswerResponse:
@@ -412,20 +413,28 @@ def upsert_assessment_answer(
         )
     )
 
+    # Convert integer to AnswerChoice if needed
+    if isinstance(answer, int):
+        answer_choice = AnswerChoice.from_id(answer)
+        if answer_choice is None:
+            raise HTTPException(status_code=400, detail=f"Invalid answer ID: {answer}")
+    else:
+        answer_choice = AnswerChoice(answer)
+
     if existing is None:
         existing = AssessmentAnswer(
             assessment_id=assessment.id,
             question_id=question_id,
-            answer=answer,
-            answer_score=ANSWER_SCORES[answer],
-            weighted_priority=_priority_for_choice(answer),
+            answer=answer_choice,
+            answer_score=ANSWER_SCORES[answer_choice],
+            weighted_priority=_priority_for_choice(answer_choice),
             note_text=note_text,
         )
         db.add(existing)
     else:
-        existing.answer = answer
-        existing.answer_score = ANSWER_SCORES[answer]
-        existing.weighted_priority = _priority_for_choice(answer)
+        existing.answer = answer_choice
+        existing.answer_score = ANSWER_SCORES[answer_choice]
+        existing.weighted_priority = _priority_for_choice(answer_choice)
         existing.note_text = note_text
 
     if assessment.status == AssessmentStatus.not_started:
@@ -434,12 +443,13 @@ def upsert_assessment_answer(
 
     completion = _recompute_completion(db, assessment=assessment)
     db.commit()
+    db.refresh(assessment)  # Refresh assessment to get updated completion_percent
     db.refresh(existing)
 
     return AssessmentAnswerResponse(
         assessment_id=assessment.id,
         question_id=question_id,
-        answer=existing.answer,
+        answer=answer_choice,
         answer_score=existing.answer_score,
         weighted_priority=existing.weighted_priority,
         completion_percent=completion,
@@ -455,6 +465,20 @@ def submit_assessment(db: Session, *, user: User, assessment_id: UUID, lang_code
 
     assessment.status = AssessmentStatus.submitted
     assessment.submitted_at = _now_utc()
+
+    # Create assessment review for admin review
+    from app.models.assessment_review import AssessmentReview
+    existing_review = db.scalar(
+        select(AssessmentReview).where(AssessmentReview.assessment_id == assessment.id)
+    )
+    
+    if not existing_review:
+        review = AssessmentReview(
+            assessment_id=assessment.id,
+            status="pending",  # Use string instead of enum to avoid import issues
+            completion_percentage=completion,
+        )
+        db.add(review)
 
     db.commit()
     db.refresh(assessment)
