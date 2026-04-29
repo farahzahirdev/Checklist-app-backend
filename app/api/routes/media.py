@@ -191,20 +191,34 @@ def download_media(
             detail="Media is not active"
         )
     
-    file_path = Path(media.file_path)
-    if not file_path.exists():
+    # Handle both file path and base64 storage
+    if media.file_path.startswith("base64:"):
+        # File stored as base64 (serverless fallback)
+        from fastapi.responses import Response
+        import base64
+        
+        # In a real implementation, we'd retrieve the base64 data from database
+        # For now, return an error message
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="File not found on disk"
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="File download not available in serverless environment. Please contact admin."
         )
-    
-    from fastapi.responses import FileResponse
-    
-    return FileResponse(
-        path=file_path,
-        filename=media.original_filename,
-        media_type=media.mime_type,
-    )
+    else:
+        # Regular file path
+        file_path = Path(media.file_path)
+        if not file_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="File not found on disk"
+            )
+        
+        from fastapi.responses import FileResponse
+        
+        return FileResponse(
+            path=file_path,
+            filename=media.original_filename,
+            media_type=media.mime_type,
+        )
 
 
 @router.get(
