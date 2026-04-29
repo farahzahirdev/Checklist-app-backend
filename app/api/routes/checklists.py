@@ -64,24 +64,29 @@ def list_customer_checklists(
             translation = None
         title = translation.title if translation else f"Checklist v{checklist.version}"
         
-        # Get pricing from Stripe - only include checklist if it has an active price
+        # Get pricing from Stripe - only include checklist if it has an active price above $0.50
         pricing_info = None
-        has_price = False
+        has_valid_price = False
         try:
             price_data = get_stripe_price_for_checklist(db, checklist_id=checklist.id)
             if price_data:
-                pricing_info = ChecklistPricingInfo(
-                    price_id=price_data["price_id"],
-                    amount_cents=price_data["amount_cents"],
-                    currency=price_data["currency"]
-                )
-                has_price = True
+                # Check if price meets minimum amount requirement ($0.50 USD = 50 cents)
+                if price_data["currency"].upper() == "USD" and price_data["amount_cents"] >= 50:
+                    pricing_info = ChecklistPricingInfo(
+                        price_id=price_data["price_id"],
+                        amount_cents=price_data["amount_cents"],
+                        currency=price_data["currency"]
+                    )
+                    has_valid_price = True
+                else:
+                    # Price exists but is too low - skip this checklist
+                    print(f"Checklist {checklist.id} price ${price_data['amount_cents']/100:.2f} is below minimum $0.50")
         except Exception as e:
             # Log error but don't fail the response
             print(f"Error fetching price for checklist {checklist.id}: {e}")
         
-        # Skip this checklist if it doesn't have an active price
-        if not has_price:
+        # Skip this checklist if it doesn't have a valid price (above minimum)
+        if not has_valid_price:
             continue
         
         result.append(CustomerChecklistResponse(

@@ -87,6 +87,20 @@ def create_checkout_session_for_user(
         if not price_data:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="checklist_price_not_available")
         
+        # Check minimum amount for Stripe checkout sessions ($0.50 USD = 50 cents)
+        if price_data["currency"].upper() == "USD" and price_data["amount_cents"] < 50:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, 
+                detail={
+                    "error": "minimum_amount_error",
+                    "message": f"Amount ${price_data['amount_cents']/100:.2f} is below Stripe's minimum of $0.50 for checkout sessions.",
+                    "current_amount": price_data["amount_cents"],
+                    "minimum_amount": 50,
+                    "currency": price_data["currency"],
+                    "suggestion": "Contact support to update pricing or use payment intent for lower amounts"
+                }
+            )
+        
         line_items = [
             {
                 "price": price_data["price_id"],
