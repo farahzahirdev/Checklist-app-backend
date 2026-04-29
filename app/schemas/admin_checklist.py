@@ -34,7 +34,7 @@ class AdminStripeInfo(BaseModel):
     price_amount_cents: int | None = None
     price_currency: str | None = None
     price_available: bool = False
-    price_status: str = "not_set"  # not_set, available, error
+    price_status: str = "not_set"  # not_set, available, error, below_minimum
 
 
 class AdminChecklistResponse(BaseModel):

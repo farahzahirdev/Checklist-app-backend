@@ -85,8 +85,14 @@ def _to_checklist_response(checklist: Checklist, db: Session) -> AdminChecklistR
                     stripe_info.price_id = price_data["price_id"]
                     stripe_info.price_amount_cents = price_data["amount_cents"]
                     stripe_info.price_currency = price_data["currency"]
-                    stripe_info.price_available = True
-                    stripe_info.price_status = "available"
+                    
+                    # Check if price meets minimum amount requirement ($0.50 USD = 50 cents)
+                    if price_data["currency"].upper() == "USD" and price_data["amount_cents"] < 50:
+                        stripe_info.price_available = False
+                        stripe_info.price_status = "below_minimum"
+                    else:
+                        stripe_info.price_available = True
+                        stripe_info.price_status = "available"
                 else:
                     stripe_info.price_status = "not_set"
             except Exception as e:
