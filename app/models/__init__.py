@@ -41,8 +41,6 @@ from app.models.report import (
     ReportReviewEvent,
     ReportSectionSummary,
     ReportStatus,
-    ReportAdminSuggestion,
-    ReportAdminNote,
 )
 from app.models.user import User, UserRole
 from app.models.rbac import (
@@ -88,8 +86,6 @@ __all__ = [
     "ReportReviewEvent",
     "ReportSectionSummary",
     "ReportStatus",
-    "ReportAdminSuggestion",
-    "ReportAdminNote",
     "SeverityCode",
     "SeverityLevel",
     "SeverityTranslation",

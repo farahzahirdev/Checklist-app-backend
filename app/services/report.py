@@ -5,10 +5,12 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
+from sqlalchemy.orm import selectinload
 from app.utils.i18n_messages import translate
 from sqlalchemy.orm import Session
 
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentStatus, PriorityLevel
+from app.models.assessment_review import AssessmentReview, AnswerReview, SuggestionType
 from app.models.checklist import ChecklistQuestion, ChecklistQuestionTranslation
 from app.models.report import (
     Report,
@@ -17,8 +19,6 @@ from app.models.report import (
     ReportReviewEvent,
     ReportSectionSummary,
     ReportStatus,
-    ReportAdminSuggestion,
-    ReportAdminNote,
 )
 from app.models.user import User
 from app.schemas.report import (
@@ -27,8 +27,6 @@ from app.schemas.report import (
     ReportSummaryItem,
     ReviewActionRequest,
     UpsertReportSummaryRequest,
-    AdminSuggestionRequest,
-    AdminNoteRequest,
     CustomerReportDataResponse,
 )
 
@@ -293,74 +291,12 @@ def list_report_findings(db: Session, *, report_id: UUID, lang_code: str = "en")
     ]
 
 
-def add_admin_suggestion(db: Session, *, report_id: UUID, actor: User, payload: AdminSuggestionRequest, lang_code: str = "en") -> ReportAdminSuggestion:
-    report = _get_report(db, report_id, lang_code)
-    suggestion = ReportAdminSuggestion(
-        report_id=report.id,
-        admin_user_id=actor.id,
-        suggestion_text=payload.suggestion_text,
-        is_public=payload.is_public,
-    )
-    db.add(suggestion)
-    
-    _create_review_event(
-        db,
-        report_id=report.id,
-        actor_user_id=actor.id,
-        event_type=ReportEventType.summary_updated,
-        note=f"Admin suggestion added: {'public' if payload.is_public else 'internal'}",
-    )
-    
-    db.commit()
-    db.refresh(suggestion)
-    return suggestion
 
 
-def add_admin_note(db: Session, *, report_id: UUID, actor: User, payload: AdminNoteRequest, lang_code: str = "en") -> ReportAdminNote:
-    report = _get_report(db, report_id, lang_code)
-    note = ReportAdminNote(
-        report_id=report.id,
-        admin_user_id=actor.id,
-        note_text=payload.note_text,
-        note_type=payload.note_type,
-    )
-    db.add(note)
-    
-    _create_review_event(
-        db,
-        report_id=report.id,
-        actor_user_id=actor.id,
-        event_type=ReportEventType.summary_updated,
-        note=f"Admin note added: {payload.note_type}",
-    )
-    
-    db.commit()
-    db.refresh(note)
-    return note
 
 
-def list_admin_suggestions(db: Session, *, report_id: UUID, include_private: bool = False, actor: User | None = None, lang_code: str = "en") -> list[ReportAdminSuggestion]:
-    report = _get_report(db, report_id, lang_code)
-    query = select(ReportAdminSuggestion).where(ReportAdminSuggestion.report_id == report_id)
-    
-    # Only show public suggestions to non-admins
-    if not include_private and (not actor or actor.role != UserRole.admin):
-        query = query.where(ReportAdminSuggestion.is_public.is_(True))
-    
-    rows = db.scalars(query.order_by(desc(ReportAdminSuggestion.created_at))).all()
-    return list(rows)
 
 
-def list_admin_notes(db: Session, *, report_id: UUID, actor: User, lang_code: str = "en") -> list[ReportAdminNote]:
-    # Only admins can see notes
-    if actor.role != UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
-    
-    report = _get_report(db, report_id, lang_code)
-    rows = db.scalars(
-        select(ReportAdminNote).where(ReportAdminNote.report_id == report_id).order_by(desc(ReportAdminNote.created_at))
-    ).all()
-    return list(rows)
 
 
 def get_customer_report_data(db: Session, *, report_id: UUID, lang_code: str = "en") -> CustomerReportDataResponse:
@@ -595,21 +531,30 @@ def _get_section_summaries_for_customer(db: Session, report_id: UUID) -> list[di
 
 
 def _get_public_suggestions(db: Session, report_id: UUID) -> list[dict]:
-    """Get public admin suggestions for customer"""
-    suggestions = db.scalars(
-        select(ReportAdminSuggestion)
-        .where(
-            ReportAdminSuggestion.report_id == report_id,
-            ReportAdminSuggestion.is_public.is_(True)
-        )
-        .order_by(desc(ReportAdminSuggestion.created_at))
-    ).all()
+    """Get public admin suggestions for customer from assessment review"""
+    # Get the report to find the assessment
+    report = db.get(Report, report_id)
+    if not report:
+        return []
+    
+    # Get assessment review with answer reviews
+    assessment_review = db.scalar(
+        select(AssessmentReview)
+        .where(AssessmentReview.assessment_id == report.assessment_id)
+        .options(selectinload(AssessmentReview.answer_reviews))
+    )
+    
+    if not assessment_review:
+        return []
     
     customer_suggestions = []
-    for suggestion in suggestions:
-        customer_suggestions.append({
-            "suggestion_text": suggestion.suggestion_text,
-            "created_at": suggestion.created_at
-        })
+    for answer_review in assessment_review.answer_reviews:
+        # Only include suggestions that are marked as best practices or improvements
+        if answer_review.suggestion_type in [SuggestionType.BEST_PRACTICE, SuggestionType.IMPROVEMENT]:
+            customer_suggestions.append({
+                "suggestion_text": answer_review.suggestion_text,
+                "created_at": answer_review.created_at,
+                "question_id": str(answer_review.answer.question_id) if answer_review.answer else None
+            })
     
     return customer_suggestions

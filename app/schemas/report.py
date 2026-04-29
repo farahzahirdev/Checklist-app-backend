@@ -59,14 +59,6 @@ class UpsertReportSummaryRequest(BaseModel):
     summary_text: str = Field(min_length=1)
 
 
-class AdminSuggestionRequest(BaseModel):
-    suggestion_text: str = Field(min_length=1, max_length=2000)
-    is_public: bool = Field(default=True, description="Whether customer can see this suggestion")
-
-
-class AdminNoteRequest(BaseModel):
-    note_text: str = Field(min_length=1, max_length=2000)
-    note_type: str = Field(default="general", description="Type of note: general, priority, recommendation")
 
 
 class CustomerReportDataResponse(BaseModel):

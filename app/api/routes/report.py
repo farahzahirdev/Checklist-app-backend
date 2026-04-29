@@ -15,8 +15,6 @@ from app.schemas.report import (
     ReportSummaryItem,
     ReviewActionRequest,
     UpsertReportSummaryRequest,
-    AdminSuggestionRequest,
-    AdminNoteRequest,
 )
 from app.services.report import (
     approve_report,
@@ -29,10 +27,6 @@ from app.services.report import (
     request_changes,
     start_review,
     upsert_report_summary,
-    add_admin_suggestion,
-    add_admin_note,
-    list_admin_suggestions,
-    list_admin_notes,
 )
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -147,76 +141,6 @@ def request_changes_route(
 ) -> ReportResponse:
     lang_code = get_language_code(request, db)
     return request_changes(db, report_id=report_id, actor=reviewer, payload=payload, lang_code=lang_code)
-
-
-# Admin Suggestions and Notes
-@router.post(
-    "/{report_id}/suggestions",
-    summary="Add Admin Suggestion",
-    description="Adds a suggestion to the report. Can be public (visible to customer) or private (internal only).",
-)
-def add_suggestion_route(
-    report_id: UUID,
-    request: Request,
-    payload: AdminSuggestionRequest,
-    admin=Depends(require_roles(UserRole.admin)),
-    db: Session = Depends(get_db),
-):
-    lang_code = get_language_code(request, db)
-    return add_admin_suggestion(db, report_id=report_id, actor=admin, payload=payload, lang_code=lang_code)
-
-
-@router.get(
-    "/{report_id}/suggestions",
-    summary="List Report Suggestions",
-    description="Returns suggestions for the report. Public suggestions visible to all, private only to admins.",
-)
-def list_suggestions_route(
-    report_id: UUID,
-    request: Request,
-    include_private: bool = False,
-    current_user=Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    lang_code = get_language_code(request, db)
-    return list_admin_suggestions(
-        db, 
-        report_id=report_id, 
-        include_private=include_private, 
-        actor=current_user, 
-        lang_code=lang_code
-    )
-
-
-@router.post(
-    "/{report_id}/notes",
-    summary="Add Admin Note",
-    description="Adds an internal note to the report. Only visible to admins.",
-)
-def add_note_route(
-    report_id: UUID,
-    request: Request,
-    payload: AdminNoteRequest,
-    admin=Depends(require_roles(UserRole.admin)),
-    db: Session = Depends(get_db),
-):
-    lang_code = get_language_code(request, db)
-    return add_admin_note(db, report_id=report_id, actor=admin, payload=payload, lang_code=lang_code)
-
-
-@router.get(
-    "/{report_id}/notes",
-    summary="List Admin Notes",
-    description="Returns internal notes for the report. Admin access required.",
-)
-def list_notes_route(
-    report_id: UUID,
-    request: Request,
-    admin=Depends(require_roles(UserRole.admin)),
-    db: Session = Depends(get_db),
-):
-    lang_code = get_language_code(request, db)
-    return list_admin_notes(db, report_id=report_id, actor=admin, lang_code=lang_code)
 
 
 @router.post(
