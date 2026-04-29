@@ -725,6 +725,7 @@ def download_template(
             raise HTTPException(status_code=500, detail="pandas not installed")
         
         # Generate XLSX using pandas with a two-row header structure.
+
         columns = pd.MultiIndex.from_tuples([
             ("#", ""),
             ("", "section"),
@@ -746,7 +747,13 @@ def download_template(
             ("Upload evidence", ""),
         ])
         df = pd.DataFrame(sample_rows, columns=columns)
-        
+
+        # Flatten MultiIndex columns for Excel export
+        df.columns = [
+            '_'.join([str(part) for part in col if part]) if isinstance(col, tuple) else str(col)
+            for col in df.columns.values
+        ]
+
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name='Template', index=False)
