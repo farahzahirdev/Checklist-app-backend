@@ -827,7 +827,6 @@ def create_from_file(
                 request.checklist_title,
                 request.checklist_description,
                 request.checklist_type_code,
-                request.checklist_version,
             ]
         )
         return BulkChecklistTaskResponse(

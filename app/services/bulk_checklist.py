@@ -186,7 +186,6 @@ def create_checklist_from_file(
     checklist_title: str,
     checklist_description: Optional[str] = None,
     checklist_type_code: str = "compliance",
-    checklist_version: int = 1,
 ) -> BulkChecklistCreateResponse:
     """
     Parse file and create complete checklist with sections and questions.
@@ -239,7 +238,7 @@ def create_checklist_from_file(
         # Create checklist
         checklist = Checklist(
             checklist_type_id=checklist_type.id,
-            version=checklist_version,
+            version="1.0",  # Always start with version 1.0 (same as admin checklist service)
             status=ChecklistStatus.draft,
             created_by=actor_id,
             updated_by=actor_id,

@@ -81,7 +81,6 @@ class BulkChecklistCreateRequest(BaseModel):
     checklist_title: str = Field(min_length=1, max_length=255)
     checklist_description: str | None = Field(default=None)
     checklist_type_code: str = Field(default="compliance")
-    checklist_version: int = Field(default=1, ge=1)
 
 
 class BulkChecklistCreateResponse(BaseModel):

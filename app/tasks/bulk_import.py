@@ -17,7 +17,6 @@ def create_checklist_task(
     checklist_title: str,
     checklist_description: str | None,
     checklist_type_code: str,
-    checklist_version: int,
 ) -> dict:
     """Execute bulk checklist creation in a background worker."""
     file_content = base64.b64decode(file_content_b64)
@@ -33,7 +32,6 @@ def create_checklist_task(
             checklist_title=checklist_title,
             checklist_description=checklist_description,
             checklist_type_code=checklist_type_code,
-            checklist_version=checklist_version,
         )
         serialized = response.model_dump()
         if serialized.get("checklist_id") is not None:
