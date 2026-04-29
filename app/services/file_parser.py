@@ -153,45 +153,34 @@ def parse_xlsx(content: bytes) -> tuple[list[str], list[dict]]:
 
 
 def get_column_value(row: dict, column_spec: str | None, headers: list[str] | None = None) -> Optional[str]:
-    """
-    Get value from row using column specification.
-    Spec can be: "A" (letter), "1" (number), or "Column Name" (header name).
-    """
+    """Get value from a row using column letter or header name."""
     if not column_spec:
         return None
     
-    column_spec = column_spec.strip()
+    # If column_spec is a letter (like "A", "B"), use it directly
+    if column_spec.isalpha() and len(column_spec) <= 3:
+        return row.get(column_spec.upper())
     
-    # Try by positional reference first if possible
-    try:
-        idx, _ = normalize_column_ref(column_spec)
-    except ValueError:
-        idx = None
-    if idx is not None:
-        if headers and idx < len(headers):
-            header_key = headers[idx]
-            if header_key in row:
-                value = row.get(header_key)
-                return str(value) if value is not None else None
-        # Fallback to row order if headers are not available or mismatch
-        keys = [key for key in row.keys() if key != '_row_number']
-        if idx < len(keys):
-            value = row.get(keys[idx])
-            return str(value) if value is not None else None
+    # If column_spec is a header name, find the matching column
+    if headers:
+        # Try exact match first
+        if column_spec in headers:
+            return row.get(column_spec)
+        
+        # Try case-insensitive match
+        for header in headers:
+            if header.lower() == column_spec.lower():
+                return row.get(header)
+        
+        # Try normalized match (remove spaces, underscores, and convert to lowercase)
+        normalized_spec = column_spec.lower().replace(" ", "").replace("_", "")
+        for header in headers:
+            normalized_header = header.lower().replace(" ", "").replace("_", "")
+            if normalized_header == normalized_spec:
+                return row.get(header)
     
-    # Try direct key match first (column name/header)
-    if column_spec in row:
-        value = row.get(column_spec)
-        return str(value) if value is not None else None
-    
-    # Try to find by closest match (case-insensitive)
-    lower_spec = column_spec.lower()
-    for key in row.keys():
-        if key and key != '_row_number' and lower_spec in key.lower():
-            value = row.get(key)
-            return str(value) if value is not None else None
-    
-    return None
+    # Fallback: try column_spec as key directly
+    return row.get(column_spec)
 
 
 def parse_file(
