@@ -157,6 +157,12 @@ def verify_mapping(
                 prev_row = rows[prev_row_idx]
                 prev_section = get_column_value(prev_row, column_mapping.section_name_col, headers) or ""
                 prev_raw_q_id = get_column_value(prev_row, column_mapping.question_id_col, headers) or ""
+                prev_legal_req = get_column_value(prev_row, column_mapping.legal_requirement_col, headers) or ""
+                prev_question_text = get_column_value(prev_row, column_mapping.question_text_col, headers) or ""
+                
+                # Skip header rows and rows without actual content
+                if prev_section and not prev_legal_req and not prev_question_text and (prev_raw_q_id or get_column_value(prev_row, column_mapping.child_question_col, headers)):
+                    continue
                 
                 if prev_section == section_name and prev_raw_q_id:
                     # Check if previous row was a parent question (not a sub-question)
@@ -301,9 +307,12 @@ def create_checklist_from_file(
         
         # Track created items and sections
 
-        # Helper for answer options
+        # Helper for answer options with fixed labels
         def build_answer_options(row):
             answer_options = []
+            # Fixed labels as requested: Yes=4pts, Maybe=3pts, Sure=2pts, No=1pts
+            fixed_labels = {4: "Yes", 3: "Maybe", 2: "Sure", 1: "No"}
+            
             for score, col_key in zip([4, 3, 2, 1], [
                 column_mapping.guidance_score_4_col,
                 column_mapping.guidance_score_3_col,
@@ -311,8 +320,8 @@ def create_checklist_from_file(
                 column_mapping.guidance_score_1_col,
             ]):
                 desc = row.get(col_key) if col_key else None
-                # If label/title is missing, use description
-                label = desc if desc else None
+                # Use fixed label, CSV content as description
+                label = fixed_labels.get(score, f"Score {score}")
                 answer_options.append({
                     "position": score,
                     "label": label,
@@ -384,6 +393,12 @@ def create_checklist_from_file(
                         prev_row = rows[prev_row_idx]
                         prev_section = get_column_value(prev_row, column_mapping.section_name_col, headers) or ""
                         prev_raw_q_id = get_column_value(prev_row, column_mapping.question_id_col, headers) or ""
+                        prev_legal_req = get_column_value(prev_row, column_mapping.legal_requirement_col, headers) or ""
+                        prev_question_text = get_column_value(prev_row, column_mapping.question_text_col, headers) or ""
+                        
+                        # Skip header rows and rows without actual content
+                        if prev_section and not prev_legal_req and not prev_question_text and (prev_raw_q_id or get_column_value(prev_row, column_mapping.child_question_col, headers)):
+                            continue
                         
                         if prev_section == section_name and prev_raw_q_id:
                             # Check if previous row was a parent question (not a sub-question)
@@ -461,8 +476,8 @@ def create_checklist_from_file(
                         question_id=parent_question.id,
                         language_id=language.id,
                         question_text=question_text,
-                        legal_requirement_title=legal_req,
-                        legal_requirement_description=legal_req,
+                        legal_requirement_title="",  # Empty title as requested
+                        legal_requirement_description=legal_req,  # Store text in description
                         explanation=explanation,
                         expected_implementation=expected_impl,
                     ))
@@ -488,7 +503,7 @@ def create_checklist_from_file(
                             checklist_id=checklist.id,
                             section_id=section_id,
                             parent_question_id=questions_map[parent_q_id],
-                            question_code=child_q_id,
+                            question_code=f"{parent_q_id}-{child_q_id}",  # Unique code: "1-a)", "2-a)", etc.
                             audit_type="compliance",
                             points=1,
                             answer_logic="answer_only",
@@ -512,8 +527,8 @@ def create_checklist_from_file(
                             question_id=child_question.id,
                             language_id=language.id,
                             question_text=question_text,
-                            legal_requirement_title=legal_req,
-                            legal_requirement_description=legal_req,
+                            legal_requirement_title="",  # Empty title as requested
+                            legal_requirement_description=legal_req,  # Store text in description
                             explanation=explanation,
                             expected_implementation=expected_impl,
                         ))
@@ -539,7 +554,7 @@ def create_checklist_from_file(
                                 checklist_id=checklist.id,
                                 section_id=section_id,
                                 parent_question_id=child_parent_id,
-                                question_code=grandchild_q_id,
+                                question_code=f"{parent_q_id}-{child_q_id}-{grandchild_q_id}",  # Unique code: "1-a)-i)", etc.
                                 audit_type="compliance",
                                 points=1,
                                 answer_logic="answer_only",
@@ -563,8 +578,8 @@ def create_checklist_from_file(
                                 question_id=grandchild_question.id,
                                 language_id=language.id,
                                 question_text=question_text,
-                                legal_requirement_title=legal_req,
-                                legal_requirement_description=legal_req,
+                                legal_requirement_title="",  # Empty title as requested
+                                legal_requirement_description=legal_req,  # Store text in description
                                 explanation=explanation,
                                 expected_implementation=expected_impl,
                             ))

@@ -153,7 +153,7 @@ class ChecklistSection(Base):
 class ChecklistQuestion(Base):
     __tablename__ = "checklist_questions"
     __table_args__ = (
-        UniqueConstraint("checklist_id", "question_code", name="uq_questions_checklist_code"),
+        UniqueConstraint("section_id", "question_code", name="uq_questions_checklist_code"),
         UniqueConstraint("section_id", "display_order", name="uq_questions_section_order"),
     )
 
