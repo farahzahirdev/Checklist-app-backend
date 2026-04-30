@@ -254,6 +254,20 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
             if checklist is None:
                 return None
         
+        # SECURITY: Verify Stripe customer ID matches the user
+        stripe_customer_id = data.get("customer")
+        if stripe_customer_id and user.stripe_customer_id:
+            if stripe_customer_id != user.stripe_customer_id:
+                # Customer ID mismatch - potential security issue
+                print(f"Security warning: Customer ID mismatch for user {user_id}. "
+                      f"Event customer: {stripe_customer_id}, User customer: {user.stripe_customer_id}")
+                return None
+        elif stripe_customer_id and not user.stripe_customer_id:
+            # User has no stored customer ID but payment has one - update user record
+            user.stripe_customer_id = stripe_customer_id
+            db.add(user)
+            db.flush()
+        
         payment = Payment(
             user_id=user_id,
             checklist_id=checklist_id,
