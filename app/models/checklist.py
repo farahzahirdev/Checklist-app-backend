@@ -236,7 +236,7 @@ class ChecklistQuestionAnswerOption(Base):
     )
     position: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     choice_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
-    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    label: Mapped[str | None] = mapped_column(String(255), nullable=True)
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     illustrative_image_id: Mapped[uuid.UUID | None] = mapped_column(

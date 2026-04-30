@@ -157,8 +157,14 @@ def get_column_value(row: dict, column_spec: str | None, headers: list[str] | No
     if not column_spec:
         return None
     
-    # If column_spec is a letter (like "A", "B"), use it directly
+    # If column_spec is a letter (like "A", "B") and headers are provided, map to header name
     if column_spec.isalpha() and len(column_spec) <= 3:
+        if headers:
+            idx = ord(column_spec.upper()) - ord('A')
+            if 0 <= idx < len(headers):
+                header = headers[idx]
+                return row.get(header)
+        # fallback: try direct key
         return row.get(column_spec.upper())
     
     # If column_spec is a header name, find the matching column

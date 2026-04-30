@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.checklist import (
     Checklist,
     ChecklistQuestion,
+    ChecklistQuestionAnswerOption,
     ChecklistQuestionTranslation,
     ChecklistSection,
     ChecklistSectionTranslation,
@@ -252,12 +253,34 @@ def create_checklist_from_file(
         # Add checklist translation
         db.add(ChecklistTranslation(
             checklist_id=checklist.id,
-            lang_code="en",
+            language_id=language.id,
             title=checklist_title,
             description=checklist_description or "",
         ))
         
         # Track created items and sections
+
+        # Helper for answer options
+        def build_answer_options(row):
+            answer_options = []
+            for score, col_key in zip([4, 3, 2, 1], [
+                column_mapping.guidance_score_4_col,
+                column_mapping.guidance_score_3_col,
+                column_mapping.guidance_score_2_col,
+                column_mapping.guidance_score_1_col,
+            ]):
+                desc = row.get(col_key) if col_key else None
+                # If label/title is missing, use description
+                label = desc if desc else None
+                answer_options.append({
+                    "position": score,
+                    "label": label,
+                    "score": score,
+                    "description": desc,
+                })
+            return answer_options
+
+        # ...existing code...
         sections_map = {}  # section_name -> section_id
         questions_map = {}  # parent_q_id -> question_id (for linking children)
         sections_created = 0
@@ -303,19 +326,20 @@ def create_checklist_from_file(
                     )
                     db.add(section)
                     db.flush()
-                    
-                    # Add section translation
                     db.add(ChecklistSectionTranslation(
                         section_id=section.id,
-                        lang_code="en",
+                        language_id=language.id,
                         title=section_name,
                     ))
-                    
                     sections_map[section_name] = section.id
                     sections_created += 1
-                
                 section_id = sections_map[section_name]
-                
+
+                # Build answer options for this row
+                answer_options = build_answer_options(row)
+                if not any(opt["description"] for opt in answer_options):
+                    warnings.append(f"Row {row_number}: No answer guidance provided for any score column.")
+
                 # Create parent question if this is a new parent ID
                 parent_question_id = None
                 if parent_q_id not in questions_map:
@@ -324,10 +348,13 @@ def create_checklist_from_file(
                         section_id=section_id,
                         parent_question_id=None,
                         question_code=parent_q_id,
+                        audit_type="compliance",
+                        points=1,
+                        answer_logic="answer_only",
                         severity=severity,
                         report_domain=None,
                         report_chapter=None,
-                        illustrative_image_url=None,
+                        illustrative_image_id=None,
                         note_for_user=None,
                         note_enabled=True,
                         evidence_enabled=True,
@@ -340,21 +367,29 @@ def create_checklist_from_file(
                     )
                     db.add(parent_question)
                     db.flush()
-                    
-                    # Add question translation
                     db.add(ChecklistQuestionTranslation(
                         question_id=parent_question.id,
-                        lang_code="en",
+                        language_id=language.id,
                         question_text=question_text,
+                        legal_requirement_title=legal_req,
+                        legal_requirement_description=legal_req,
                         explanation=explanation,
                         expected_implementation=expected_impl,
                     ))
-                    
+                    # Add answer options for parent question
+                    for opt in answer_options:
+                        db.add(ChecklistQuestionAnswerOption(
+                            question_id=parent_question.id,
+                            position=opt["position"],
+                            label=opt["label"],
+                            score=opt["score"],
+                            description=opt["description"],
+                        ))
                     questions_map[parent_q_id] = parent_question.id
                     questions_created += 1
                 else:
                     parent_question_id = questions_map[parent_q_id]
-                
+
                 # Create child question if specified
                 if child_q_id:
                     child_key = f"{parent_q_id}|{child_q_id}"
@@ -364,10 +399,13 @@ def create_checklist_from_file(
                             section_id=section_id,
                             parent_question_id=questions_map[parent_q_id],
                             question_code=child_q_id,
+                            audit_type="compliance",
+                            points=1,
+                            answer_logic="answer_only",
                             severity=severity,
                             report_domain=None,
                             report_chapter=None,
-                            illustrative_image_url=None,
+                            illustrative_image_id=None,
                             note_for_user=None,
                             note_enabled=True,
                             evidence_enabled=True,
@@ -380,18 +418,27 @@ def create_checklist_from_file(
                         )
                         db.add(child_question)
                         db.flush()
-                        
                         db.add(ChecklistQuestionTranslation(
                             question_id=child_question.id,
-                            lang_code="en",
+                            language_id=language.id,
                             question_text=question_text,
+                            legal_requirement_title=legal_req,
+                            legal_requirement_description=legal_req,
                             explanation=explanation,
                             expected_implementation=expected_impl,
                         ))
-                        
+                        # Add answer options for child question
+                        for opt in answer_options:
+                            db.add(ChecklistQuestionAnswerOption(
+                                question_id=child_question.id,
+                                position=opt["position"],
+                                label=opt["label"],
+                                score=opt["score"],
+                                description=opt["description"],
+                            ))
                         questions_map[child_key] = child_question.id
                         sub_questions_created += 1
-                
+
                 # Create grandchild question if specified
                 if grandchild_q_id and child_q_id:
                     grandchild_key = f"{parent_q_id}|{child_q_id}|{grandchild_q_id}"
@@ -403,10 +450,13 @@ def create_checklist_from_file(
                                 section_id=section_id,
                                 parent_question_id=child_parent_id,
                                 question_code=grandchild_q_id,
+                                audit_type="compliance",
+                                points=1,
+                                answer_logic="answer_only",
                                 severity=severity,
                                 report_domain=None,
                                 report_chapter=None,
-                                illustrative_image_url=None,
+                                illustrative_image_id=None,
                                 note_for_user=None,
                                 note_enabled=True,
                                 evidence_enabled=True,
@@ -419,15 +469,24 @@ def create_checklist_from_file(
                             )
                             db.add(grandchild_question)
                             db.flush()
-                            
                             db.add(ChecklistQuestionTranslation(
                                 question_id=grandchild_question.id,
-                                lang_code="en",
+                                language_id=language.id,
                                 question_text=question_text,
+                                legal_requirement_title=legal_req,
+                                legal_requirement_description=legal_req,
                                 explanation=explanation,
                                 expected_implementation=expected_impl,
                             ))
-                            
+                            # Add answer options for grandchild question
+                            for opt in answer_options:
+                                db.add(ChecklistQuestionAnswerOption(
+                                    question_id=grandchild_question.id,
+                                    position=opt["position"],
+                                    label=opt["label"],
+                                    score=opt["score"],
+                                    description=opt["description"],
+                                ))
                             questions_map[grandchild_key] = grandchild_question.id
                             sub_questions_created += 1
                 

@@ -13,6 +13,7 @@ from app.models.checklist import (
     ChecklistStatus,
     ChecklistTranslation,
     ChecklistType,
+    SeverityLevel,
 )
 from app.models.assessment import Assessment
 from app.models.reference import Language
