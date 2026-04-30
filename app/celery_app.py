@@ -15,6 +15,14 @@ celery_app = Celery(
 # Auto-discover tasks from all registered app modules
 celery_app.autodiscover_tasks(["app.tasks"])
 
+# Import tasks to ensure they are registered
+# This avoids circular import by importing after celery_app is fully initialized
+try:
+    from app.tasks import bulk_import  # noqa: F401
+except ImportError:
+    # Tasks will be registered when imported elsewhere
+    pass
+
 celery_app.conf.update(
     task_serializer="json",
     result_serializer="json",
