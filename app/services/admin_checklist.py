@@ -696,6 +696,22 @@ def reorder_sections(db: Session, *, checklist_id, section_orders: list[dict]) -
     if any(order < 1 for order in orders):
         raise ValueError("Orders must be positive")
     
+    # Check for existing orders that would conflict
+    existing_sections = db.scalars(
+        select(ChecklistSection)
+        .where(
+            ChecklistSection.checklist_id == checklist_id,
+            ChecklistSection.display_order.in_(orders),
+            ~ChecklistSection.id.in_(section_ids)  # Exclude sections we're updating
+        )
+    ).all()
+    
+    if existing_sections:
+        conflicts = []
+        for section in existing_sections:
+            conflicts.append(f"Order {section.display_order} is already assigned to section '{section.section_code}'")
+        raise ValueError("; ".join(conflicts))
+    
     # Update the display order for each section using temporary values to avoid constraint violations
     # Step 1: Assign temporary negative orders to avoid conflicts using bulk update
     temp_order = -1
@@ -796,6 +812,22 @@ def reorder_questions(db: Session, *, checklist_id, section_id, question_orders:
         raise ValueError("Orders must be unique")
     if any(order < 1 for order in orders):
         raise ValueError("Orders must be positive")
+    
+    # Check for existing orders that would conflict
+    existing_questions = db.scalars(
+        select(ChecklistQuestion)
+        .where(
+            ChecklistQuestion.section_id == section_id,
+            ChecklistQuestion.display_order.in_(orders),
+            ~ChecklistQuestion.id.in_(question_ids)  # Exclude questions we're updating
+        )
+    ).all()
+    
+    if existing_questions:
+        conflicts = []
+        for question in existing_questions:
+            conflicts.append(f"Order {question.display_order} is already assigned to question '{question.question_code}'")
+        raise ValueError("; ".join(conflicts))
     
     # Build parent-child relationships for validation
     parent_child_map = {}
