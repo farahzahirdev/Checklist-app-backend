@@ -126,7 +126,7 @@ class AdminQuestionCreateRequest(BaseModel):
     points: int | None = Field(default=None, ge=1, le=4)
     answer_logic: AnswerLogic = "answer_only"
     audit_type: str = Field(default="compliance", min_length=1, max_length=50)
-    legal_requirement_title: str | None = Field(default=None, min_length=1, max_length=500)
+    legal_requirement_title: str = Field(default="", max_length=500)
     legal_requirement_description: str | None = Field(default=None)
     explanation: str = Field(default="")
     expected_implementation: str = Field(default="")
@@ -150,7 +150,7 @@ class AdminQuestionUpdateRequest(BaseModel):
     points: int | None = Field(default=None, ge=1, le=4)
     answer_logic: AnswerLogic | None = None
     audit_type: str | None = Field(default=None, min_length=1, max_length=50)
-    legal_requirement_title: str | None = Field(default=None, min_length=1, max_length=500)
+    legal_requirement_title: str = Field(default="", max_length=500)
     legal_requirement_description: str | None = Field(default=None)
     explanation: str | None = None
     expected_implementation: str | None = None
