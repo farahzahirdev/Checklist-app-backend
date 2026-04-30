@@ -113,7 +113,7 @@ def verify_mapping(
         
         # Extract fields
         section_name = get_column_value(row, column_mapping.section_name_col, headers) or ""
-        parent_q_id = get_column_value(row, column_mapping.question_id_col, headers) or ""
+        raw_question_id = get_column_value(row, column_mapping.question_id_col, headers) or ""
         child_q_id = get_column_value(row, column_mapping.child_question_col, headers)
         grandchild_q_id = get_column_value(row, column_mapping.grandchild_question_col, headers)
         legal_req = get_column_value(row, column_mapping.legal_requirement_col, headers) or ""
@@ -122,15 +122,48 @@ def verify_mapping(
         explanation = get_column_value(row, column_mapping.explanation_col, headers)
         expected_impl = get_column_value(row, column_mapping.expected_implementation_col, headers)
         
+        # Parse hierarchical question ID from single column (same logic as creation function)
+        parent_q_id = ""
+        if raw_question_id:
+            # Check if it's a sub-question like "a)", "b)", "c)"
+            import re
+            if re.match(r'^[a-z]\)$', raw_question_id.strip()):
+                # This is a sub-question, we need to find the parent
+                # Look backwards in processed rows to find the last parent question
+                child_q_id = raw_question_id.strip()
+                # We'll find the parent later
+            else:
+                # This is a parent question
+                parent_q_id = raw_question_id.strip()
+                child_q_id = None
+        
         # Validate required fields
         if not section_name:
             errors.append("Missing section name")
         else:
             seen_sections.add(section_name)
         
-        # For hierarchical questions, parent_q_id can be inferred from context
-        # if child_q_id or grandchild_q_id is present
-        if not parent_q_id and not child_q_id and not grandchild_q_id:
+        # For hierarchical questions, if we have child_q_id but no parent_q_id,
+        # find the most recent parent question in the same section
+        if not parent_q_id and child_q_id:
+            # Look backwards to find the last parent question in this section
+            found_parent = False
+            for prev_row_idx in range(row_idx - 1, -1, -1):
+                prev_row = rows[prev_row_idx]
+                prev_section = get_column_value(prev_row, column_mapping.section_name_col, headers) or ""
+                prev_raw_q_id = get_column_value(prev_row, column_mapping.question_id_col, headers) or ""
+                
+                if prev_section == section_name and prev_raw_q_id:
+                    # Check if previous row was a parent question (not a sub-question)
+                    import re
+                    if not re.match(r'^[a-z]\)$', prev_raw_q_id.strip()):
+                        parent_q_id = prev_raw_q_id.strip()
+                        found_parent = True
+                        break
+            
+            if not found_parent:
+                errors.append("Missing parent question ID")
+        elif not parent_q_id:
             errors.append("Missing parent question ID")
         
         if not legal_req:
