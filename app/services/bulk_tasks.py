@@ -60,39 +60,67 @@ def _discover_all_task_ids() -> List[str]:
         result_backend = celery_app.conf.result_backend
         broker_url = celery_app.conf.broker_url
         
+        logger.info(f"Result backend: {result_backend}")
+        logger.info(f"Broker URL: {broker_url}")
+        
         # Try result backend first (where task results are stored)
         redis_url = result_backend if result_backend.startswith('redis://') else broker_url
         
         if redis_url.startswith('redis://'):
             redis_client = redis.from_url(redis_url)
             
+            # Test connection
+            redis_client.ping()
+            logger.info(f"Connected to Redis at {redis_url}")
+            
+            # Get ALL keys first to see what's there
+            all_keys = redis_client.keys('*')
+            logger.info(f"Total keys in database: {len(all_keys)}")
+            
+            # Look for any task-related keys
+            all_task_keys = [key.decode('utf-8') for key in all_keys if 'task' in key.decode('utf-8').lower()]
+            logger.info(f"All task-related keys: {all_task_keys}")
+            
             # Get all task result keys - try different patterns
             task_keys = []
             
             # Standard Celery result backend pattern
-            task_keys.extend(redis_client.keys("celery-task-meta-*"))
+            meta_keys = redis_client.keys("celery-task-meta-*")
+            task_keys.extend(meta_keys)
+            logger.info(f"Found {len(meta_keys)} celery-task-meta-* keys")
             
             # Alternative patterns that might be used
-            task_keys.extend(redis_client.keys("celery-result-*"))
-            task_keys.extend(redis_client.keys("*task*"))
+            result_keys = redis_client.keys("celery-result-*")
+            task_keys.extend(result_keys)
+            logger.info(f"Found {len(result_keys)} celery-result-* keys")
+            
+            any_task_keys = redis_client.keys("*task*")
+            task_keys.extend(any_task_keys)
+            logger.info(f"Found {len(any_task_keys)} *task* keys")
             
             # Remove duplicates
             task_keys = list(set(task_keys))
+            logger.info(f"Total unique task keys: {len(task_keys)}")
             
             # Extract task IDs from keys
             task_ids = []
             for key in task_keys:
                 key_str = key.decode('utf-8')
+                logger.debug(f"Processing key: {key_str}")
+                
                 if 'celery-task-meta-' in key_str:
                     task_id = key_str.replace('celery-task-meta-', '')
+                    task_ids.append(task_id)
+                    logger.debug(f"Extracted task ID: {task_id}")
                 elif 'celery-result-' in key_str:
                     task_id = key_str.replace('celery-result-', '')
+                    task_ids.append(task_id)
+                    logger.debug(f"Extracted task ID from result: {task_id}")
                 else:
-                    continue
-                task_ids.append(task_id)
+                    logger.debug(f"Skipping non-task key: {key_str}")
             
+            logger.info(f"Final task IDs extracted: {task_ids}")
             logger.info(f"Found {len(task_ids)} task IDs in Redis database")
-            logger.info(f"Redis URL used: {redis_url}")
             
             # If no tasks found in result backend, try broker database
             if len(task_ids) == 0 and result_backend != broker_url:
@@ -110,6 +138,8 @@ def _discover_all_task_ids() -> List[str]:
             
     except Exception as e:
         logger.error(f"Error discovering tasks: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return []
 
 
@@ -121,19 +151,76 @@ def _filter_bulk_tasks(task_ids: List[str]) -> List[str]:
     for task_id in task_ids:
         try:
             async_result = celery_app.AsyncResult(task_id)
-            logger.info(f"Task {task_id}: name={async_result.name}, state={async_result.state}")
+            task_name = getattr(async_result, 'name', 'UNKNOWN')
+            task_state = getattr(async_result, 'state', 'UNKNOWN')
             
-            if async_result.name == "app.tasks.bulk_import.create_checklist_task":
+            # If task name is not available, try to extract it from Redis data
+            if task_name == 'UNKNOWN' or task_name is None:
+                task_name = _extract_task_name_from_redis(task_id)
+            
+            logger.info(f"Task {task_id}: name='{task_name}', state='{task_state}'")
+            
+            # Check for multiple possible task name variations
+            is_bulk_task = (
+                task_name == "app.tasks.bulk_import.create_checklist_task" or
+                task_name == "create_checklist_task" or
+                "bulk_import" in task_name or
+                "create_checklist" in task_name
+            )
+            
+            if is_bulk_task:
                 bulk_task_ids.append(task_id)
-                logger.info(f"✓ Found bulk checklist task: {task_id}")
+                logger.info(f"✓ Found bulk checklist task: {task_id} (name: {task_name})")
             else:
-                logger.debug(f"✗ Skipping non-bulk task: {task_id} (name: {async_result.name})")
+                logger.info(f"✗ Skipping non-bulk task: {task_id} (name: {task_name})")
+                
         except Exception as e:
             logger.warning(f"Error checking task {task_id}: {e}")
+            import traceback
+            logger.warning(f"Traceback: {traceback.format_exc()}")
             continue
     
     logger.info(f"Filtered to {len(bulk_task_ids)} bulk checklist tasks")
     return bulk_task_ids
+
+
+def _extract_task_name_from_redis(task_id: str) -> str:
+    """Extract task name from Redis data when not available in AsyncResult."""
+    try:
+        import redis
+        import json
+        
+        result_backend = celery_app.conf.result_backend
+        if result_backend.startswith('redis://'):
+            redis_client = redis.from_url(result_backend)
+            task_key = f"celery-task-meta-{task_id}"
+            task_data = redis_client.get(task_key)
+            
+            if task_data:
+                data = json.loads(task_data.decode('utf-8'))
+                
+                # Check if task name is in the data
+                if 'name' in data:
+                    return data['name']
+                
+                # Check if task name is in the error message (for NotRegistered errors)
+                result = data.get('result', {})
+                if isinstance(result, dict) and 'exc_message' in result:
+                    exc_message = result['exc_message']
+                    if isinstance(exc_message, list) and len(exc_message) > 0:
+                        # Task name is often in the exception message for NotRegistered errors
+                        potential_name = exc_message[0]
+                        if 'bulk_import' in potential_name or 'create_checklist' in potential_name:
+                            return potential_name
+                
+                # Check if task_id contains the name
+                if 'task_id' in data:
+                    return data['task_id']
+    
+    except Exception as e:
+        logger.warning(f"Could not extract task name from Redis for {task_id}: {e}")
+    
+    return 'UNKNOWN'
 
 
 def _get_task_details(task_id: str) -> BulkTaskInfo | None:
