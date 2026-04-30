@@ -946,6 +946,36 @@ def debug_bulk_tasks(
 
 
 @router.get(
+    "/bulk/debug/simple",
+    summary="Simple Bulk Tasks Test",
+    description="Simple test to check basic functionality.",
+)
+def debug_simple_bulk_tasks(
+    _admin=Depends(require_admin_only()),
+) -> dict:
+    """Simple test for bulk tasks."""
+    try:
+        from app.services.bulk_tasks import _discover_all_task_ids, _filter_bulk_tasks
+        
+        # Just test discovery and filtering
+        all_task_ids = _discover_all_task_ids()
+        bulk_task_ids = _filter_bulk_tasks(all_task_ids)
+        
+        # Return simple info without detailed processing
+        return {
+            "status": "success",
+            "total_tasks": len(all_task_ids),
+            "bulk_tasks": len(bulk_task_ids),
+            "message": f"Found {len(bulk_task_ids)} bulk tasks out of {len(all_task_ids)} total"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+
+@router.get(
     "/bulk/tasks/stuck",
     response_model=BulkTasksListResponse,
     summary="Get Stuck Bulk Import Tasks",
