@@ -367,7 +367,7 @@ def _serialize_assessment_detail(db: Session, assessment: Assessment) -> Assessm
                 questions=[
                     _to_assessment_question_response(question, answer_map, children_map, db)
                     for question in sorted(questions, key=lambda q: q.display_order)
-                    if question.section_id == section.id and question.parent_question_id is None
+                    if question.section_id == section.id
                 ],
             )
         )
