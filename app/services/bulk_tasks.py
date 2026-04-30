@@ -34,11 +34,17 @@ def get_all_bulk_tasks() -> BulkTasksListResponse:
     tasks = []
     for task_id in bulk_task_ids:
         try:
+            logger.info(f"Processing task details for: {task_id}")
             task_info = _get_task_details(task_id)
             if task_info:
                 tasks.append(task_info)
+                logger.info(f"✓ Successfully processed task: {task_id}")
+            else:
+                logger.warning(f"✗ No task info returned for: {task_id}")
         except Exception as e:
             logger.error(f"Error processing task {task_id}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             continue
     
     # Sort tasks by creation time (newest first)
