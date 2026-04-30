@@ -176,8 +176,14 @@ def _filter_bulk_tasks(task_ids: List[str]) -> List[str]:
                 if extracted_name and ('bulk_import' in extracted_name or 'create_checklist' in extracted_name):
                     is_bulk_task = True
                     logger.info(f"✓ Identified bulk task from Redis: {task_id} ({extracted_name})")
+                else:
+                    # Method 3: Check task result content for bulk import indicators
+                    task_result = _get_task_result_from_redis(task_id)
+                    if task_result and _is_bulk_import_result(task_result):
+                        is_bulk_task = True
+                        logger.info(f"✓ Identified bulk task by result content: {task_id}")
             
-            # Method 3: Check task result content for bulk import indicators
+            # Method 3: Check task result content for bulk import indicators (for named tasks that don't match patterns)
             else:
                 task_result = _get_task_result_from_redis(task_id)
                 if task_result and _is_bulk_import_result(task_result):
