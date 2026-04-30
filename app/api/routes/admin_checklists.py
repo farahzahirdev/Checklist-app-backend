@@ -912,6 +912,40 @@ def get_all_bulk_tasks_endpoint(
 
 
 @router.get(
+    "/bulk/debug/tasks",
+    summary="Debug Bulk Tasks Discovery",
+    description="Debug endpoint to test task discovery and filtering.",
+)
+def debug_bulk_tasks(
+    _admin=Depends(require_admin_only()),
+) -> dict:
+    """Debug endpoint to test bulk tasks discovery."""
+    from app.services.bulk_tasks import _discover_all_task_ids, _filter_bulk_tasks
+    
+    try:
+        # Discover all task IDs
+        all_task_ids = _discover_all_task_ids()
+        
+        # Filter for bulk tasks
+        bulk_task_ids = _filter_bulk_tasks(all_task_ids)
+        
+        return {
+            "total_tasks_found": len(all_task_ids),
+            "bulk_tasks_found": len(bulk_task_ids),
+            "all_task_ids": all_task_ids,
+            "bulk_task_ids": bulk_task_ids,
+            "redis_broker": celery_app.conf.broker_url,
+            "redis_result_backend": celery_app.conf.result_backend,
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "redis_broker": celery_app.conf.broker_url,
+            "redis_result_backend": celery_app.conf.result_backend,
+        }
+
+
+@router.get(
     "/bulk/tasks/stuck",
     response_model=BulkTasksListResponse,
     summary="Get Stuck Bulk Import Tasks",
@@ -926,6 +960,53 @@ def get_stuck_bulk_tasks(
     return BulkTasksListResponse(
         total=len(stuck_tasks),
         tasks=stuck_tasks
+    )
+
+
+@router.get(
+    "/bulk/tasks/{task_id}",
+    response_model=BulkChecklistTaskStatusResponse,
+    summary="Get Bulk Import Task Status",
+    description="Returns current Celery task state and any completed result for bulk checklist import.",
+)
+def get_bulk_import_task_status(
+    task_id: str,
+    _admin=Depends(require_admin_or_auditor_for_read()),
+) -> BulkChecklistTaskStatusResponse:
+    async_result = celery_app.AsyncResult(task_id)
+    state = async_result.state
+    detail = "Task queued or waiting for worker execution."
+    status_text = "pending"
+    result = None
+    error = None
+
+    if state == "PENDING":
+        detail = "Task is pending execution."
+    elif state == "STARTED":
+        detail = "Task has started processing."
+        status_text = "started"
+    elif state == "SUCCESS":
+        payload = async_result.result or {}
+        if isinstance(payload, dict):
+            status_text = payload.get("status", "success")
+            detail = payload.get("message", "Bulk import task completed.")
+            result = BulkChecklistCreateResponse.model_validate(payload)
+        else:
+            status_text = "failed"
+            error = "Unexpected task result format."
+            detail = "Task completed with an invalid result payload."
+    elif state in ("FAILURE", "RETRY"):
+        status_text = "failed"
+        error = str(async_result.result)
+        detail = "Bulk import task failed."
+
+    return BulkChecklistTaskStatusResponse(
+        task_id=task_id,
+        celery_state=state,
+        status=status_text,
+        detail=detail,
+        result=result,
+        error=error,
     )
 
 
