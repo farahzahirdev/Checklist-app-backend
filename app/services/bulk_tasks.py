@@ -204,13 +204,13 @@ def _filter_bulk_tasks(task_ids: List[str]) -> List[str]:
 
 
 def _cleanup_old_completed_tasks(task_ids: List[str]) -> List[str]:
-    """Remove completed tasks (both success and failure) older than 5 minutes from the task list."""
+    """Remove completed tasks (both success and failure) older than 1 minutes from the task list."""
     from datetime import datetime, timedelta
     import redis
     import json
     
     cleaned_task_ids = []
-    cleanup_threshold = datetime.utcnow() - timedelta(minutes=5)
+    cleanup_threshold = datetime.utcnow().replace(tzinfo=None) - timedelta(minutes=1)
     
     try:
         result_backend = celery_app.conf.result_backend
@@ -230,8 +230,8 @@ def _cleanup_old_completed_tasks(task_ids: List[str]) -> List[str]:
                         should_delete = False
                         if date_done_str:
                             try:
-                                # Parse ISO datetime
-                                date_done = datetime.fromisoformat(date_done_str.replace('Z', '+00:00'))
+                                # Parse ISO datetime and remove timezone for comparison
+                                date_done = datetime.fromisoformat(date_done_str.replace('Z', '+00:00')).replace(tzinfo=None)
                                 if date_done < cleanup_threshold:
                                     task_status = data.get('status', 'UNKNOWN')
                                     logger.info(f"Cleaning up old task: {task_id} (status: {task_status}, completed at {date_done})")
