@@ -3,7 +3,7 @@
 import json
 import logging
 from datetime import datetime
-from typing import list
+from typing import List
 
 from celery.result import AsyncResult
 from sqlalchemy.orm import Session
@@ -50,7 +50,7 @@ def get_all_bulk_tasks() -> BulkTasksListResponse:
     )
 
 
-def _discover_all_task_ids() -> list[str]:
+def _discover_all_task_ids() -> List[str]:
     """Discover all task IDs from the Celery backend."""
     try:
         # For Redis backend, we can inspect all keys
@@ -77,7 +77,7 @@ def _discover_all_task_ids() -> list[str]:
         return []
 
 
-def _filter_bulk_tasks(task_ids: list[str]) -> list[str]:
+def _filter_bulk_tasks(task_ids: List[str]) -> List[str]:
     """Filter task IDs to only include bulk checklist creation tasks."""
     bulk_task_ids = []
     for task_id in task_ids:
@@ -203,7 +203,7 @@ def _process_task_state(async_result: AsyncResult, task_info_dict: dict) -> None
         task_info_dict["completed_at"] = datetime.utcnow().isoformat() + "Z"
 
 
-def get_stuck_tasks(timeout_minutes: int = 20) -> list[BulkTaskInfo]:
+def get_stuck_tasks(timeout_minutes: int = 20) -> List[BulkTaskInfo]:
     """
     Get tasks that have been pending for longer than the specified timeout.
     
