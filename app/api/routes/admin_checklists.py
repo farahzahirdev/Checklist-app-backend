@@ -57,11 +57,14 @@ from app.schemas.bulk_checklist import (
     BulkChecklistCreateResponse,
     BulkChecklistTaskResponse,
     BulkChecklistTaskStatusResponse,
+    BulkTasksListResponse,
+    BulkTaskInfo,
 )
 from app.services.bulk_checklist import (
     verify_mapping,
     create_checklist_from_file,
 )
+from app.services.bulk_tasks import get_all_bulk_tasks, get_stuck_tasks
 from app.tasks.bulk_import import create_checklist_task
 from app.celery_app import celery_app
 
@@ -892,6 +895,37 @@ def get_bulk_import_task_status(
         detail=detail,
         result=result,
         error=error,
+    )
+
+
+@router.get(
+    "/bulk/tasks",
+    response_model=BulkTasksListResponse,
+    summary="Get All Bulk Import Tasks",
+    description="Returns all bulk checklist creation tasks with detailed progress information for admin monitoring.",
+)
+def get_all_bulk_tasks_endpoint(
+    _admin=Depends(require_admin_only()),
+) -> BulkTasksListResponse:
+    """Get all bulk checklist creation tasks with detailed information."""
+    return get_all_bulk_tasks()
+
+
+@router.get(
+    "/bulk/tasks/stuck",
+    response_model=BulkTasksListResponse,
+    summary="Get Stuck Bulk Import Tasks",
+    description="Returns bulk checklist creation tasks that have been pending for longer than 20 minutes, indicating potential issues.",
+)
+def get_stuck_bulk_tasks(
+    timeout_minutes: int = Query(20, ge=1, le=120, description="Maximum allowed time in minutes for a task to be pending"),
+    _admin=Depends(require_admin_only()),
+) -> BulkTasksListResponse:
+    """Get bulk checklist creation tasks that have been pending too long."""
+    stuck_tasks = get_stuck_tasks(timeout_minutes)
+    return BulkTasksListResponse(
+        total=len(stuck_tasks),
+        tasks=stuck_tasks
     )
 
 

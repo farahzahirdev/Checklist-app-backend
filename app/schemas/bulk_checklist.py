@@ -119,6 +119,30 @@ class TemplateDownloadRequest(BaseModel):
     include_sample_data: bool = Field(default=False, description="Include sample data rows")
 
 
+class BulkTaskInfo(BaseModel):
+    """Detailed information about a single bulk task."""
+    task_id: str
+    checklist_title: str
+    checklist_description: str | None = None
+    file_name: str
+    checklist_type_code: str
+    celery_state: str
+    status: Literal["pending", "started", "success", "success_with_warnings", "failed"]
+    detail: str
+    created_at: str
+    started_at: str | None = None
+    completed_at: str | None = None
+    result: BulkChecklistCreateResponse | None = None
+    error: str | None = None
+    actor_id: int
+
+
+class BulkTasksListResponse(BaseModel):
+    """Response for listing all bulk tasks."""
+    total: int
+    tasks: list[BulkTaskInfo]
+
+
 class SampleDataResponse(BaseModel):
     """Sample data for template download."""
     download_url: str
