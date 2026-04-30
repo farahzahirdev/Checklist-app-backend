@@ -30,6 +30,9 @@ def get_all_bulk_tasks() -> BulkTasksListResponse:
     
     logger.info(f"Found {len(bulk_task_ids)} bulk checklist tasks")
     
+    # Auto-cleanup failed tasks older than 20 minutes
+    bulk_task_ids = _cleanup_old_failed_tasks(bulk_task_ids)
+    
     # Get detailed information for each task
     tasks = []
     for task_id in bulk_task_ids:
@@ -188,6 +191,61 @@ def _filter_bulk_tasks(task_ids: List[str]) -> List[str]:
     
     logger.info(f"Filtered to {len(bulk_task_ids)} bulk checklist tasks")
     return bulk_task_ids
+
+
+def _cleanup_old_failed_tasks(task_ids: List[str]) -> List[str]:
+    """Remove failed tasks older than 20 minutes from the task list."""
+    from datetime import datetime, timedelta
+    import redis
+    import json
+    
+    cleaned_task_ids = []
+    cleanup_threshold = datetime.utcnow() - timedelta(minutes=20)
+    
+    try:
+        result_backend = celery_app.conf.result_backend
+        if result_backend.startswith('redis://'):
+            redis_client = redis.from_url(result_backend)
+            
+            for task_id in task_ids:
+                try:
+                    task_key = f"celery-task-meta-{task_id}"
+                    task_data = redis_client.get(task_key)
+                    
+                    if task_data:
+                        data = json.loads(task_data.decode('utf-8'))
+                        
+                        # Check if task is failed and old
+                        if data.get('status') == 'FAILURE':
+                            date_done_str = data.get('date_done')
+                            if date_done_str:
+                                try:
+                                    # Parse ISO datetime
+                                    date_done = datetime.fromisoformat(date_done_str.replace('Z', '+00:00'))
+                                    if date_done < cleanup_threshold:
+                                        logger.info(f"Cleaning up old failed task: {task_id} (failed at {date_done})")
+                                        # Delete the task from Redis
+                                        redis_client.delete(task_key)
+                                        continue  # Skip this task
+                                except ValueError:
+                                    logger.warning(f"Could not parse date for task {task_id}: {date_done_str}")
+                    
+                    # Keep tasks that are not old failed tasks
+                    cleaned_task_ids.append(task_id)
+                    
+                except Exception as e:
+                    logger.warning(f"Error checking task {task_id} for cleanup: {e}")
+                    cleaned_task_ids.append(task_id)  # Keep on error
+                    
+    except Exception as e:
+        logger.error(f"Error during task cleanup: {e}")
+        return task_ids  # Return original list on error
+    
+    cleaned_count = len(task_ids) - len(cleaned_task_ids)
+    if cleaned_count > 0:
+        logger.info(f"Cleaned up {cleaned_count} old failed tasks")
+    
+    return cleaned_task_ids
 
 
 def _extract_task_name_from_redis(task_id: str) -> str:
