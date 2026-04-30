@@ -15,9 +15,6 @@ celery_app = Celery(
 # Auto-discover tasks from all registered app modules
 celery_app.autodiscover_tasks(["app.tasks"])
 
-# Explicitly import tasks to ensure registration
-from app.tasks.bulk_import import create_checklist_task  # noqa: F401
-
 celery_app.conf.update(
     task_serializer="json",
     result_serializer="json",
