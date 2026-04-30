@@ -128,8 +128,11 @@ def verify_mapping(
         else:
             seen_sections.add(section_name)
         
-        if not parent_q_id:
+        # For hierarchical questions, parent_q_id can be inferred from context
+        # if child_q_id or grandchild_q_id is present
+        if not parent_q_id and not child_q_id and not grandchild_q_id:
             errors.append("Missing parent question ID")
+        
         if not legal_req:
             errors.append("Missing legal requirement")
         if not question_text:
@@ -296,7 +299,7 @@ def create_checklist_from_file(
             try:
                 # Extract fields
                 section_name = get_column_value(row, column_mapping.section_name_col, headers) or ""
-                parent_q_id = get_column_value(row, column_mapping.question_id_col, headers) or ""
+                raw_question_id = get_column_value(row, column_mapping.question_id_col, headers) or ""
                 child_q_id = get_column_value(row, column_mapping.child_question_col, headers)
                 grandchild_q_id = get_column_value(row, column_mapping.grandchild_question_col, headers)
                 legal_req = get_column_value(row, column_mapping.legal_requirement_col, headers) or ""
@@ -306,10 +309,52 @@ def create_checklist_from_file(
                 expected_impl = get_column_value(row, column_mapping.expected_implementation_col, headers)
                 source_ref = get_column_value(row, column_mapping.source_ref_col, headers)
                 
-                # Validate required fields
-                if not section_name or not parent_q_id or not legal_req or not question_text:
+                # Parse hierarchical question ID from single column
+                parent_q_id = ""
+                if raw_question_id:
+                    # Check if it's a sub-question like "a)", "b)", "c)"
+                    import re
+                    if re.match(r'^[a-z]\)$', raw_question_id.strip()):
+                        # This is a sub-question, we need to find the parent
+                        # Look backwards in processed rows to find the last parent question
+                        child_q_id = raw_question_id.strip()
+                        # We'll find the parent later
+                    else:
+                        # This is a parent question
+                        parent_q_id = raw_question_id.strip()
+                        child_q_id = None
+                
+                # Validate required fields - allow hierarchical questions
+                if not section_name or not legal_req or not question_text:
                     skipped_rows += 1
                     warnings.append(f"Row {row_number}: Skipped - missing required fields")
+                    continue
+                
+                # For hierarchical questions, if we have child_q_id but no parent_q_id,
+                # find the most recent parent question in the same section
+                if not parent_q_id and child_q_id:
+                    # Look backwards to find the last parent question in this section
+                    found_parent = False
+                    for prev_row_idx in range(row_idx - 1, -1, -1):
+                        prev_row = rows[prev_row_idx]
+                        prev_section = get_column_value(prev_row, column_mapping.section_name_col, headers) or ""
+                        prev_raw_q_id = get_column_value(prev_row, column_mapping.question_id_col, headers) or ""
+                        
+                        if prev_section == section_name and prev_raw_q_id:
+                            # Check if previous row was a parent question (not a sub-question)
+                            import re
+                            if not re.match(r'^[a-z]\)$', prev_raw_q_id.strip()):
+                                parent_q_id = prev_raw_q_id.strip()
+                                found_parent = True
+                                break
+                    
+                    if not found_parent:
+                        skipped_rows += 1
+                        warnings.append(f"Row {row_number}: Skipped - could not find parent question for sub-question {child_q_id}")
+                        continue
+                elif not parent_q_id:
+                    skipped_rows += 1
+                    warnings.append(f"Row {row_number}: Skipped - missing parent question ID")
                     continue
                 
                 # Normalize severity

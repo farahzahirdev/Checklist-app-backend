@@ -4,11 +4,11 @@
   "file_name": "Check list draft_short.csv",
   "column_mapping": {
     "section_name_col": "Unnamed: 1",
-    "question_id_col": "Question ID",
+    "question_id_col": "Question ID", 
     "legal_requirement_col": "Legal Requirement",
     "question_text_col": "paragraph title",
     "severity_col": "Severity",
-    "explanation_col": "Explanation",
+    "explanation_col": "Explanation", 
     "expected_implementation_col": "Expected Implementation",
     "guidance_score_4_col": "Answers yes / 4 points",
     "guidance_score_3_col": "Answers yes / 3 points",
