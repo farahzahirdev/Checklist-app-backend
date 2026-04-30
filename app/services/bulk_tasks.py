@@ -57,15 +57,51 @@ def _discover_all_task_ids() -> List[str]:
         import redis
         
         # Get Redis connection from Celery config
-        redis_url = celery_app.conf.broker_url
+        result_backend = celery_app.conf.result_backend
+        broker_url = celery_app.conf.broker_url
+        
+        # Try result backend first (where task results are stored)
+        redis_url = result_backend if result_backend.startswith('redis://') else broker_url
+        
         if redis_url.startswith('redis://'):
             redis_client = redis.from_url(redis_url)
             
-            # Get all task result keys
-            task_keys = redis_client.keys("celery-task-meta-*")
-            task_ids = [key.decode('utf-8').replace('celery-task-meta-', '') for key in task_keys]
+            # Get all task result keys - try different patterns
+            task_keys = []
             
-            logger.info(f"Found {len(task_ids)} task IDs in Redis")
+            # Standard Celery result backend pattern
+            task_keys.extend(redis_client.keys("celery-task-meta-*"))
+            
+            # Alternative patterns that might be used
+            task_keys.extend(redis_client.keys("celery-result-*"))
+            task_keys.extend(redis_client.keys("*task*"))
+            
+            # Remove duplicates
+            task_keys = list(set(task_keys))
+            
+            # Extract task IDs from keys
+            task_ids = []
+            for key in task_keys:
+                key_str = key.decode('utf-8')
+                if 'celery-task-meta-' in key_str:
+                    task_id = key_str.replace('celery-task-meta-', '')
+                elif 'celery-result-' in key_str:
+                    task_id = key_str.replace('celery-result-', '')
+                else:
+                    continue
+                task_ids.append(task_id)
+            
+            logger.info(f"Found {len(task_ids)} task IDs in Redis database")
+            logger.info(f"Redis URL used: {redis_url}")
+            
+            # If no tasks found in result backend, try broker database
+            if len(task_ids) == 0 and result_backend != broker_url:
+                logger.info("No tasks found in result backend, trying broker database...")
+                broker_client = redis.from_url(broker_url)
+                broker_task_keys = broker_client.keys("celery-task-meta-*")
+                task_ids = [key.decode('utf-8').replace('celery-task-meta-', '') for key in broker_task_keys]
+                logger.info(f"Found {len(task_ids)} task IDs in broker database")
+            
             return task_ids
         else:
             # Fallback for other backends - this is less efficient
@@ -80,14 +116,23 @@ def _discover_all_task_ids() -> List[str]:
 def _filter_bulk_tasks(task_ids: List[str]) -> List[str]:
     """Filter task IDs to only include bulk checklist creation tasks."""
     bulk_task_ids = []
+    logger.info(f"Filtering {len(task_ids)} task IDs for bulk checklist tasks")
+    
     for task_id in task_ids:
         try:
             async_result = celery_app.AsyncResult(task_id)
+            logger.info(f"Task {task_id}: name={async_result.name}, state={async_result.state}")
+            
             if async_result.name == "app.tasks.bulk_import.create_checklist_task":
                 bulk_task_ids.append(task_id)
-        except Exception:
+                logger.info(f"✓ Found bulk checklist task: {task_id}")
+            else:
+                logger.debug(f"✗ Skipping non-bulk task: {task_id} (name: {async_result.name})")
+        except Exception as e:
+            logger.warning(f"Error checking task {task_id}: {e}")
             continue
     
+    logger.info(f"Filtered to {len(bulk_task_ids)} bulk checklist tasks")
     return bulk_task_ids
 
 
@@ -133,11 +178,21 @@ def _extract_task_metadata(task_id: str, task_info_dict: dict) -> None:
     try:
         import redis
         
-        redis_url = celery_app.conf.broker_url
+        # Try result backend first, then broker
+        result_backend = celery_app.conf.result_backend
+        broker_url = celery_app.conf.broker_url
+        
+        redis_url = result_backend if result_backend.startswith('redis://') else broker_url
+        
         if redis_url.startswith('redis://'):
             redis_client = redis.from_url(redis_url)
             task_key = f"celery-task-meta-{task_id}"
             task_data = redis_client.get(task_key)
+            
+            # If not found in result backend, try broker
+            if not task_data and result_backend != broker_url:
+                broker_client = redis.from_url(broker_url)
+                task_data = broker_client.get(task_key)
             
             if task_data:
                 meta = json.loads(task_data.decode('utf-8'))
