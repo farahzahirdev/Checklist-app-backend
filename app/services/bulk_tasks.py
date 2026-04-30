@@ -155,38 +155,42 @@ def _discover_all_task_ids() -> List[str]:
 def _filter_bulk_tasks(task_ids: List[str]) -> List[str]:
     """Filter task IDs to only include bulk checklist creation tasks."""
     bulk_task_ids = []
-    logger.info(f"Filtering {len(task_ids)} task IDs for bulk checklist tasks")
     
     for task_id in task_ids:
         try:
-            async_result = celery_app.AsyncResult(task_id)
-            task_name = getattr(async_result, 'name', 'UNKNOWN')
-            task_state = getattr(async_result, 'state', 'UNKNOWN')
+            # Try to get task name from AsyncResult
+            result = celery_app.AsyncResult(task_id)
+            task_name = getattr(result, 'name', None) or result.name
             
-            # If task name is not available, try to extract it from Redis data
-            if task_name == 'UNKNOWN' or task_name is None:
-                task_name = _extract_task_name_from_redis(task_id)
+            # Check if this is a bulk import task
+            is_bulk_task = False
             
-            logger.info(f"Task {task_id}: name='{task_name}', state='{task_state}'")
+            # Method 1: Check task name
+            if task_name and ('bulk_import' in task_name or 'create_checklist' in task_name):
+                is_bulk_task = True
+                logger.info(f"✓ Identified bulk task by name: {task_id} ({task_name})")
             
-            # Check for multiple possible task name variations
-            is_bulk_task = (
-                task_name == "app.tasks.bulk_import.create_checklist_task" or
-                task_name == "create_checklist_task" or
-                "bulk_import" in task_name or
-                "create_checklist" in task_name
-            )
+            # Method 2: Check extracted name from Redis
+            elif not task_name or task_name == 'None':
+                extracted_name = _extract_task_name_from_redis(task_id)
+                if extracted_name and ('bulk_import' in extracted_name or 'create_checklist' in extracted_name):
+                    is_bulk_task = True
+                    logger.info(f"✓ Identified bulk task from Redis: {task_id} ({extracted_name})")
+            
+            # Method 3: Check task result content for bulk import indicators
+            else:
+                task_result = _get_task_result_from_redis(task_id)
+                if task_result and _is_bulk_import_result(task_result):
+                    is_bulk_task = True
+                    logger.info(f"✓ Identified bulk task by result content: {task_id}")
             
             if is_bulk_task:
                 bulk_task_ids.append(task_id)
-                logger.info(f"✓ Found bulk checklist task: {task_id} (name: {task_name})")
             else:
-                logger.info(f"✗ Skipping non-bulk task: {task_id} (name: {task_name})")
-                
+                logger.debug(f"✗ Skipping non-bulk task: {task_id} (name: {task_name})")
+                    
         except Exception as e:
-            logger.warning(f"Error checking task {task_id}: {e}")
-            import traceback
-            logger.warning(f"Traceback: {traceback.format_exc()}")
+            logger.warning(f"Error filtering task {task_id}: {e}")
             continue
     
     logger.info(f"Filtered to {len(bulk_task_ids)} bulk checklist tasks")
@@ -246,6 +250,55 @@ def _cleanup_old_failed_tasks(task_ids: List[str]) -> List[str]:
         logger.info(f"Cleaned up {cleaned_count} old failed tasks")
     
     return cleaned_task_ids
+
+
+def _get_task_result_from_redis(task_id: str) -> dict:
+    """Get task result data from Redis."""
+    try:
+        import redis
+        import json
+        
+        result_backend = celery_app.conf.result_backend
+        if result_backend.startswith('redis://'):
+            redis_client = redis.from_url(result_backend)
+            task_key = f"celery-task-meta-{task_id}"
+            task_data = redis_client.get(task_key)
+            
+            if task_data:
+                data = json.loads(task_data.decode('utf-8'))
+                return data.get('result', {})
+    
+    except Exception as e:
+        logger.warning(f"Could not get task result from Redis for {task_id}: {e}")
+    
+    return {}
+
+
+def _is_bulk_import_result(result: dict) -> bool:
+    """Check if task result indicates a bulk import task."""
+    if not isinstance(result, dict):
+        return False
+    
+    # Check for bulk import specific fields
+    bulk_indicators = [
+        'checklist_title',
+        'sections_created', 
+        'questions_created',
+        'total_rows_processed',
+        'warnings',
+        'checklist_id'
+    ]
+    
+    # If result has multiple bulk import indicators, it's likely a bulk import task
+    indicator_count = sum(1 for indicator in bulk_indicators if indicator in result)
+    
+    # Also check for bulk import related error messages
+    if 'exc_type' in result:
+        exc_type = result.get('exc_type', '')
+        if 'ValidationError' in exc_type or 'bulk_import' in str(result):
+            indicator_count += 1
+    
+    return indicator_count >= 2  # Need at least 2 indicators to be confident
 
 
 def _extract_task_name_from_redis(task_id: str) -> str:
