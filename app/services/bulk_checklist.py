@@ -603,6 +603,20 @@ def create_checklist_from_file(
         db.commit()
         db.refresh(checklist)
         
+        # Create Stripe product for checklist
+        try:
+            from app.services.stripe_products import create_stripe_product_for_checklist
+            stripe_product_id = create_stripe_product_for_checklist(
+                db,
+                checklist_id=checklist.id,
+                title=checklist_title,
+                description=checklist_description,
+            )
+            print(f"Created Stripe product {stripe_product_id} for bulk checklist {checklist.id}")
+        except Exception as e:
+            # Log error but don't fail checklist creation
+            print(f"Error creating Stripe product for bulk checklist {checklist.id}: {e}")
+        
         status = "success"
         message = f"Created checklist with {sections_created} sections and {questions_created + sub_questions_created} questions"
         
