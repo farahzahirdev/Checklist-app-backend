@@ -134,7 +134,7 @@ class BulkTaskInfo(BaseModel):
     completed_at: str | None = None
     result: BulkChecklistCreateResponse | None = None
     error: str | None = None
-    actor_id: int
+    actor_id: int | None = None
 
 
 class BulkTasksListResponse(BaseModel):
