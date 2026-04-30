@@ -1,0 +1,21 @@
+{
+  "actor_id": 1,
+  "file_content": "U2VjdGlvbiBUaXRsZSxTZWN0aW9uIERlc2NyaXB0aW9uLFF1ZXN0aW9uIFRleHQsUXVlc3Rpb24gVHlwZSxTY29yZSAxLFNjb3JlIDIxLFNjb3JlIDIsU2NvcmUgNApTZWN0aW9uIDEgLSBTYWZldHksU2FmZXR5IHNlY3Rpb24gZGVzY3JpcHRpb24sV2hhdCBpcyB0aGUgcHJvcGVyIHdheSB0byBzdG9yZSBzZW5zaXRpdmUgZG9jdW1lbnRzPyxNdWx0aXBsZSBDaG9pY2UsU3RvcmUgaW4gbG9ja2VkIGZpbGUgY2FiaW5ldCxTdG9yZSBpbiBlbmNyeXB0ZWQgZHJpdmUsU3RvcmUgaW4gY2xvdWQgc3RvcmFnZSxVc2UgcGFzc3dvcmQtcHJvdGVjdGVkIGZpbGVzClNlY3Rpb24gMSAtIFNhZmV0eSxTYWZldHkgc2VjdGlvbiBkZXNjcmlwdGlvbixXaGF0IGlzIHRoZSBwcm9wZXIgd2F5IHRvIHJlcG9ydCBhIHNlY3VyaXR5IGJyZWFjaD8sTXVsdGlwbGUgQ2hvaWNlLEltbWVkaWF0ZWx5IHJlcG9ydCB0byBzZWN1cml0eSB0ZWFtLEVtYWlsIHNlY3VyaXR5IG9mZmljZXIsVXNlIGRlZGljYXRlZCByZXBvcnRpbmcgY2hhbm5lbA==",
+  "file_name": "test_simple.csv",
+  "column_mapping": {
+    "section_name_col": "Section Title",
+    "question_id_col": "Question Text", 
+    "legal_requirement_col": "Section Description",
+    "question_text_col": "Question Text",
+    "severity_col": "Question Type",
+    "explanation_col": "Explanation",
+    "expected_implementation_col": "Expected Implementation",
+    "guidance_score_4_col": "Score 4",
+    "guidance_score_3_col": "Score 3",
+    "guidance_score_2_col": "Score 2",
+    "guidance_score_1_col": "Score 1"
+  },
+  "checklist_title": "Simple Test Import",
+  "checklist_description": "Testing with simple CSV format",
+  "checklist_type_code": "compliance"
+}

@@ -1,0 +1,21 @@
+{
+  "actor_id": 1,
+  "file_content": "U2VjdGlvbiBUaXRsZSxTZWN0aW9uIERlc2NyaXB0aW9uLFF1ZXN0aW9uIFRleHQsUXVlc3Rpb24gVHlwZSxTY29yZSAxLFNjb3JlIDIxLFNjb3JlIDMsU2NvcmUgNApTZWN0aW9uIDEgLSBTYWZldHksU2FmZXR5IHNlY3Rpb24gZGVzY3JpcHRpb24sV2hhdCBpcyB0aGUgcHJvcGVyIHdheSB0byBzdG9yZSBzZW5zaXRpdmUgZG9jdW1lbnRzPyxNdWx0aXBsZSBDaG9pY2UsU3RvcmUgaW4gbG9ja2VkIGZpbGUgY2FiaW5ldCxTdG9yZSBpbiBlbmNyeXB0ZWQgZHJpdmUsU3RvcmUgaW4gY2xvdWQgc3RvcmFnZSxVc2UgcGFzc3dvcmQtcHJvdGVjdGVkIGZpbGVzClNlY3Rpb24gMSAtIFNhZmV0eSxTYWZldHkgc2VjdGlvbiBkZXNjcmlwdGlvbixXaGF0IGlzIHRoZSBwcm9wZXIgd2F5IHRvIHJlcG9ydCBhIHNlY3VyaXR5IGJyZWFjaD8sTXVsdGlwbGUgQ2hvaWNlLEltbWVkaWF0ZWx5IHJlcG9ydCB0byBzZWN1cml0eSB0ZWFtLEVtYWlsIHNlY3VyaXR5IG9mZmljZXIsVXNlIGRlZGljYXRlZCByZXBvcnRpbmcgY2hhbm5lbA==",
+  "file_name": "Check list draft_short.csv",
+  "column_mapping": {
+    "section_name_col": "Unnamed: 1",
+    "question_id_col": "Question ID",
+    "legal_requirement_col": "Legal Requirement", 
+    "question_text_col": "paragraph title",
+    "severity_col": "Severity",
+    "explanation_col": "Explanation",
+    "expected_implementation_col": "Expected Implementation",
+    "guidance_score_4_col": "Answers yes / 4 points",
+    "guidance_score_3_col": "Answers yes / 3 points",
+    "guidance_score_2_col": "Answers yes / 2 points",
+    "guidance_score_1_col": "Answers yes / 1 points"
+  },
+  "checklist_title": "Compliance Framework Import",
+  "checklist_description": "Imported from compliance framework CSV",
+  "checklist_type_code": "compliance"
+}
