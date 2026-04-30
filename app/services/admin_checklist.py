@@ -538,6 +538,8 @@ def create_section(db: Session, *, checklist_id, payload: AdminSectionCreateRequ
         )
     db.commit()
     db.refresh(section)
+    # Load the translation for the response
+    section._translation = _latest_section_translation(db, section.id)
     return _to_section_response(section)
 
 
