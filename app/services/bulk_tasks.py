@@ -210,7 +210,7 @@ def _cleanup_old_failed_tasks(task_ids: List[str]) -> List[str]:
     import json
     
     cleaned_task_ids = []
-    cleanup_threshold = datetime.utcnow() - timedelta(minutes=20)
+    cleanup_threshold = datetime.utcnow() - timedelta(minutes=5)
     
     try:
         result_backend = celery_app.conf.result_backend
