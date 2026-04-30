@@ -469,6 +469,16 @@ def delete_checklist(db: Session, *, checklist_id) -> bool:
     if payment_count > 0:
         raise ValueError(f"Cannot delete checklist with {payment_count} associated payments. Delete payments first.")
     
+    # Delete Stripe product if no prices exist
+    try:
+        from app.services.stripe_products import delete_stripe_product_for_checklist
+        stripe_deleted = delete_stripe_product_for_checklist(db, checklist_id=checklist_id)
+        if not stripe_deleted:
+            print(f"Warning: Could not delete Stripe product for checklist {checklist_id} - prices still exist")
+    except Exception as e:
+        print(f"Error deleting Stripe product for checklist {checklist_id}: {e}")
+        # Continue with checklist deletion even if Stripe deletion fails
+    
     # Delete the checklist (CASCADE will handle sections, questions, and translations)
     db.delete(checklist)
     db.commit()

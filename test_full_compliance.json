@@ -4,7 +4,9 @@
   "file_name": "Check list draft_short.csv",
   "column_mapping": {
     "section_name_col": "Unnamed: 1",
-    "question_id_col": "Question ID", 
+    "question_id_col": "Question ID",
+    "child_question_col": "Unnamed: 5",
+    "grandchild_question_col": "Unnamed: 6",
     "legal_requirement_col": "Legal Requirement",
     "question_text_col": "paragraph title",
     "severity_col": "Severity",

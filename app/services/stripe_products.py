@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import stripe
 from fastapi import HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -143,3 +144,51 @@ def update_stripe_product_for_checklist(
     except Exception as e:
         print(f"Error updating product for checklist {checklist_id}: {e}")
         return None
+
+
+def delete_stripe_product_for_checklist(
+    db: Session,
+    *,
+    checklist_id: UUID
+) -> bool:
+    """
+    Delete Stripe product for a checklist if no prices exist.
+    
+    Returns:
+        bool: True if product was deleted or didn't exist, False if couldn't delete due to prices
+    """
+    stripe_client = _stripe_required()
+    
+    checklist = db.get(Checklist, checklist_id)
+    if checklist is None:
+        return True  # Checklist doesn't exist, consider it successful
+    
+    if not checklist.stripe_product_id:
+        return True  # No Stripe product to delete
+    
+    try:
+        # Check if there are any prices for this product
+        prices = stripe_client.Price.list(
+            product=checklist.stripe_product_id,
+            limit=100
+        )
+        
+        if prices.data:
+            # Don't delete Stripe product if prices exist
+            price_count = len(prices.data)
+            print(f"Skipping Stripe product deletion for checklist {checklist_id}: {price_count} prices exist")
+            return False
+        
+        # Delete the Stripe product
+        stripe_client.Product.delete(checklist.stripe_product_id)
+        print(f"Deleted Stripe product {checklist.stripe_product_id} for checklist {checklist_id}")
+        
+        # Clear the product ID from checklist
+        checklist.stripe_product_id = None
+        db.commit()
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error deleting Stripe product for checklist {checklist_id}: {e}")
+        return False

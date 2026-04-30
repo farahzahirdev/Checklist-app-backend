@@ -30,8 +30,8 @@ def get_all_bulk_tasks() -> BulkTasksListResponse:
     
     logger.info(f"Found {len(bulk_task_ids)} bulk checklist tasks")
     
-    # Auto-cleanup failed tasks older than 20 minutes
-    bulk_task_ids = _cleanup_old_failed_tasks(bulk_task_ids)
+    # Auto-cleanup completed tasks older than 5 minutes
+    bulk_task_ids = _cleanup_old_completed_tasks(bulk_task_ids)
     
     # Get detailed information for each task
     tasks = []
@@ -203,8 +203,8 @@ def _filter_bulk_tasks(task_ids: List[str]) -> List[str]:
     return bulk_task_ids
 
 
-def _cleanup_old_failed_tasks(task_ids: List[str]) -> List[str]:
-    """Remove failed tasks older than 20 minutes from the task list."""
+def _cleanup_old_completed_tasks(task_ids: List[str]) -> List[str]:
+    """Remove completed tasks (both success and failure) older than 5 minutes from the task list."""
     from datetime import datetime, timedelta
     import redis
     import json
@@ -227,6 +227,7 @@ def _cleanup_old_failed_tasks(task_ids: List[str]) -> List[str]:
                         
                         # Check if task is old (both failed and successful)
                         date_done_str = data.get('date_done')
+                        should_delete = False
                         if date_done_str:
                             try:
                                 # Parse ISO datetime
@@ -236,14 +237,15 @@ def _cleanup_old_failed_tasks(task_ids: List[str]) -> List[str]:
                                     logger.info(f"Cleaning up old task: {task_id} (status: {task_status}, completed at {date_done})")
                                     # Delete task from Redis
                                     redis_client.delete(task_key)
-                                continue  # Skip this task
+                                    should_delete = True
                             except ValueError:
                                 logger.warning(f"Could not parse date for task {task_id}: {date_done_str}")
                             except Exception as e:
                                 logger.warning(f"Error processing task {task_id} for cleanup: {e}")
-                    
-                    # Keep tasks that are not old failed tasks
-                    cleaned_task_ids.append(task_id)
+                        
+                        # Only keep task if it wasn't deleted
+                        if not should_delete:
+                            cleaned_task_ids.append(task_id)
                     
                 except Exception as e:
                     logger.warning(f"Error checking task {task_id} for cleanup: {e}")
@@ -255,7 +257,7 @@ def _cleanup_old_failed_tasks(task_ids: List[str]) -> List[str]:
     
     cleaned_count = len(task_ids) - len(cleaned_task_ids)
     if cleaned_count > 0:
-        logger.info(f"Cleaned up {cleaned_count} old failed tasks")
+        logger.info(f"Cleaned up {cleaned_count} old completed tasks")
     
     return cleaned_task_ids
 
