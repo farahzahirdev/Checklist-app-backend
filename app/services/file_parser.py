@@ -114,6 +114,55 @@ def parse_csv(content: str | bytes, encoding: str = 'utf-8') -> list[dict]:
         # Use pandas to read CSV - much more robust than manual parsing
         df = pd.read_csv(io.StringIO(content), dtype=str, na_filter=False)
         
+        # Check for two-row header format (like user's CSV)
+        if len(df) >= 2:
+            first_row = df.iloc[0].fillna('').astype(str)
+            second_row = df.iloc[1].fillna('').astype(str)
+            
+            # Check if second row contains column letters (A, B, C, etc.)
+            header_letters = [col.strip() for col in second_row if col.strip() and col.strip().isalpha()]
+            if len(header_letters) >= 3:  # Likely two-row header format
+                
+                # Create mapping from letter to actual column name
+                column_mapping = {}
+                for i, letter in enumerate(header_letters):
+                    if i < len(first_row):
+                        column_mapping[letter] = str(first_row.iloc[i])
+                
+                # Apply mapping to data rows (skip first two header rows)
+                rows = []
+                for idx in range(2, len(df)):  # Start from row 3 (index 2)
+                    row_dict = {'_row_number': idx + 2}
+                    raw_row = df.iloc[idx].fillna('').astype(str)
+                    
+                    # Map letter columns to actual names
+                    for letter, actual_name in column_mapping.items():
+                        if actual_name and actual_name.strip():
+                            row_dict[actual_name] = raw_row.iloc[i] if i < len(raw_row) else ''
+                    
+                    # Add remaining columns that don't have letter mapping
+                    for i, (col_name, value) in enumerate(raw_row.items()):
+                        if col_name not in row_dict:
+                            row_dict[col_name] = value
+                    
+                    rows.append(row_dict)
+                
+                # Create headers from the mapping and any additional columns
+                headers = []
+                # Add mapped column names
+                for actual_name in column_mapping.values():
+                    if actual_name and actual_name.strip() and actual_name not in headers:
+                        headers.append(actual_name)
+                
+                # Add any remaining column names from the data
+                if rows:
+                    for col_name in rows[0].keys():
+                        if col_name not in headers and col_name != '_row_number':
+                            headers.append(col_name)
+                
+                return headers, rows
+        
+        # Default parsing for normal CSV
         # Convert to list of dicts, adding row number
         rows = []
         for idx, row in df.iterrows():
@@ -121,7 +170,12 @@ def parse_csv(content: str | bytes, encoding: str = 'utf-8') -> list[dict]:
             row_dict.update(row.to_dict())
             rows.append(row_dict)
         
-        return rows
+        if rows:
+            headers = list(rows[0].keys())
+            headers = [h for h in headers if h != '_row_number']
+        else:
+            headers = []
+        return headers, rows
         
     except Exception as e:
         raise FileParseError(f"Failed to parse CSV: {str(e)}")
@@ -208,9 +262,7 @@ def parse_file(
     file_type = detect_file_type(file_name)
     
     if file_type == FileType.csv:
-        rows = parse_csv(file_content, encoding)
-        headers = list(rows[0].keys()) if rows else []
-        headers = [h for h in headers if h != '_row_number']
+        headers, rows = parse_csv(file_content, encoding)
         return headers, rows
     
     elif file_type in (FileType.xlsx, FileType.xls):
