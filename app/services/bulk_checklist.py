@@ -503,7 +503,7 @@ def create_checklist_from_file(
                             checklist_id=checklist.id,
                             section_id=section_id,
                             parent_question_id=questions_map[parent_q_id],
-                            question_code=f"{parent_q_id}-{child_q_id}",  # Unique code: "1-a)", "2-a)", etc.
+                            question_code=child_q_id,  # Back to simple: "a)", "b)", "c)"
                             audit_type="compliance",
                             points=1,
                             answer_logic="answer_only",
@@ -554,7 +554,7 @@ def create_checklist_from_file(
                                 checklist_id=checklist.id,
                                 section_id=section_id,
                                 parent_question_id=child_parent_id,
-                                question_code=f"{parent_q_id}-{child_q_id}-{grandchild_q_id}",  # Unique code: "1-a)-i)", etc.
+                                question_code=grandchild_q_id,  # Back to simple: "i)", "ii)", etc.
                                 audit_type="compliance",
                                 points=1,
                                 answer_logic="answer_only",
