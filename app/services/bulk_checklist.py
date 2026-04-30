@@ -137,6 +137,11 @@ def verify_mapping(
                 parent_q_id = raw_question_id.strip()
                 child_q_id = None
         
+        # Skip header rows (rows that have section name but no actual content)
+        if section_name and not legal_req and not question_text and (parent_q_id or child_q_id):
+            # This looks like a header row, skip it
+            continue
+        
         # Validate required fields
         if not section_name:
             errors.append("Missing section name")
@@ -356,6 +361,13 @@ def create_checklist_from_file(
                         # This is a parent question
                         parent_q_id = raw_question_id.strip()
                         child_q_id = None
+                
+                # Skip header rows (rows that have section name but no actual content)
+                if section_name and not legal_req and not question_text and (parent_q_id or child_q_id):
+                    # This looks like a header row, skip it
+                    skipped_rows += 1
+                    warnings.append(f"Row {row_number}: Skipped - header row")
+                    continue
                 
                 # Validate required fields - allow hierarchical questions
                 if not section_name or not legal_req or not question_text:

@@ -121,7 +121,7 @@ def parse_csv(content: str | bytes, encoding: str = 'utf-8') -> list[dict]:
             
             # Check if second row contains column letters (A, B, C, etc.)
             header_letters = [col.strip() for col in second_row if col.strip() and col.strip().isalpha()]
-            if len(header_letters) >= 3:  # Likely two-row header format
+            if len(header_letters) >= 3:  # Likely two-row header format with letters
                 
                 # Create mapping from letter to actual column name
                 column_mapping = {}
@@ -147,18 +147,28 @@ def parse_csv(content: str | bytes, encoding: str = 'utf-8') -> list[dict]:
                     
                     rows.append(row_dict)
                 
-                # Create headers from the mapping and any additional columns
-                headers = []
-                # Add mapped column names
-                for actual_name in column_mapping.values():
-                    if actual_name and actual_name.strip() and actual_name not in headers:
-                        headers.append(actual_name)
+                # Create headers from pandas columns and mapping
+                headers = list(df.columns)
                 
-                # Add any remaining column names from the data
-                if rows:
-                    for col_name in rows[0].keys():
-                        if col_name not in headers and col_name != '_row_number':
-                            headers.append(col_name)
+                return headers, rows
+            else:
+                # Handle two-row header format without letters (user's actual format)
+                # Use first row as headers, treat second row as first data row
+                headers = list(df.columns)
+                
+                rows = []
+                # Process all rows starting from the second row (index 1)
+                for idx in range(1, len(df)):
+                    row_dict = {'_row_number': idx + 1}
+                    raw_row = df.iloc[idx].fillna('').astype(str)
+                    
+                    for i, (col_name, value) in enumerate(raw_row.items()):
+                        if i < len(headers):
+                            row_dict[headers[i]] = value
+                        else:
+                            row_dict[col_name] = value
+                    
+                    rows.append(row_dict)
                 
                 return headers, rows
         
@@ -170,11 +180,9 @@ def parse_csv(content: str | bytes, encoding: str = 'utf-8') -> list[dict]:
             row_dict.update(row.to_dict())
             rows.append(row_dict)
         
-        if rows:
-            headers = list(rows[0].keys())
-            headers = [h for h in headers if h != '_row_number']
-        else:
-            headers = []
+        # Use pandas columns as headers
+        headers = list(df.columns)
+        
         return headers, rows
         
     except Exception as e:
