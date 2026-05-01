@@ -103,6 +103,13 @@ class AuditLogSummary(BaseModel):
     generated_at: datetime
 
 
+class AuditLogFilterOptionsResponse(BaseModel):
+    """Schema for audit log filter options response."""
+    actions: Dict[str, List[Dict[str, str]]]
+    actor_roles: List[Dict[str, str]]
+    target_entities: List[Dict[str, str]]
+
+
 class UserActivitySummary(BaseModel):
     """Schema for user activity summary."""
     user_id: UUID

@@ -13,6 +13,7 @@ from app.schemas.audit_log import (
     AuditLogListResponse,
     AuditLogFilter,
     AuditLogSummary,
+    AuditLogFilterOptionsResponse,
     UserActivitySummary,
     EntityActivitySummary,
     RecentChangesResponse,
@@ -36,13 +37,14 @@ router = APIRouter(prefix="/admin/audit-logs", tags=["audit-logs"])
 
 @router.get(
     "/filter-options",
+    response_model=AuditLogFilterOptionsResponse,
     summary="Get Audit Log Filter Options",
     description="Get available options for audit log filters (actions, roles, entities).",
 )
 def get_audit_log_filter_options(
     admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
-) -> dict[str, list[dict[str, str]]]:
+) -> AuditLogFilterOptionsResponse:
     """Get available filter options for audit logs."""
     
     # Get available actions grouped by category
