@@ -317,7 +317,13 @@ def preview_media(
             # For local files, we need to return a URL to the raw file endpoint
             # We'll create a direct URL to the media file
             settings = get_settings()
-            base_url = f"http://{settings.app_host}:{settings.app_port}{settings.api_v1_prefix}"
+            
+            # Use production base URL if available, otherwise fall back to local development URL
+            if settings.production_base_url:
+                base_url = settings.production_base_url
+            else:
+                base_url = f"http://{settings.app_host}:{settings.app_port}{settings.api_v1_prefix}"
+            
             local_url = f"{base_url}/media/{media_id}/raw"
             
             logger.info(f"Returning local file URL: {local_url}")
