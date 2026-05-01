@@ -172,12 +172,19 @@ def admin_publish_checklist(
     db: Session = Depends(get_db),
 ) -> AdminChecklistResponse:
     lang_code = get_language_code(http_request, db)
-    checklist = publish_checklist(
-        db, actor=admin, checklist_id=checklist_id, payload=request, lang_code=lang_code
-    )
-    if checklist is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
-    return checklist
+    try:
+        checklist = publish_checklist(
+            db, actor=admin, checklist_id=checklist_id, payload=request, lang_code=lang_code
+        )
+        if checklist is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
+        return checklist
+    except ValueError as e:
+        # Handle Stripe validation error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=str(e)
+        )
 
 
 @router.delete(

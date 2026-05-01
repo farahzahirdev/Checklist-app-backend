@@ -682,7 +682,8 @@ def get_assessment_reviews_for_admin(
     
     responses = []
     for r in reviews:
-        response = AssessmentReviewResponse.from_orm(r)
+        # Create response using Pydantic model with from_attributes=True
+        response = AssessmentReviewResponse.model_validate(r, from_attributes=True)
         
         # Populate additional context fields
         if r.assessment:

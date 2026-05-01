@@ -497,6 +497,15 @@ def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminCh
 
 
 def publish_checklist(db: Session, *, actor: User, checklist_id, payload: PublishChecklistRequest, lang_code: str = "en") -> AdminChecklistResponse | None:
+    # Get the checklist to verify Stripe product configuration
+    checklist = db.get(Checklist, checklist_id)
+    if checklist is None:
+        return None
+    
+    # Security check: Require Stripe product ID before allowing publish
+    if payload.status == ChecklistStatus.published and not checklist.stripe_product_id:
+        raise ValueError("Cannot publish checklist without configuring a price in Stripe. Please add a Stripe product ID first.")
+    
     return update_checklist(
         db,
         actor=actor,
