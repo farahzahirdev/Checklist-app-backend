@@ -457,6 +457,25 @@ def update_assessment_review(
     
     db.commit()
     
+    # If the assessment review was completed, start the report review flow for the generated draft
+    try:
+        if update_data.get("status") == ReviewStatus.COMPLETED:
+            # Find any report for this assessment and mark it under review by this reviewer
+            from sqlalchemy import select
+            from app.models.report import Report
+            from app.models.user import User as UserModel
+            from app.schemas.report import ReviewActionRequest
+            from app.services.report import start_review
+
+            report = db.scalar(select(Report).where(Report.assessment_id == assessment_id))
+            reviewer_user = db.get(UserModel, reviewer_id)
+            if report and reviewer_user:
+                payload = ReviewActionRequest(note="Assessment review completed; starting report review")
+                start_review(db, report_id=report.id, actor=reviewer_user, payload=payload)
+    except Exception:
+        # Do not fail the review update if report start fails; log could be added here.
+        pass
+
     return AssessmentReviewResponse.from_orm(review)
 
 

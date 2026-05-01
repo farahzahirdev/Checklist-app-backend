@@ -65,11 +65,32 @@ def _latest_succeeded_payment(db: Session, *, user_id: UUID, checklist_id: UUID)
 
 
 def _active_access_window(db: Session, *, user_id: UUID, now: datetime) -> AccessWindow | None:
-    return db.scalar(
+    """
+    Get the most recent active access window for the user that hasn't been 
+    used for a submitted assessment yet.
+    """
+    from sqlalchemy import and_, not_
+    
+    # Get active access windows (not expired)
+    access_windows = db.execute(
         select(AccessWindow)
         .where(AccessWindow.user_id == user_id, AccessWindow.expires_at > now)
         .order_by(desc(AccessWindow.expires_at))
-    )
+    ).scalars().all()
+    
+    # Check each access window to see if it has a submitted assessment
+    for aw in access_windows:
+        submitted_assessment = db.scalar(
+            select(Assessment).where(
+                Assessment.access_window_id == aw.id,
+                Assessment.status == AssessmentStatus.submitted,
+            )
+        )
+        # Only return if no submitted assessment exists for this access window
+        if submitted_assessment is None:
+            return aw
+    
+    return None
 
 
 def _ensure_access_window(db: Session, *, user: User, payment: Payment | None, now: datetime) -> AccessWindow:
@@ -121,6 +142,8 @@ def start_assessment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
     if checklist.status != ChecklistStatus.published:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("checklist_not_published", lang_code))
+    
+    # Check for existing assessment in progress (can resume)
     existing = db.scalar(
         select(Assessment)
         .where(
@@ -133,13 +156,42 @@ def start_assessment(
     )
     if existing is not None:
         return _serialize_assessment(existing, is_new=False)
+    
+    # Check if user already has a SUBMITTED assessment for this checklist
+    # If so, they would need a new payment/access to start another one
+    submitted_for_checklist = db.scalar(
+        select(Assessment).where(
+            Assessment.user_id == user.id,
+            Assessment.checklist_id == checklist_id,
+            Assessment.status == AssessmentStatus.submitted,
+        )
+    )
+    
     if user.role == UserRole.admin:
         access_window = _ensure_access_window(db, user=user, payment=None, now=now)
     else:
         payment = _latest_succeeded_payment(db, user_id=user.id, checklist_id=checklist_id)
         if payment is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("payment_required", lang_code))
+        
+        # For non-admin users, check if their latest payment already has a submitted assessment
+        if submitted_for_checklist is not None:
+            # They submitted with this checklist already
+            # Check if the payment they're trying to use is the SAME payment linked to submitted assessment
+            submitted_access_window = db.scalar(
+                select(AccessWindow).where(
+                    AccessWindow.id == submitted_for_checklist.access_window_id
+                )
+            )
+            if submitted_access_window and submitted_access_window.payment_id == payment.id:
+                # Same payment being reused - not allowed
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=translate("assessment_already_submitted_with_this_payment", lang_code)
+                )
+        
         access_window = _ensure_access_window(db, user=user, payment=payment, now=now)
+    
     settings = get_settings()
     assessment = Assessment(
         user_id=user.id,
