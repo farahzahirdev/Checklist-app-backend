@@ -9,6 +9,14 @@ from sqlalchemy.orm import Session
 from app.api.dependencies.auth import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.user import UserRole
+from app.models.assessment_review import (
+    AssessmentReview, 
+    AnswerReview, 
+    ReviewStatus, 
+    SuggestionType,
+    ReviewHistory
+)
+from app.models.checklist import Checklist, ChecklistTranslation
 from app.schemas.assessment_review import (
     AssessmentReviewCreate,
     AssessmentReviewUpdate,
@@ -366,9 +374,17 @@ def get_my_reviews(
     # Commit the new reviews
     db.commit()
     
-    # Get all reviews again (including newly created ones)
+    # Get all reviews again (including newly created ones) with related data
     all_reviews = (
         db.query(AssessmentReview)
+        .options(
+            joinedload(AssessmentReview.assessment)
+            .joinedload(Assessment.user),
+            joinedload(AssessmentReview.assessment)
+            .joinedload(Assessment.checklist)
+            .joinedload(Checklist.translations)
+            .joinedload(ChecklistTranslation.language)
+        )
         .filter(AssessmentReview.reviewer_id == admin.id)
         .order_by(desc(AssessmentReview.updated_at))
         .offset(skip)
@@ -376,7 +392,23 @@ def get_my_reviews(
         .all()
     )
     
-    return [AssessmentReviewResponse.from_orm(r) for r in all_reviews]
+    # Build responses with proper data
+    responses = []
+    for review in all_reviews:
+        response = AssessmentReviewResponse.model_validate(review, from_attributes=True)
+        
+        # Add assessment context data
+        if review.assessment:
+            response.customer_email = review.assessment.user.email if review.assessment.user else None
+            response.customer_name = review.assessment.user.full_name if review.assessment.user else None
+            response.checklist_title = next((t.title for t in review.assessment.checklist.translations if t.language.code == 'en'), None)
+            response.checklist_version = review.assessment.checklist.version
+            response.assessment_status = review.assessment.status
+            response.submitted_at = review.assessment.updated_at
+        
+        responses.append(response)
+    
+    return responses
 
 
 @router.get(
