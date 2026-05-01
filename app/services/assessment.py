@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.access_window import AccessWindow
-from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentStatus, PriorityLevel
+from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentEvidenceFile, AssessmentStatus, PriorityLevel
 from app.models.checklist import (
     Checklist,
     ChecklistQuestion,
