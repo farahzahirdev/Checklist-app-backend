@@ -29,6 +29,7 @@ class SuggestionType(str):
     """Type of suggestion."""
     IMPROVEMENT = "improvement"
     REQUIRED_CHANGE = "required_change"
+    APPROVED = "approved"
     BEST_PRACTICE = "best_practice"
     REFERENCE = "reference"
     CLARIFICATION = "clarification"
@@ -108,7 +109,7 @@ class AnswerReview(Base):
         nullable=True
     )
     suggestion_type: Mapped[str] = mapped_column(
-        SQLEnum('improvement', 'required_change', 'best_practice', 'reference', 'clarification', name="suggestion_type", native_enum=True),
+        SQLEnum('improvement', 'required_change', 'best_practice', 'reference', 'clarification', 'approved', name="suggestion_type", native_enum=True),
         nullable=False,
         default=SuggestionType.IMPROVEMENT,
     )

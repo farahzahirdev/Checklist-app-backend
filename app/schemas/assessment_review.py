@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 class AnswerReviewCreate(BaseModel):
     """Schema for creating answer review."""
-    suggestion_type: str = Field(..., description="Type of suggestion")
+    suggestion_type: str = Field(..., description="Type of suggestion: improvement, required_change, best_practice, reference, clarification, approved")
     suggestion_text: str = Field(..., min_length=10, description="Detailed suggestion text")
     reference_materials: Optional[str] = Field(None, description="Reference materials or links")
     is_action_required: bool = Field(False, description="Whether action is required from customer")
@@ -18,7 +18,7 @@ class AnswerReviewCreate(BaseModel):
 
 class AnswerReviewUpdate(BaseModel):
     """Schema for updating answer review."""
-    suggestion_type: Optional[str] = Field(None, description="Type of suggestion")
+    suggestion_type: Optional[str] = Field(None, description="Type of suggestion: improvement, required_change, best_practice, reference, clarification, approved")
     suggestion_text: Optional[str] = Field(None, min_length=10, description="Updated suggestion text")
     reference_materials: Optional[str] = Field(None, description="Updated reference materials")
     is_action_required: Optional[bool] = Field(None, description="Updated action requirement")
