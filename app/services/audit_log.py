@@ -111,8 +111,8 @@ def get_audit_logs(
             if filters.action in [action.value for action in AuditAction]:
                 query = query.filter(AuditLog.action == filters.action)
             else:
-                # Invalid enum value, return empty result set
-                query = query.filter(AuditLog.action == "invalid_action")  # This will match no rows
+                # Invalid enum value, return empty result set by using a condition that's always false
+                query = query.filter(AuditLog.action != AuditLog.action)  # This will always be false, returning no rows
         
         if filters.target_entity:
             query = query.filter(AuditLog.target_entity == filters.target_entity)
