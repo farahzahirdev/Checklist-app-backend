@@ -266,38 +266,79 @@ def preview_media(
             detail="Media cannot be previewed due to scan status"
         )
     
-    # Check if file exists
+    # Check if file is stored in S3 or locally
+    settings = get_settings()
+    s3_key = media.file_path
+    
+    logger.info(f"Checking media storage: S3 key = {s3_key}")
+    
+    # Try to serve from S3 first (most common case)
+    if s3_key and not s3_key.startswith('/'):
+        try:
+            import boto3
+            from botocore.exceptions import BotoCoreError, ClientError
+            from fastapi.responses import Response
+            
+            s3_client = boto3.client(
+                "s3",
+                aws_access_key_id=settings.aws_access_key_id,
+                aws_secret_access_key=settings.aws_secret_access_key,
+                region_name=settings.aws_default_region,
+            )
+            
+            bucket_arn = settings.s3_bucket_arn
+            logger.info(f"Fetching file from S3: bucket={bucket_arn}, key={s3_key}")
+            
+            s3_object = s3_client.get_object(Bucket=bucket_arn, Key=s3_key)
+            file_content = s3_object['Body'].read()
+            
+            logger.info(f"Successfully fetched file from S3, size: {len(file_content)} bytes")
+            
+            return Response(
+                content=file_content,
+                media_type=media.mime_type,
+                headers={
+                    "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+                    "Content-Disposition": "inline",  # Show inline instead of download
+                    "Content-Length": str(len(file_content)),
+                }
+            )
+            
+        except (BotoCoreError, ClientError) as e:
+            logger.error(f"Failed to fetch file from S3: {str(e)}")
+            # Fall through to local file check as backup
+        except Exception as e:
+            logger.error(f"Unexpected error fetching from S3: {str(e)}")
+            # Fall through to local file check as backup
+    
+    # Check if file exists locally (fallback for local storage or development)
     file_path = Path(media.file_path)
-    logger.info(f"Checking file path: {file_path}")
+    logger.info(f"Checking local file path: {file_path}")
     
-    if not file_path.exists():
-        logger.error(f"File not found on disk: {file_path} for media: {media_id}")
-        # Instead of 404, return a placeholder image or error message
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Preview not available - media file not found on disk. The media exists in the database but the actual file is missing."
-        )
+    if file_path.exists():
+        try:
+            from fastapi.responses import FileResponse
+            
+            logger.info(f"Returning local file response for: {file_path}")
+            return FileResponse(
+                path=file_path,
+                filename=media.original_filename,
+                media_type=media.mime_type,
+                # Add cache headers for better performance
+                headers={
+                    "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
+                    "Content-Disposition": "inline",  # Show inline instead of download
+                }
+            )
+        except Exception as e:
+            logger.error(f"Error serving local file {file_path}: {str(e)}")
     
-    try:
-        from fastapi.responses import FileResponse
-        
-        logger.info(f"Returning file response for: {file_path}")
-        return FileResponse(
-            path=file_path,
-            filename=media.original_filename,
-            media_type=media.mime_type,
-            # Add cache headers for better performance
-            headers={
-                "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
-                "Content-Disposition": "inline",  # Show inline instead of download
-            }
-        )
-    except Exception as e:
-        logger.error(f"Error serving file {file_path}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error serving media file"
-        )
+    # If we get here, the file couldn't be found anywhere
+    logger.error(f"File not found in S3 or locally for media: {media_id}")
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Preview not available - media file not found in S3 or on disk. The media exists in the database but the actual file is missing."
+    )
 
 
 @router.get(
