@@ -121,23 +121,23 @@ def get_assessment_answers_with_reviews(
     
     answers = answers_query.all()
     
-    # Get evidence files for all answers
+    # Get evidence files for all answers and questions
     evidence_files_query = (
         db.query(AssessmentEvidenceFile)
         .filter(
-            AssessmentEvidenceFile.answer_id.in_([a.id for a in answers]),
+            AssessmentEvidenceFile.assessment_id == assessment_id,
             AssessmentEvidenceFile.deleted_at.is_(None)
         )
         .options(joinedload(AssessmentEvidenceFile.media))
     )
     evidence_files = evidence_files_query.all()
     
-    # Group evidence files by answer_id
+    # Group evidence files by answer_id and question_id
     evidence_by_answer = {}
+    evidence_by_question = {}
+    
     for evidence_file in evidence_files:
-        if evidence_file.answer_id not in evidence_by_answer:
-            evidence_by_answer[evidence_file.answer_id] = []
-        evidence_by_answer[evidence_file.answer_id].append({
+        evidence_data = {
             "id": str(evidence_file.id),
             "media_id": str(evidence_file.media_id),
             "filename": evidence_file.media.original_filename,
@@ -146,7 +146,19 @@ def get_assessment_answers_with_reviews(
             "scan_status": evidence_file.media.scan_status,
             "encryption_status": evidence_file.media.encryption_status,
             "uploaded_at": evidence_file.uploaded_at.isoformat() if evidence_file.uploaded_at else None,
-        })
+        }
+        
+        # Group by answer_id if present
+        if evidence_file.answer_id:
+            if evidence_file.answer_id not in evidence_by_answer:
+                evidence_by_answer[evidence_file.answer_id] = []
+            evidence_by_answer[evidence_file.answer_id].append(evidence_data)
+        
+        # Also group by question_id for files not linked to answers
+        if evidence_file.question_id:
+            if evidence_file.question_id not in evidence_by_question:
+                evidence_by_question[evidence_file.question_id] = []
+            evidence_by_question[evidence_file.question_id].append(evidence_data)
     
     # Sort answers in Python by section order then question order
     answers.sort(key=lambda a: (
@@ -213,7 +225,10 @@ def get_assessment_answers_with_reviews(
             weighted_priority=answer.weighted_priority.value if answer.weighted_priority else None,
             note_text=answer.note_text,
             answered_at=answer.answered_at,
-            evidence_files=evidence_by_answer.get(answer.id, []),
+            evidence_files=[
+                ...(evidence_by_answer.get(answer.id, [])),
+                ...(evidence_by_question.get(answer.question_id, []))
+            ],
             review=AnswerReviewResponse.from_orm(review) if review else None,
             has_review=has_review,
             is_action_required=is_action_required,
