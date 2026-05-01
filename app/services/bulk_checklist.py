@@ -31,6 +31,7 @@ from app.services.file_parser import (
     get_column_value,
     FileParseError,
 )
+from app.utils.audit_logger import AuditLogger
 
 def _generate_unique_checklist_type_code(title: str) -> str:
     """Generate a unique checklist type code from title"""
@@ -646,6 +647,27 @@ def create_checklist_from_file(
         except Exception as e:
             # Log error but don't fail checklist creation
             print(f"Error creating Stripe product for bulk checklist {checklist.id}: {e}")
+        
+        # Add audit logging for bulk checklist creation
+        try:
+            AuditLogger.log_checklist_action(
+                db=db,
+                actor_user_id=actor_id,
+                action="checklist_bulk_import",
+                target_id=checklist.id,
+                before_json=None,
+                after_json={
+                    "title": checklist_title,
+                    "sections_created": sections_created,
+                    "questions_created": questions_created,
+                    "sub_questions_created": sub_questions_created,
+                    "file_name": file_name
+                },
+                changes_summary=f"Bulk imported checklist: {checklist_title} ({sections_created} sections, {questions_created + sub_questions_created} questions)"
+            )
+        except Exception as e:
+            # Log error but don't fail checklist creation
+            print(f"Error creating audit log for bulk checklist {checklist.id}: {e}")
         
         status = "success"
         message = f"Created checklist with {sections_created} sections and {questions_created + sub_questions_created} questions"

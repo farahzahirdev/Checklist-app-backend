@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 from uuid import UUID
 
-from sqlalchemy import func, select, and_, or_, desc, asc
+from sqlalchemy import func, select, and_, or_, desc, asc, String
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
@@ -139,7 +139,7 @@ def get_audit_logs(
                 or_(
                     AuditLog.changes_summary.ilike(search_term),
                     AuditLog.target_entity.ilike(search_term),
-                    AuditLog.action.ilike(search_term),
+                    AuditLog.action.cast(String).ilike(search_term),
                     AuditLog.error_message.ilike(search_term),
                 )
             )

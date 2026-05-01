@@ -20,6 +20,7 @@ from app.models.assessment import Assessment
 from app.models.reference import Language
 from app.models.user import User
 from app.services.stripe_products import create_stripe_product_for_checklist, get_stripe_price_for_checklist
+from app.utils.audit_logger import AuditLogger
 from app.schemas.admin_checklist import (
     AdminChecklistCreateRequest,
     AdminChecklistResponse,
@@ -422,6 +423,25 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
     except Exception as e:
         # Log error but don't fail checklist creation
         print(f"Error creating Stripe product for checklist {checklist.id}: {e}")
+    
+    # Add audit logging
+    try:
+        AuditLogger.log_checklist_action(
+            db=db,
+            actor_user_id=actor.id,
+            action="checklist_created",
+            target_id=checklist.id,
+            before_json=None,
+            after_json={
+                "title": payload.title,
+                "status": payload.status.value if hasattr(payload.status, 'value') else str(payload.status),
+                "law_decree": payload.law_decree
+            },
+            changes_summary=f"Created checklist: {payload.title}"
+        )
+    except Exception as e:
+        # Log error but don't fail checklist creation
+        print(f"Error creating audit log for checklist {checklist.id}: {e}")
     
     return _to_checklist_response(checklist, db)
 
