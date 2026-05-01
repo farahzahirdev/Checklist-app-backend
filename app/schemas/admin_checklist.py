@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from app.models.checklist import ChecklistStatus, SeverityLevel
-
+from app.schemas.checklist import ChecklistTypeInfo
 
 AuditType = Literal["compliance"]
 AnswerLogic = Literal["answer_only", "answer_with_adjustment"]
@@ -40,6 +40,7 @@ class AdminStripeInfo(BaseModel):
 class AdminChecklistResponse(BaseModel):
     id: UUID
     title: str
+    checklist_type: ChecklistTypeInfo
     audit_type: AuditType = "compliance"
     law_decree: str
     version: str

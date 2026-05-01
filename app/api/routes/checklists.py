@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, Request, HTTPException
 from sqlalchemy import desc, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.db.session import get_db
 from app.models.checklist import Checklist, ChecklistStatus, ChecklistType, ChecklistTranslation
 from app.models.reference import Language
@@ -52,7 +52,7 @@ def list_customer_checklists(
 
     result = []
     for checklist in checklists:
-        checklist_type = db.query(ChecklistType).filter(ChecklistType.id == checklist.checklist_type_id).first()
+        checklist_type = checklist.checklist_type  
         # Get language record from lang_code
         language = db.query(Language).filter(Language.code == lang_code, Language.is_active == True).first()
         if language:

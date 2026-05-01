@@ -106,9 +106,19 @@ def _to_checklist_response(checklist: Checklist, db: Session) -> AdminChecklistR
     else:
         stripe_info.price_status = "not_set"
     
+    # Build checklist type info
+    from app.schemas.checklist import ChecklistTypeInfo
+    checklist_type_info = ChecklistTypeInfo(
+        id=checklist_type.id,
+        code=checklist_type.code,
+        name=checklist_type.name,
+        description=checklist_type.description,
+    )
+    
     return AdminChecklistResponse(
         id=checklist.id,
         title=title,
+        checklist_type=checklist_type_info,
         law_decree=decree,
         version=_format_version(checklist.version),
         status=checklist.status,
