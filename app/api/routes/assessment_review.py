@@ -360,15 +360,18 @@ def get_review_history(
 ) -> List[dict]:
     """Get review history."""
     from app.models.assessment_review import AnswerReview, ReviewHistory
+    from app.models.user import User
+    from sqlalchemy.orm import joinedload
     
     # Get answer review to find assessment review
     answer_review = db.query(AnswerReview).filter(AnswerReview.id == review_id).first()
     if not answer_review:
         raise HTTPException(status_code=404, detail="Review not found")
     
-    # Get history
+    # Get history with reviewer information
     history = (
         db.query(ReviewHistory)
+        .options(joinedload(ReviewHistory.reviewer))
         .filter(ReviewHistory.assessment_review_id == answer_review.assessment_review_id)
         .order_by(desc(ReviewHistory.created_at))
         .all()
@@ -383,6 +386,8 @@ def get_review_history(
             "new_values": h.new_values,
             "created_at": h.created_at,
             "reviewer_id": h.reviewer_id,
+            "reviewer_name": h.reviewer.email if h.reviewer else None,
+            "reviewer_email": h.reviewer.email if h.reviewer else None,
         }
         for h in history
     ]
