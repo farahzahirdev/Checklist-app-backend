@@ -97,6 +97,7 @@ class Assessment(Base):
         "AssessmentSectionScore", back_populates="assessment", cascade="all, delete-orphan"
     )
     review: Mapped["AssessmentReview"] = relationship("AssessmentReview", back_populates="assessment", uselist=False)
+    report: Mapped["Report"] = relationship("Report", back_populates="assessment", uselist=False)
 
 
 class AssessmentAnswer(Base):

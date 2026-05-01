@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.assessment import PriorityLevel
@@ -52,6 +52,9 @@ class Report(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
+
+    # Relationships
+    assessment = relationship("Assessment", back_populates="report")
 
 
 class ReportSectionSummary(Base):

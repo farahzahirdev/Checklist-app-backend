@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
@@ -51,6 +52,25 @@ def generate_draft_report_route(
 ) -> ReportResponse:
     lang_code = get_language_code(request, db)
     return generate_draft_report(db, assessment_id=payload.assessment_id, actor=admin, lang_code=lang_code)
+
+
+@router.get(
+    "/",
+    response_model=dict[str, Any],
+    summary="List All Reports",
+    description="Returns all reports with optional status filtering and pagination.",
+)
+def list_reports_route(
+    request: Request,
+    status: str | None = None,
+    skip: int = 0,
+    limit: int = 50,
+    _admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    from app.services.report import list_reports
+    lang_code = get_language_code(request, db)
+    return list_reports(db, status=status, skip=skip, limit=limit, lang_code=lang_code)
 
 
 @router.get(

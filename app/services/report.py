@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
 from app.services.admin_checklist import _latest_section_translation
@@ -188,6 +189,68 @@ def approve_report(db: Session, *, report_id: UUID, actor: User, payload: Review
     db.commit()
     db.refresh(report)
     return _serialize_report(db, report)
+
+
+def list_reports(db: Session, *, status: str | None = None, skip: int = 0, limit: int = 50, lang_code: str = "en") -> dict[str, Any]:
+    """List all reports with optional status filtering."""
+    from sqlalchemy.orm import joinedload
+    from app.models.checklist import Checklist, ChecklistTranslation
+    
+    query = (
+        db.query(Report)
+        .options(
+            joinedload(Report.assessment).joinedload(Assessment.user),
+            joinedload(Report.assessment).joinedload(Assessment.checklist).joinedload(Checklist.translations),
+        )
+        .order_by(desc(Report.created_at))
+    )
+    
+    if status:
+        try:
+            status_enum = ReportStatus(status)
+            query = query.filter(Report.status == status_enum)
+        except ValueError:
+            pass  # Invalid status, ignore filter
+    
+    total = db.scalar(select(func.count(Report.id)))
+    reports = query.offset(skip).limit(limit).all()
+    
+    report_items = []
+    for report in reports:
+        # Get reviewer name
+        reviewer_name = None
+        if report.reviewed_by:
+            reviewer = db.get(User, report.reviewed_by)
+            if reviewer:
+                reviewer_name = reviewer.email
+        
+        # Get checklist title from translation
+        checklist_title = None
+        if report.assessment.checklist and report.assessment.checklist.translations:
+            # Get the first translation (English if available)
+            translation = report.assessment.checklist.translations[0]
+            checklist_title = translation.title
+        
+        report_items.append({
+            "id": str(report.id),
+            "assessment_id": str(report.assessment_id),
+            "customer_email": report.assessment.user.email if report.assessment.user else None,
+            "customer_name": report.assessment.user.email if report.assessment.user else None,
+            "checklist_title": checklist_title,
+            "checklist_version": report.assessment.checklist.version if report.assessment.checklist else None,
+            "status": report.status,
+            "draft_generated_at": report.draft_generated_at.isoformat() if report.draft_generated_at else None,
+            "reviewed_at": report.reviewed_at.isoformat() if report.reviewed_at else None,
+            "approved_at": report.approved_at.isoformat() if report.approved_at else None,
+            "findings_count": _report_counts(db, report.id)[0],
+            "summaries_count": _report_counts(db, report.id)[1],
+            "reviewer_name": reviewer_name,
+        })
+    
+    return {
+        "reports": report_items,
+        "total": total,
+    }
 
 
 def publish_report(db: Session, *, report_id: UUID, actor: User, final_pdf_storage_key: str, lang_code: str = "en") -> ReportResponse:
