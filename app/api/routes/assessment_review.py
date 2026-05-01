@@ -400,7 +400,7 @@ def get_my_reviews(
         # Add assessment context data
         if review.assessment:
             response.customer_email = review.assessment.user.email if review.assessment.user else None
-            response.customer_name = review.assessment.user.full_name if review.assessment.user else None
+            response.customer_name = review.assessment.user.email if review.assessment.user else None
             response.checklist_title = next((t.title for t in review.assessment.checklist.translations if t.language.code == 'en'), None)
             response.checklist_version = review.assessment.checklist.version
             response.assessment_status = review.assessment.status
