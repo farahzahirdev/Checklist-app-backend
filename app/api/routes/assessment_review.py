@@ -334,8 +334,40 @@ def get_my_reviews(
 ) -> List[AssessmentReviewResponse]:
     """Get reviews assigned to current user."""
     from app.models.assessment_review import AssessmentReview
+    from app.models.assessment import Assessment
+    from app.services.assessment_review import get_or_create_assessment_review
+    from app.models.assessment_review import ReviewStatus
     
-    reviews = (
+    # Get existing reviews
+    existing_reviews = (
+        db.query(AssessmentReview)
+        .filter(AssessmentReview.reviewer_id == admin.id)
+        .order_by(desc(AssessmentReview.updated_at))
+        .all()
+    )
+    
+    # Get submitted assessments that don't have reviews yet
+    submitted_assessments = (
+        db.query(Assessment)
+        .filter(Assessment.status == 'submitted')
+        .filter(~Assessment.id.in_([r.assessment_id for r in existing_reviews]))
+        .order_by(desc(Assessment.updated_at))
+        .all()
+    )
+    
+    # Create reviews for submitted assessments
+    for assessment in submitted_assessments:
+        try:
+            get_or_create_assessment_review(db, assessment.id, admin.id)
+        except Exception:
+            # Skip if there's an error creating review
+            continue
+    
+    # Commit the new reviews
+    db.commit()
+    
+    # Get all reviews again (including newly created ones)
+    all_reviews = (
         db.query(AssessmentReview)
         .filter(AssessmentReview.reviewer_id == admin.id)
         .order_by(desc(AssessmentReview.updated_at))
@@ -344,7 +376,7 @@ def get_my_reviews(
         .all()
     )
     
-    return [AssessmentReviewResponse.from_orm(r) for r in reviews]
+    return [AssessmentReviewResponse.from_orm(r) for r in all_reviews]
 
 
 @router.get(
