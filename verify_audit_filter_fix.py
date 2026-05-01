@@ -125,7 +125,7 @@ def test_service_layer_fix():
     print("=" * 30)
     
     # Check the actual service file
-    service_file = "/home/bnb/Documents/checklist-app/apps/api/app/services/audit_log.py"
+    service_file = "/home/ec2-user/apps/mvp-app-backend/app/services/audit_log.py"
     
     try:
         with open(service_file, 'r') as f:

@@ -144,7 +144,7 @@ def test_audit_log_filters():
             print(f"      Actor: {log[0]} ({log[1]})")
             print(f"      Action: {log[2]} on {log[3]}")
             print(f"      Success: {log[6]}")
-            print(f"      Summary: {log[10][:50]}...")
+            print(f"      Summary: {log[10][:50] + '...' if log[10] else 'No summary'}")
         
         # Test 9: Test specific filter combinations
         print("\n🔧 Test 9: Filter combinations")
