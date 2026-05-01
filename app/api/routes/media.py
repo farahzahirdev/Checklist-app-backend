@@ -316,7 +316,6 @@ def preview_media(
         try:
             # For local files, we need to return a URL to the raw file endpoint
             # We'll create a direct URL to the media file
-            from app.core.config import get_settings
             settings = get_settings()
             base_url = f"http://{settings.app_host}:{settings.app_port}{settings.api_v1_prefix}"
             local_url = f"{base_url}/media/{media_id}/raw"
