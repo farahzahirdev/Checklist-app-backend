@@ -494,18 +494,93 @@ def create_bulk_answer_reviews(
     # Get or create assessment review
     assessment_review = get_or_create_assessment_review(db, assessment_id, reviewer_id)
     
+    # Update assessment review status if needed
+    if assessment_review.status == ReviewStatus.PENDING:
+        assessment_review.status = ReviewStatus.IN_PROGRESS
+    
+    # Add overall assessment notes if provided
+    if bulk_data.assessment_notes:
+        assessment_review.summary_notes = bulk_data.assessment_notes
+    
     for review_data in bulk_data.answer_reviews:
         try:
-            # We need the answer_id, so we'll need to modify this to accept it
-            # For now, this is a placeholder structure
-            pass
+            # Verify answer belongs to assessment
+            answer = (
+                db.query(AssessmentAnswer)
+                .filter(
+                    AssessmentAnswer.id == review_data.answer_id,
+                    AssessmentAnswer.assessment_id == assessment_id
+                )
+                .first()
+            )
+            
+            if not answer:
+                results.append(BulkAnswerReviewResult(
+                    answer_id=review_data.answer_id,
+                    success=False,
+                    message="Answer not found or doesn't belong to assessment",
+                ))
+                failure_count += 1
+                continue
+            
+            # Check if review already exists
+            existing_review = (
+                db.query(AnswerReview)
+                .filter(AnswerReview.answer_id == review_data.answer_id)
+                .first()
+            )
+            
+            if existing_review:
+                results.append(BulkAnswerReviewResult(
+                    answer_id=review_data.answer_id,
+                    success=False,
+                    message="Review already exists for this answer",
+                ))
+                failure_count += 1
+                continue
+            
+            # Create answer review
+            review = AnswerReview(
+                assessment_review_id=assessment_review.id,
+                answer_id=review_data.answer_id,
+                reviewer_id=reviewer_id,
+                suggestion_type=review_data.suggestion_type,
+                suggestion_text=review_data.suggestion_text,
+                reference_materials=review_data.reference_materials,
+                is_action_required=review_data.is_action_required,
+                priority_level=review_data.priority_level,
+                score_adjustment=review_data.score_adjustment,
+            )
+            
+            db.add(review)
+            
+            # Add history entry
+            history = ReviewHistory(
+                assessment_review_id=assessment_review.id,
+                reviewer_id=reviewer_id,
+                action_type="answer_review_created",
+                description=f"Bulk review created for answer {review_data.answer_id}",
+            )
+            db.add(history)
+            
+            results.append(BulkAnswerReviewResult(
+                answer_id=review_data.answer_id,
+                success=True,
+                message="Review created successfully",
+                review_id=review.id,
+            ))
+            success_count += 1
+            
         except Exception as e:
             failure_count += 1
             results.append(BulkAnswerReviewResult(
-                answer_id=UUID(),  # Placeholder
+                answer_id=review_data.answer_id,
                 success=False,
                 message=str(e),
             ))
+    
+    # Commit all changes
+    db.commit()
     
     return BulkAnswerReviewResponse(
         success_count=success_count,
