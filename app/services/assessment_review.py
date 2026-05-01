@@ -225,10 +225,10 @@ def get_assessment_answers_with_reviews(
             weighted_priority=answer.weighted_priority.value if answer.weighted_priority else None,
             note_text=answer.note_text,
             answered_at=answer.answered_at,
-            evidence_files=[
-                ...(evidence_by_answer.get(answer.id, [])),
-                ...(evidence_by_question.get(answer.question_id, []))
-            ],
+            evidence_files=(
+                evidence_by_answer.get(answer.id, []) + 
+                evidence_by_question.get(answer.question_id, [])
+            ),
             review=AnswerReviewResponse.from_orm(review) if review else None,
             has_review=has_review,
             is_action_required=is_action_required,
