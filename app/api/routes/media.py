@@ -221,8 +221,9 @@ def download_media(
 
 @router.get(
     "/{media_id}/preview",
-    summary="Preview Media File",
-    description="Preview a media file (publicly accessible for illustrative images in assessments).",
+    response_model=dict[str, str],
+    summary="Get Media Preview URL",
+    description="Get a presigned URL for media file preview (publicly accessible for illustrative images in assessments).",
 )
 def preview_media(
     media_id: uuid.UUID,
@@ -272,12 +273,11 @@ def preview_media(
     
     logger.info(f"Checking media storage: S3 key = {s3_key}")
     
-    # Try to serve from S3 first (most common case)
+    # Try to generate presigned URL for S3 first (most common case)
     if s3_key and not s3_key.startswith('/'):
         try:
             import boto3
             from botocore.exceptions import BotoCoreError, ClientError
-            from fastapi.responses import Response
             
             s3_client = boto3.client(
                 "s3",
@@ -287,28 +287,25 @@ def preview_media(
             )
             
             bucket_arn = settings.s3_bucket_arn
-            logger.info(f"Fetching file from S3: bucket={bucket_arn}, key={s3_key}")
+            logger.info(f"Generating presigned URL for S3: bucket={bucket_arn}, key={s3_key}")
             
-            s3_object = s3_client.get_object(Bucket=bucket_arn, Key=s3_key)
-            file_content = s3_object['Body'].read()
-            
-            logger.info(f"Successfully fetched file from S3, size: {len(file_content)} bytes")
-            
-            return Response(
-                content=file_content,
-                media_type=media.mime_type,
-                headers={
-                    "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
-                    "Content-Disposition": "inline",  # Show inline instead of download
-                    "Content-Length": str(len(file_content)),
-                }
+            # Generate presigned URL valid for 1 hour
+            presigned_url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={'Bucket': bucket_arn, 'Key': s3_key},
+                ExpiresIn=3600  # 1 hour
             )
             
+            logger.info(f"Successfully generated presigned URL: {presigned_url}")
+            
+            # Return the URL as JSON response
+            return {"preview_url": presigned_url}
+            
         except (BotoCoreError, ClientError) as e:
-            logger.error(f"Failed to fetch file from S3: {str(e)}")
+            logger.error(f"Failed to generate presigned URL for S3: {str(e)}")
             # Fall through to local file check as backup
         except Exception as e:
-            logger.error(f"Unexpected error fetching from S3: {str(e)}")
+            logger.error(f"Unexpected error generating S3 URL: {str(e)}")
             # Fall through to local file check as backup
     
     # Check if file exists locally (fallback for local storage or development)
@@ -317,21 +314,18 @@ def preview_media(
     
     if file_path.exists():
         try:
-            from fastapi.responses import FileResponse
+            # For local files, we need to return a URL to the raw file endpoint
+            # We'll create a direct URL to the media file
+            from app.core.config import get_settings
+            settings = get_settings()
+            base_url = f"http://{settings.app_host}:{settings.app_port}{settings.api_v1_prefix}"
+            local_url = f"{base_url}/media/{media_id}/raw"
             
-            logger.info(f"Returning local file response for: {file_path}")
-            return FileResponse(
-                path=file_path,
-                filename=media.original_filename,
-                media_type=media.mime_type,
-                # Add cache headers for better performance
-                headers={
-                    "Cache-Control": "public, max-age=3600",  # Cache for 1 hour
-                    "Content-Disposition": "inline",  # Show inline instead of download
-                }
-            )
+            logger.info(f"Returning local file URL: {local_url}")
+            return {"preview_url": local_url}
+            
         except Exception as e:
-            logger.error(f"Error serving local file {file_path}: {str(e)}")
+            logger.error(f"Error generating local file URL: {str(e)}")
     
     # If we get here, the file couldn't be found anywhere
     logger.error(f"File not found in S3 or locally for media: {media_id}")
@@ -339,6 +333,61 @@ def preview_media(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="Preview not available - media file not found in S3 or on disk. The media exists in the database but the actual file is missing."
     )
+
+
+@router.get(
+    "/{media_id}/raw",
+    summary="Get Raw Media File",
+    description="Get the raw media file (for local file serving).",
+)
+def get_raw_media(
+    media_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Get raw media file for local serving."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"Raw media requested for ID: {media_id}")
+    
+    media = db.get(Media, media_id)
+    if media is None:
+        logger.warning(f"Media not found in database: {media_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media not found"
+        )
+    
+    # Check if file exists locally
+    file_path = Path(media.file_path)
+    logger.info(f"Checking local file path: {file_path}")
+    
+    if not file_path.exists():
+        logger.error(f"Local file not found: {file_path} for media: {media_id}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media file not found on disk"
+        )
+    
+    try:
+        from fastapi.responses import FileResponse
+        
+        logger.info(f"Returning raw file response for: {file_path}")
+        return FileResponse(
+            path=file_path,
+            filename=media.original_filename,
+            media_type=media.mime_type,
+            headers={
+                "Cache-Control": "public, max-age=3600",
+                "Content-Disposition": "inline",
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error serving raw file {file_path}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error serving media file"
+        )
 
 
 @router.get(
