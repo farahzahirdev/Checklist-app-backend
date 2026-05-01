@@ -313,6 +313,7 @@ def _to_assessment_question_response(
     answer_map: dict[UUID, AssessmentAnswer],
     children_map: dict[UUID, list[ChecklistQuestion]],
     db: Session,
+    assessment: Assessment,
 ) -> 'AssessmentQuestionResponse':
     translation = _latest_question_translation(db, question.id)
     customer_answer = None
@@ -323,7 +324,7 @@ def _to_assessment_question_response(
         customer_answer_status = "answered"
 
     sub_questions = [
-        _to_assessment_question_response(subq, answer_map, children_map, db)
+        _to_assessment_question_response(subq, answer_map, children_map, db, assessment)
         for subq in sorted(children_map.get(question.id, []), key=lambda q: q.display_order)
     ]
 
@@ -344,12 +345,26 @@ def _to_assessment_question_response(
 
     # Get evidence files for this question
     evidence_files = []
+    # Query evidence files by both answer_id and question_id
+    evidence_query = select(AssessmentEvidenceFile).where(
+        AssessmentEvidenceFile.assessment_id == assessment.id,
+        AssessmentEvidenceFile.question_id == question.id,
+        AssessmentEvidenceFile.deleted_at.is_(None)
+    )
+    
+    # If there's an answer, also include files linked to the answer
     if answer is not None:
-        evidence_files = db.scalars(
-            select(AssessmentEvidenceFile)
-            .where(AssessmentEvidenceFile.answer_id == answer.id)
-            .order_by(AssessmentEvidenceFile.uploaded_at.desc())
-        ).all()
+        evidence_query = evidence_query.where(
+            (AssessmentEvidenceFile.answer_id == answer.id) |
+            (AssessmentEvidenceFile.answer_id.is_(None))
+        )
+    else:
+        # If no answer, only get files not linked to an answer
+        evidence_query = evidence_query.where(AssessmentEvidenceFile.answer_id.is_(None))
+    
+    evidence_files = db.scalars(
+        evidence_query.order_by(AssessmentEvidenceFile.uploaded_at.desc())
+    ).all()
 
     return AssessmentQuestionResponse(
         id=question.id,
@@ -439,7 +454,7 @@ def _serialize_assessment_detail(db: Session, assessment: Assessment) -> Assessm
                 title=title.title if title else section.section_code,
                 order=section.display_order,
                 questions=[
-                    _to_assessment_question_response(question, answer_map, children_map, db)
+                    _to_assessment_question_response(question, answer_map, children_map, db, assessment)
                     for question in sorted(questions, key=lambda q: q.display_order)
                     if question.section_id == section.id and question.parent_question_id is None
                 ],
