@@ -74,6 +74,7 @@ class AssessmentQuestionResponse(BaseModel):
     admin_note: str | None = None
     user_note: str | None = None
     evidence_rule: EvidenceRuleResponse
+    evidence_files: list[dict] = []
     sub_questions: list[AssessmentQuestionResponse] = []
 
 

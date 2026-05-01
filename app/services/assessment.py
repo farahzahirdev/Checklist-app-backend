@@ -342,6 +342,15 @@ def _to_assessment_question_response(
     if answer is not None and answer.note_text:
         user_note = answer.note_text
 
+    # Get evidence files for this question
+    evidence_files = []
+    if answer is not None:
+        evidence_files = db.scalars(
+            select(AssessmentEvidenceFile)
+            .where(AssessmentEvidenceFile.answer_id == answer.id)
+            .order_by(AssessmentEvidenceFile.uploaded_at.desc())
+        ).all()
+
     return AssessmentQuestionResponse(
         id=question.id,
         checklist_id=question.checklist_id,
@@ -370,6 +379,19 @@ def _to_assessment_question_response(
             allowed_mime_types=["application/pdf", "image/png", "image/jpeg"],
             max_file_size_bytes=10 * 1024 * 1024,
         ),
+        evidence_files=[
+            {
+                "id": str(evidence.id),
+                "media_id": str(evidence.media_id),
+                "filename": evidence.media.original_filename,
+                "mime_type": evidence.media.mime_type,
+                "file_size": evidence.media.file_size_bytes,
+                "scan_status": evidence.media.scan_status,
+                "encryption_status": evidence.media.encryption_status,
+                "uploaded_at": evidence.uploaded_at.isoformat() if evidence.uploaded_at else None,
+            }
+            for evidence in evidence_files
+        ],
         sub_questions=sub_questions,
     )
 
