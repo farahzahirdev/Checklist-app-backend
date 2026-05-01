@@ -31,9 +31,11 @@ def main():
         
         # Get checklists to fix
         checklists = conn.execute(text("""
-            SELECT id, title FROM checklists 
-            WHERE status_code_id = 2 AND checklist_type_id = '6f93c47f-edbc-4550-99a0-047c55015b6b'
-            ORDER BY created_at DESC
+            SELECT c.id, ct.title 
+            FROM checklists c
+            LEFT JOIN checklist_translations ct ON c.id = ct.checklist_id
+            WHERE c.status_code_id = 2 AND c.checklist_type_id = '6f93c47f-edbc-4550-99a0-047c55015b6b'
+            ORDER BY c.created_at DESC
         """)).all()
         
         print(f"Found {len(checklists)} checklists to fix with {len(types)} available types")
@@ -49,7 +51,7 @@ def main():
                 WHERE id = :checklist_id
             """), {'new_type_id': new_type_id, 'checklist_id': checklist_id})
             
-            print(f"  ✅ {title[:30]} → {new_type_name}")
+            print(f"  ✅ {title[:30] if title else 'No title'} → {new_type_name}")
         
         conn.commit()
         print(f"🎉 Updated {min(len(checklists), len(types))} checklists!")
