@@ -86,8 +86,8 @@ def main():
             
             # Insert new type
             conn.execute(text("""
-                INSERT INTO checklist_types (id, name, code, description, created_at, updated_at)
-                VALUES (:id, :name, :code, :description, NOW(), NOW())
+                INSERT INTO checklist_types (id, name, code, description, is_active, created_at, updated_at)
+                VALUES (:id, :name, :code, :description, true, NOW(), NOW())
             """), {
                 "id": str(uuid.uuid4()),
                 "name": new_type["name"],

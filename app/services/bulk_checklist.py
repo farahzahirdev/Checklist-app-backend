@@ -12,10 +12,12 @@ from app.models.checklist import (
     ChecklistSection,
     ChecklistSectionTranslation,
     ChecklistStatus,
-    ChecklistTranslation,
     ChecklistType,
+    ChecklistTranslation,
     SeverityLevel,
 )
+import re
+import uuid
 from app.models.reference import Language
 from app.models.user import User
 from app.schemas.bulk_checklist import (
@@ -29,6 +31,45 @@ from app.services.file_parser import (
     get_column_value,
     FileParseError,
 )
+
+def _generate_unique_checklist_type_code(title: str) -> str:
+    """Generate a unique checklist type code from title"""
+    # Remove special characters and convert to lowercase
+    clean_title = re.sub(r'[^a-zA-Z0-9\s]', '', title).strip()
+    words = clean_title.split()
+    
+    # Take first 3 words and create code
+    if len(words) >= 3:
+        code = '_'.join(words[:3]).lower()
+    elif len(words) == 2:
+        code = '_'.join(words).lower()
+    elif len(words) == 1:
+        code = words[0].lower()
+    else:
+        code = "checklist"
+    
+    # Add random suffix for uniqueness
+    suffix = uuid.uuid4().hex[:6]
+    return f"{code}_{suffix}"
+
+def _get_or_create_unique_checklist_type(db: Session, title: str, description: str) -> ChecklistType:
+    """Get or create a unique checklist type based on title"""
+    # Generate unique code
+    unique_code = _generate_unique_checklist_type_code(title)
+    
+    # Check if type with this code already exists (unlikely but possible)
+    checklist_type = db.scalar(select(ChecklistType).where(ChecklistType.code == unique_code))
+    if checklist_type is None:
+        checklist_type = ChecklistType(
+            code=unique_code,
+            name=title,
+            description=description,
+            is_active=True,
+        )
+        db.add(checklist_type)
+        db.flush()
+    
+    return checklist_type
 
 
 class BulkImportError(Exception):
@@ -267,19 +308,8 @@ def create_checklist_from_file(
         )
     
     try:
-        # Create or get checklist type
-        checklist_type = db.scalar(
-            select(ChecklistType).where(ChecklistType.code == checklist_type_code)
-        )
-        if not checklist_type:
-            checklist_type = ChecklistType(
-                code=checklist_type_code,
-                name=checklist_title,
-                description=checklist_description,
-                is_active=True,
-            )
-            db.add(checklist_type)
-            db.flush()
+        # Create unique checklist type for each bulk import to prevent duplicates
+        checklist_type = _get_or_create_unique_checklist_type(db, checklist_title, checklist_description or "")
         
         actor_id = actor.id if hasattr(actor, "id") else actor
 

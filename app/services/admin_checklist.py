@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import re
 from sqlalchemy import asc, case, desc, func, or_, select, delete, update
 from sqlalchemy.orm import Session
 from app.models.checklist import (
@@ -40,6 +41,45 @@ DEFAULT_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
 DEFAULT_QUESTION_POINTS = 1
 DEFAULT_ANSWER_LOGIC = "answer_only"
 
+
+def _generate_unique_checklist_type_code(title: str) -> str:
+    """Generate a unique checklist type code from title"""
+    # Remove special characters and convert to lowercase
+    clean_title = re.sub(r'[^a-zA-Z0-9\s]', '', title).strip()
+    words = clean_title.split()
+    
+    # Take first 3 words and create code
+    if len(words) >= 3:
+        code = '_'.join(words[:3]).lower()
+    elif len(words) == 2:
+        code = '_'.join(words).lower()
+    elif len(words) == 1:
+        code = words[0].lower()
+    else:
+        code = "checklist"
+    
+    # Add random suffix for uniqueness
+    suffix = uuid.uuid4().hex[:6]
+    return f"{code}_{suffix}"
+
+def _get_or_create_unique_checklist_type(db: Session, title: str, description: str) -> ChecklistType:
+    """Get or create a unique checklist type based on title"""
+    # Generate unique code
+    unique_code = _generate_unique_checklist_type_code(title)
+    
+    # Check if type with this code already exists (unlikely but possible)
+    checklist_type = db.scalar(select(ChecklistType).where(ChecklistType.code == unique_code))
+    if checklist_type is None:
+        checklist_type = ChecklistType(
+            code=unique_code,
+            name=title,
+            description=description,
+            is_active=True,
+        )
+        db.add(checklist_type)
+        db.flush()
+    
+    return checklist_type
 
 def _ensure_default_checklist_type(db: Session) -> ChecklistType:
     checklist_type = db.scalar(select(ChecklistType).where(ChecklistType.code == "compliance"))
@@ -346,21 +386,8 @@ def get_checklist(db: Session, *, checklist_id, lang_code: str = "en") -> AdminC
 
 
 def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateRequest, lang_code: str = "en") -> AdminChecklistResponse:
-    # Always create or update ChecklistType with name/description from payload
-    checklist_type = db.scalar(select(ChecklistType).where(ChecklistType.code == payload.checklist_type_code))
-    if checklist_type is None:
-        checklist_type = ChecklistType(
-            code=payload.checklist_type_code,
-            name=payload.title,
-            description=payload.law_decree,
-            is_active=True,
-        )
-        db.add(checklist_type)
-        db.flush()
-    else:
-        checklist_type.name = payload.title
-        checklist_type.description = payload.law_decree
-        db.flush()
+    # Create unique checklist type for each checklist to prevent duplicates
+    checklist_type = _get_or_create_unique_checklist_type(db, payload.title, payload.law_decree)
 
     checklist = Checklist(
         checklist_type_id=checklist_type.id,
