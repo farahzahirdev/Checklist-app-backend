@@ -29,6 +29,38 @@ router = APIRouter(prefix="/customer/payments", tags=["customer-payments"])
 
 
 @router.get(
+    "/filter-options",
+    summary="Get Payment Filter Options",
+    description="Get available options for payment filters (statuses, etc.).",
+)
+def get_payment_filter_options(
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, list[dict[str, str]]]:
+    """Get available filter options for customer payments."""
+    
+    # Get available payment statuses
+    from app.models.payment import PaymentStatus
+    
+    payment_statuses = [
+        {"value": status.value, "label": status.value.title()}
+        for status in PaymentStatus
+    ]
+    
+    # Get available sort options
+    sort_options = [
+        {"value": "created_at", "label": "Created Date"},
+        {"value": "paid_at", "label": "Paid Date"},
+        {"value": "amount_cents", "label": "Amount"},
+    ]
+    
+    return {
+        "statuses": payment_statuses,
+        "sort_options": sort_options,
+    }
+
+
+@router.get(
     "/",
     response_model=PaymentRecordListResponse,
     summary="Get Payment Records",

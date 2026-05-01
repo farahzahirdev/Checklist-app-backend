@@ -35,6 +35,74 @@ router = APIRouter(prefix="/admin/audit-logs", tags=["audit-logs"])
 
 
 @router.get(
+    "/filter-options",
+    summary="Get Audit Log Filter Options",
+    description="Get available options for audit log filters (actions, roles, entities).",
+)
+def get_audit_log_filter_options(
+    admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
+    db: Session = Depends(get_db),
+) -> dict[str, list[dict[str, str]]]:
+    """Get available filter options for audit logs."""
+    
+    # Get available actions grouped by category
+    from app.models.audit_log import AuditAction
+    
+    action_categories = {
+        "Authentication": [
+            {"value": action.value, "label": action.value.replace("auth_", "").replace("_", " ").title()}
+            for action in AuditAction if action.value.startswith("auth_")
+        ],
+        "User Management": [
+            {"value": action.value, "label": action.value.replace("user_", "").replace("_", " ").title()}
+            for action in AuditAction if action.value.startswith("user_")
+        ],
+        "Checklist": [
+            {"value": action.value, "label": action.value.replace("checklist_", "").replace("_", " ").title()}
+            for action in AuditAction if action.value.startswith("checklist_")
+        ],
+        "Assessment": [
+            {"value": action.value, "label": action.value.replace("assessment_", "").replace("_", " ").title()}
+            for action in AuditAction if action.value.startswith("assessment_")
+        ],
+        "Review": [
+            {"value": action.value, "label": action.value.replace("assessment_review_", "").replace("answer_review_", "").replace("_", " ").title()}
+            for action in AuditAction if "review" in action.value
+        ],
+        "Report": [
+            {"value": action.value, "label": action.value.replace("report_", "").replace("_", " ").title()}
+            for action in AuditAction if action.value.startswith("report_")
+        ]
+    }
+    
+    # Get available actor roles
+    actor_roles = [
+        {"value": "admin", "label": "Admin"},
+        {"value": "auditor", "label": "Auditor"},
+        {"value": "customer", "label": "Customer"}
+    ]
+    
+    # Get available target entities
+    target_entities = [
+        {"value": "auth", "label": "Authentication"},
+        {"value": "user", "label": "User"},
+        {"value": "checklist", "label": "Checklist"},
+        {"value": "assessment", "label": "Assessment"},
+        {"value": "assessment_review", "label": "Assessment Review"},
+        {"value": "report", "label": "Report"},
+        {"value": "payment", "label": "Payment"},
+        {"value": "media", "label": "Media"},
+        {"value": "system", "label": "System"}
+    ]
+    
+    return {
+        "actions": action_categories,
+        "actor_roles": actor_roles,
+        "target_entities": target_entities
+    }
+
+
+@router.get(
     "/",
     response_model=AuditLogListResponse,
     summary="Get Audit Logs",
