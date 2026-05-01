@@ -9,7 +9,7 @@ from sqlalchemy import func, select, and_, or_, desc
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
-from app.models.assessment import Assessment, AssessmentAnswer, AssessmentStatus
+from app.models.assessment import Assessment, AssessmentAnswer, AssessmentEvidenceFile, AssessmentStatus
 from app.models.checklist import ChecklistTranslation
 from app.models.assessment_review import (
     AssessmentReview, 
@@ -121,6 +121,33 @@ def get_assessment_answers_with_reviews(
     
     answers = answers_query.all()
     
+    # Get evidence files for all answers
+    evidence_files_query = (
+        db.query(AssessmentEvidenceFile)
+        .filter(
+            AssessmentEvidenceFile.answer_id.in_([a.id for a in answers]),
+            AssessmentEvidenceFile.deleted_at.is_(None)
+        )
+        .options(joinedload(AssessmentEvidenceFile.media))
+    )
+    evidence_files = evidence_files_query.all()
+    
+    # Group evidence files by answer_id
+    evidence_by_answer = {}
+    for evidence_file in evidence_files:
+        if evidence_file.answer_id not in evidence_by_answer:
+            evidence_by_answer[evidence_file.answer_id] = []
+        evidence_by_answer[evidence_file.answer_id].append({
+            "id": str(evidence_file.id),
+            "media_id": str(evidence_file.media_id),
+            "filename": evidence_file.media.original_filename,
+            "mime_type": evidence_file.media.mime_type,
+            "file_size": evidence_file.media.file_size_bytes,
+            "scan_status": evidence_file.media.scan_status,
+            "encryption_status": evidence_file.media.encryption_status,
+            "uploaded_at": evidence_file.uploaded_at.isoformat() if evidence_file.uploaded_at else None,
+        })
+    
     # Sort answers in Python by section order then question order
     answers.sort(key=lambda a: (
         a.question.section.display_order if a.question.section else 0,
@@ -186,6 +213,7 @@ def get_assessment_answers_with_reviews(
             weighted_priority=answer.weighted_priority.value if answer.weighted_priority else None,
             note_text=answer.note_text,
             answered_at=answer.answered_at,
+            evidence_files=evidence_by_answer.get(answer.id, []),
             review=AnswerReviewResponse.from_orm(review) if review else None,
             has_review=has_review,
             is_action_required=is_action_required,

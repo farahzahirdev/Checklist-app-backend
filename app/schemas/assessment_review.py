@@ -119,6 +119,9 @@ class AnswerWithReview(BaseModel):
     note_text: Optional[str]
     answered_at: datetime
     
+    # Evidence files
+    evidence_files: List[dict] = Field(default_factory=list)
+    
     # Review information
     review: Optional[AnswerReviewResponse] = None
     has_review: bool = False
