@@ -9,7 +9,7 @@ import sys
 from sqlalchemy import create_engine, text
 
 # UPDATE THIS: Your production database URL
-DATABASE_URL = "postgresql://username:password@your-production-host:5432/dbname"
+DATABASE_URL = "postgresql://checklist:checklistkb@localhost:5432/checklist"
 
 def main():
     if "username:password" in DATABASE_URL:

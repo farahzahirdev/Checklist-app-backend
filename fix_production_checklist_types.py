@@ -20,7 +20,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 # Database configuration - update these values for your production environment
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://username:password@localhost/dbname")
+DATABASE_URL = "postgresql://checklist:checklistkb@localhost:5432/checklist"
 
 def create_db_session():
     """Create database session"""

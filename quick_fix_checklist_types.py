@@ -10,7 +10,7 @@ import os
 import sys
 
 # Add your database connection here
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://username:password@localhost/dbname")
+DATABASE_URL = "postgresql://checklist:checklistkb@localhost:5432/checklist"
 
 try:
     import sqlalchemy as sa
