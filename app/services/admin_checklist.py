@@ -393,7 +393,7 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
     checklist = Checklist(
         checklist_type_id=checklist_type.id,
         version="1.0",  # Always start with version 1.0
-        status=payload.status,
+        status=ChecklistStatus.draft,  # Always start with draft status
         created_by=actor.id,
         updated_by=actor.id,
     )
