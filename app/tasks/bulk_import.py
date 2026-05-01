@@ -22,6 +22,17 @@ def create_checklist_task(
     file_content = base64.b64decode(file_content_b64)
     db: Session = SessionLocal()
     try:
+        # Validate column mapping data before processing
+        if not column_mapping_data or not isinstance(column_mapping_data, dict):
+            raise ValueError("Column mapping data is required and must be a dictionary")
+        
+        # Check for required fields
+        required_fields = ['section_name_col', 'question_id_col', 'legal_requirement_col', 'question_text_col', 'severity_col']
+        missing_fields = [field for field in required_fields if field not in column_mapping_data]
+        
+        if missing_fields:
+            raise ValueError(f"Missing required column mapping fields: {', '.join(missing_fields)}")
+        
         column_mapping = ColumnMapping.model_validate(column_mapping_data)
         response = create_checklist_from_file(
             db=db,
