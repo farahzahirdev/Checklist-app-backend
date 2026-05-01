@@ -8,6 +8,7 @@ from app.api.routes.customer_reports import router as customer_reports_router
 from app.api.routes.audit_logs import router as audit_logs_router
 from app.api.routes.customer_assessments import router as customer_assessments_router
 from app.api.routes.customer_payments import router as customer_payments_router
+from app.api.routes.support_tickets import router as support_tickets_router
 from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.health import router as health_router
 from app.api.routes.media import router as media_router
@@ -37,4 +38,5 @@ api_router.include_router(report_router)
 api_router.include_router(access_router)
 api_router.include_router(customer_checklists_router)
 api_router.include_router(customer_reports_router)
+api_router.include_router(support_tickets_router)
 api_router.include_router(media_router)

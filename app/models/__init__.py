@@ -5,9 +5,11 @@ from app.models.assessment_review import *
 from app.models.audit_log import *
 from app.models.checklist import *
 from app.models.mfa_totp import *
+from app.models.password_reset import *
 from app.models.payment import *
 from app.models.media import *
 from app.models.reference import *
 from app.models.report import *
+from app.models.support_ticket import *
 from app.models.user import *
 from app.models.rbac import *

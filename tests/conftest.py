@@ -7,6 +7,7 @@ from app.models.checklist import Checklist, ChecklistSection, ChecklistQuestion
 from app.models.assessment import Assessment, AssessmentStatus
 from fastapi.testclient import TestClient
 from app.main import app
+from app.core.security import create_access_token
 from uuid import uuid4
 from datetime import datetime, timezone, timedelta
 import os
@@ -27,6 +28,7 @@ def db():
     engine = create_engine(DATABASE_URL)
     connection = engine.connect()
     transaction = connection.begin()
+    Base.metadata.create_all(bind=connection)
     Session = sessionmaker(bind=connection)
     session: SQLASession = Session()
     yield session
@@ -150,15 +152,4 @@ def client(db):
 # Admin token fixture
 @pytest.fixture(scope="function")
 def admin_token(admin_user):
-    from app.core.config import settings
-    token_data = {
-        "sub": str(admin_user.id),
-        "email": admin_user.email,
-        "role": admin_user.role,
-    }
-    token = jwt.encode(
-        token_data,
-        settings.SECRET_KEY,
-        algorithm="HS256"
-    )
-    return token
+    return create_access_token(user_id=str(admin_user.id), role=str(admin_user.role))

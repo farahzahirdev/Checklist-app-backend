@@ -15,6 +15,8 @@ from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user, get_db
+from app.core.security import hash_password
+from app.models.audit_log import AuditAction, AuditLog
 from app.utils.i18n import get_language_code
 from app.utils.i18n_messages import translate
 from app.models.user import User, UserRole
@@ -34,10 +36,13 @@ from app.schemas.user_management import (
     UserDetailResponse,
     UserListResponse,
     UserResetPermissionsRequest,
+    UserPasswordResetRequest,
+    UserPasswordResetResponse,
     UserResponse,
 )
 from app.services.rbac import RBACService
 from app.services.user_management import UserManagementService, FixedPermissionSet
+from app.services.auth import get_password_validation_error
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -281,6 +286,53 @@ def reset_user_permissions(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=translated_detail if translated_detail != str(e) else str(e)
         )
+
+
+@router.post("/users/{user_id}/password/reset", response_model=UserPasswordResetResponse)
+def reset_user_password(
+    user_id: UUID,
+    request: Request,
+    payload: UserPasswordResetRequest,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
+) -> dict:
+    """Reset a user's password from the admin panel."""
+    lang_code = get_language_code(request, db)
+    if not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=translate("only_admins_can_manage_users", lang_code)
+        )
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("user_not_found", lang_code))
+
+    validation_error = get_password_validation_error(payload.new_password)
+    if validation_error is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate(validation_error, lang_code))
+
+    user.password_hash = hash_password(payload.new_password)
+    db.add(
+        AuditLog(
+            actor_user_id=current_user.id,
+            actor_role=str(current_user.role),
+            action=AuditAction.auth_password_change,
+            target_entity="user",
+            target_id=user.id,
+            target_user_id=user.id,
+            changes_summary=payload.reason or "Admin reset user password",
+        )
+    )
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "user_id": user.id,
+        "email": user.email,
+        "message": "Password reset successfully.",
+        "reset_at": user.updated_at,
+    }
 
 
 # ============================================================================

@@ -35,5 +35,9 @@ class User(Base):
     access_windows = relationship("AccessWindow", back_populates="user", cascade="all, delete-orphan")
     mfa_totp = relationship("MfaTotp", back_populates="user", cascade="all, delete-orphan", uselist=False)
     user_roles_rel = relationship("UserRoleAssignment", back_populates="user", cascade="all, delete-orphan", foreign_keys="UserRoleAssignment.user_id")
+    password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan", foreign_keys="PasswordResetToken.user_id")
+    issued_password_reset_tokens = relationship("PasswordResetToken", back_populates="issued_by_user", foreign_keys="PasswordResetToken.issued_by_user_id")
+    support_tickets = relationship("SupportTicket", back_populates="customer", cascade="all, delete-orphan", foreign_keys="SupportTicket.customer_id")
+    support_ticket_messages = relationship("SupportTicketMessage", back_populates="sender", cascade="all, delete-orphan", foreign_keys="SupportTicketMessage.sender_user_id")
 
     stripe_customer_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)

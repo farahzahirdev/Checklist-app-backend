@@ -64,6 +64,8 @@ from app.schemas.user_management import (
 	UserChangeRoleRequest,
 	UserAssignPermissionsRequest,
 	UserResetPermissionsRequest,
+	UserPasswordResetRequest,
+	UserPasswordResetResponse,
 	CustomerResponse,
 	CustomerDetailResponse,
 	CustomerListResponse,
@@ -76,6 +78,16 @@ from app.schemas.user_management import (
 	DashboardDataResponse,
 )
 
+from app.schemas.support_ticket import (
+	SupportTicketCreateRequest,
+	SupportTicketListResponse,
+	SupportTicketMessageResponse,
+	SupportTicketReplyRequest,
+	SupportTicketResponse,
+	SupportTicketStatusUpdateRequest,
+)
+
+from app.schemas.password_reset import AdminPasswordResetRequest, AdminPasswordResetResponse
 settings = get_settings()
 configure_logging(settings.app_name)
 
@@ -99,6 +111,7 @@ app = FastAPI(
 		},
 		{"name": "admin-checklists", "description": "Admin APIs for checklist, section, and question lifecycle management."},
 		{"name": "reports", "description": "Admin report generation, review, approval, and publish workflow APIs."},
+		{"name": "support", "description": "Customer support ticket submission and admin response APIs."},
 		{"name": "media", "description": "Media file upload and management APIs for checklist questions and answer options."},
 	],
 	root_path="/api"
@@ -185,6 +198,8 @@ def custom_openapi() -> dict:
 		UserChangeRoleRequest,
 		UserAssignPermissionsRequest,
 		UserResetPermissionsRequest,
+		UserPasswordResetRequest,
+		UserPasswordResetResponse,
 		CustomerResponse,
 		CustomerDetailResponse,
 		CustomerListResponse,
@@ -195,6 +210,14 @@ def custom_openapi() -> dict:
 		AdminRoleSwitchEndRequest,
 		CustomerDashboardAccessRequest,
 		DashboardDataResponse,
+		AdminPasswordResetRequest,
+		AdminPasswordResetResponse,
+		SupportTicketCreateRequest,
+		SupportTicketListResponse,
+		SupportTicketMessageResponse,
+		SupportTicketReplyRequest,
+		SupportTicketResponse,
+		SupportTicketStatusUpdateRequest,
 		# Media schemas
 		MediaResponse,
 		MediaUploadResponse,

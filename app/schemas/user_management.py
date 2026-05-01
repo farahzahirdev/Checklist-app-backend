@@ -58,6 +58,22 @@ class UserResetPermissionsRequest(BaseModel):
     )
 
 
+class UserPasswordResetRequest(BaseModel):
+    """Request to reset a user's password from admin panel."""
+
+    new_password: str = Field(..., min_length=8)
+    reason: str | None = Field(None, max_length=500)
+
+
+class UserPasswordResetResponse(BaseModel):
+    """Response after resetting a password."""
+
+    user_id: UUID
+    email: str
+    message: str
+    reset_at: datetime
+
+
 # Customer Management (Fixed Permissions)
 
 class CustomerResponse(BaseModel):
