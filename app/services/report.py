@@ -406,7 +406,7 @@ def get_customer_report_data(db: Session, *, report_id: UUID, lang_code: str = "
     return CustomerReportDataResponse(
         report_id=report.id,
         assessment_id=assessment.id,
-        customer_name=user.full_name or user.email,
+        customer_name=user.email,
         customer_email=user.email,
         checklist_title=checklist_title,
         assessment_date=assessment.submitted_at or assessment.created_at,
