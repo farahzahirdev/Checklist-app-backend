@@ -573,12 +573,15 @@ def submit_assessment(db: Session, *, user: User, assessment_id: UUID, lang_code
     db.refresh(assessment)
 
     # Auto-generate draft report when assessment is submitted
+    import logging
+    logger = logging.getLogger(__name__)
     try:
         from app.services.report import generate_draft_report
         generate_draft_report(db, assessment_id=assessment_id, actor=user, lang_code=lang_code)
+        logger.info(f"Draft report auto-generated for assessment {assessment_id}")
     except Exception as e:
-        # Log error but don't fail the submission
-        print(f"Failed to auto-generate report for assessment {assessment_id}: {e}")
+        # Log error but don't fail the submission (frontend will create draft as fallback)
+        logger.error(f"Failed to auto-generate report for assessment {assessment_id}: {e}", exc_info=True)
 
     return AssessmentSubmitResponse(
         assessment_id=assessment.id,
