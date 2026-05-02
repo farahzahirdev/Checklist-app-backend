@@ -74,6 +74,10 @@ class AuditorDashboardResponse(BaseModel):
     reports_changes_requested: int
     draft_reports_waiting: int
     findings_total: int
+    users_total: int | None = None
+    checklists_published: int | None = None
+    assessments_submitted: int | None = None
+    total_assessments: int | None = None
     generated_at: datetime
 
 

@@ -270,11 +270,23 @@ def get_auditor_dashboard(db: Session, *, lang_code: str = "en") -> AuditorDashb
     draft_reports_waiting = db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.draft_generated)) or 0
     findings_total = db.scalar(select(func.count(ReportFinding.id))) or 0
 
+    # Include a small set of non-sensitive admin-like metrics to help auditors visualise system health.
+    users_total = db.scalar(select(func.count(User.id))) or 0
+    checklists_published = db.scalar(
+        select(func.count(Checklist.id)).where(Checklist.status_code_id == ChecklistStatus.to_id(ChecklistStatus.published))
+    ) or 0
+    assessments_submitted = db.scalar(select(func.count(Assessment.id)).where(Assessment.status == AssessmentStatus.submitted)) or 0
+    total_assessments = db.scalar(select(func.count(Assessment.id))) or 0
+
     return AuditorDashboardResponse(
         reports_under_review=reports_under_review,
         reports_changes_requested=reports_changes_requested,
         draft_reports_waiting=draft_reports_waiting,
         findings_total=findings_total,
+        users_total=users_total,
+        checklists_published=checklists_published,
+        assessments_submitted=assessments_submitted,
+        total_assessments=total_assessments,
         generated_at=_now(),
     )
 
