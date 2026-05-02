@@ -595,7 +595,7 @@ def get_top_users_endpoint(
         if user:
             top_users.append({
                 "user_id": user_id,
-                "user_name": user.full_name or user.email,
+                "user_name": user.email,
                 "user_email": user.email,
                 "user_role": user.role.value if user.role else "unknown",
                 "count": count

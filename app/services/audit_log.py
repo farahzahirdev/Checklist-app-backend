@@ -648,7 +648,7 @@ def get_entity_activity_summary(
         actor_user = db.query(User).filter(User.id == change.actor_user_id).first() if change.actor_user_id else None
         
         change_response = AuditLogResponse.from_orm(change)
-        change_response.actor_name = actor_user.full_name if actor_user else None
+        change_response.actor_name = actor_user.email if actor_user else None
         change_response.actor_email = actor_user.email if actor_user else None
         
         recent_changes_responses.append(change_response)
