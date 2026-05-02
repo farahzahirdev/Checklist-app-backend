@@ -41,9 +41,9 @@ def _now() -> datetime:
 def _priority_from_answer(answer: AssessmentAnswer) -> PriorityLevel:
     if answer.weighted_priority is not None:
         return answer.weighted_priority
-    if answer.answer == AnswerChoice.no:
+    if answer.answer == AnswerChoice.one:
         return PriorityLevel.high
-    if answer.answer == AnswerChoice.dont_know:
+    if answer.answer == AnswerChoice.two:
         return PriorityLevel.medium
     return PriorityLevel.low
 
@@ -114,7 +114,7 @@ def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User, lang
 
     answers = db.scalars(select(AssessmentAnswer).where(AssessmentAnswer.assessment_id == assessment_id)).all()
     for answer in answers:
-        if answer.answer in {AnswerChoice.no, AnswerChoice.dont_know}:
+        if answer.answer in {AnswerChoice.one, AnswerChoice.two}:
             question = db.get(ChecklistQuestion, answer.question_id)
             if question is None:
                 continue
