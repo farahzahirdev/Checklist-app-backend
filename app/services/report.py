@@ -215,14 +215,37 @@ def list_reports(db: Session, *, status: str | None = None, skip: int = 0, limit
     total = db.scalar(select(func.count(Report.id)))
     reports = query.offset(skip).limit(limit).all()
     
+    # Batch query findings and summaries counts to avoid N+1 queries
+    counts_data = db.execute(
+        select(
+            ReportFinding.report_id,
+            func.count(ReportFinding.id).label('findings_count')
+        )
+        .group_by(ReportFinding.report_id)
+    ).all()
+    findings_counts = {row.report_id: row.findings_count for row in counts_data}
+    
+    summaries_data = db.execute(
+        select(
+            ReportSectionSummary.report_id,
+            func.count(ReportSectionSummary.id).label('summaries_count')
+        )
+        .group_by(ReportSectionSummary.report_id)
+    ).all()
+    summaries_counts = {row.report_id: row.summaries_count for row in summaries_data}
+    
+    # Cache reviewer lookups
+    reviewer_cache = {}
+    
     report_items = []
     for report in reports:
-        # Get reviewer name
+        # Get reviewer name (with caching)
         reviewer_name = None
         if report.reviewed_by:
-            reviewer = db.get(User, report.reviewed_by)
-            if reviewer:
-                reviewer_name = reviewer.email
+            if report.reviewed_by not in reviewer_cache:
+                reviewer = db.get(User, report.reviewed_by)
+                reviewer_cache[report.reviewed_by] = reviewer.email if reviewer else None
+            reviewer_name = reviewer_cache[report.reviewed_by]
         
         # Get checklist title from translation
         checklist_title = None
@@ -242,8 +265,8 @@ def list_reports(db: Session, *, status: str | None = None, skip: int = 0, limit
             "draft_generated_at": report.draft_generated_at.isoformat() if report.draft_generated_at else None,
             "reviewed_at": report.reviewed_at.isoformat() if report.reviewed_at else None,
             "approved_at": report.approved_at.isoformat() if report.approved_at else None,
-            "findings_count": _report_counts(db, report.id)[0],
-            "summaries_count": _report_counts(db, report.id)[1],
+            "findings_count": findings_counts.get(report.id, 0),
+            "summaries_count": summaries_counts.get(report.id, 0),
             "reviewer_name": reviewer_name,
         })
     
@@ -470,7 +493,7 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
         for question in questions:
             max_score += 4  # Maximum score per question is 4 (Yes answer)
             answer = answer_map.get(question.id)
-            if answer and answer.answer_score:
+            if answer and answer.answer_score is not None:
                 total_score += answer.answer_score
         
         # Get section translation
@@ -538,7 +561,7 @@ def _calculate_chapter_data(db: Session, assessment: Assessment) -> list[dict]:
         
         for question in data["questions"]:
             answer = answer_map.get(question.id)
-            if answer and answer.answer_score:
+            if answer and answer.answer_score is not None:
                 total_score += answer.answer_score
                 if answer.answer in [AnswerChoice.no, AnswerChoice.dont_know]:
                     findings_count += 1

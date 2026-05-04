@@ -56,7 +56,7 @@ class PublishReportRequest(BaseModel):
 class UpsertReportSummaryRequest(BaseModel):
     section_id: UUID | None = None
     chapter_code: str | None = Field(default=None, max_length=120)
-    summary_text: str = Field(min_length=1)
+    summary_text: str = Field(min_length=10, max_length=5000)
 
 
 

@@ -61,6 +61,7 @@ def list_users(
     sort_order: str = Query("asc", pattern="^(asc|desc)$"),
     search: str | None = Query(None, description="Filter by email or role"),
     role: str | None = Query(None, description="Filter by exact role"),
+    is_active: bool | None = Query(None, description="Filter by active status (None=show all)"),
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> dict:
@@ -80,12 +81,13 @@ def list_users(
         )
 
     query = db.query(User).filter(
-        User.id != current_user.id,
         User.role.in_([UserRole.admin.value, UserRole.auditor.value]),
     )
 
     if role:
         query = query.filter(User.role == role)
+    if is_active is not None:
+        query = query.filter(User.is_active == is_active)
     if search:
         search_term = f"%{search}%"
         query = query.filter(
@@ -100,6 +102,8 @@ def list_users(
         sort_column = User.email
     elif sort_by == "role":
         sort_column = User.role
+    elif sort_by == "updated_at":
+        sort_column = User.updated_at
 
     if sort_order == "desc":
         query = query.order_by(desc(sort_column))
