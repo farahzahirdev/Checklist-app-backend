@@ -363,7 +363,7 @@ def create_checklist_from_file(
 
         # ...existing code...
         sections_map = {}  # section_name -> section_id
-        questions_map = {}  # parent_q_id -> question_id (for linking children)
+        questions_map = {}  # section_id -> {parent_q_id -> question_id} (section-aware mapping)
         sections_created = 0
         questions_created = 0
         sub_questions_created = 0
@@ -471,6 +471,10 @@ def create_checklist_from_file(
                     sections_created += 1
                 section_id = sections_map[section_name]
 
+                # Initialize section-specific questions map if not exists
+                if section_id not in questions_map:
+                    questions_map[section_id] = {}
+
                 # Build answer options for this row
                 answer_options = build_answer_options(row)
                 if not any(opt["description"] for opt in answer_options):
@@ -478,7 +482,7 @@ def create_checklist_from_file(
 
                 # Create parent question if this is a new parent ID
                 parent_question_id = None
-                if parent_q_id not in questions_map:
+                if parent_q_id not in questions_map[section_id]:
                     parent_question = ChecklistQuestion(
                         checklist_id=checklist.id,
                         section_id=section_id,
@@ -521,19 +525,19 @@ def create_checklist_from_file(
                             score=opt["score"],
                             description=opt["description"],
                         ))
-                    questions_map[parent_q_id] = parent_question.id
+                    questions_map[section_id][parent_q_id] = parent_question.id
                     questions_created += 1
                 else:
-                    parent_question_id = questions_map[parent_q_id]
+                    parent_question_id = questions_map[section_id][parent_q_id]
 
                 # Create child question if specified
                 if child_q_id:
                     child_key = f"{parent_q_id}|{child_q_id}"
-                    if child_key not in questions_map:
+                    if child_key not in questions_map[section_id]:
                         child_question = ChecklistQuestion(
                             checklist_id=checklist.id,
                             section_id=section_id,
-                            parent_question_id=questions_map[parent_q_id],
+                            parent_question_id=questions_map[section_id][parent_q_id],
                             question_code=child_q_id,  # Back to simple: "a)", "b)", "c)"
                             audit_type="compliance",
                             points=1,
@@ -572,14 +576,14 @@ def create_checklist_from_file(
                                 score=opt["score"],
                                 description=opt["description"],
                             ))
-                        questions_map[child_key] = child_question.id
+                        questions_map[section_id][child_key] = child_question.id
                         sub_questions_created += 1
 
                 # Create grandchild question if specified
                 if grandchild_q_id and child_q_id:
                     grandchild_key = f"{parent_q_id}|{child_q_id}|{grandchild_q_id}"
-                    if grandchild_key not in questions_map:
-                        child_parent_id = questions_map.get(f"{parent_q_id}|{child_q_id}")
+                    if grandchild_key not in questions_map[section_id]:
+                        child_parent_id = questions_map[section_id].get(f"{parent_q_id}|{child_q_id}")
                         if child_parent_id:
                             grandchild_question = ChecklistQuestion(
                                 checklist_id=checklist.id,
@@ -623,7 +627,7 @@ def create_checklist_from_file(
                                     score=opt["score"],
                                     description=opt["description"],
                                 ))
-                            questions_map[grandchild_key] = grandchild_question.id
+                            questions_map[section_id][grandchild_key] = grandchild_question.id
                             sub_questions_created += 1
                 
             except Exception as e:
