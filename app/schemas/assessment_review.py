@@ -108,9 +108,18 @@ class AssessmentReviewResponse(BaseModel):
 class AnswerWithReview(BaseModel):
     """Schema for answer with its review."""
     answer_id: UUID
-    question_id: UUID
-    question_code: str
+    # Public API change: `question_id` will return the question code (string).
+    # The UUID for the question is returned as `question_uuid`.
+    question_id: str
+    question_uuid: UUID
     question_text: str
+    # New optional fields requested
+    explanation: Optional[str] = None
+    audit_type: Optional[str] = None
+    why_this_matters: Optional[str] = None
+    legal_requirement_title: Optional[str] = None
+    legal_requirement_description: Optional[str] = None
+    expected_implementation: Optional[str] = None
     section_code: str
     section_name: str
     customer_answer: str

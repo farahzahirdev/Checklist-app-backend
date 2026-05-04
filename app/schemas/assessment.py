@@ -57,12 +57,13 @@ class AssessmentQuestionResponse(BaseModel):
     question_id: str
     question_title: str | None = None
     security_level: SeverityLevel
-    audit_type: str = "compliance"
+    audit_type: str | None = None
     answer_logic: str = "answer_only"
     legal_requirement: str
     explanation: str
     expected_implementation: str
     how_it_works: str | None = None
+    why_this_matters: str | None = None
     points: int
     report_domain: str | None = None
     report_chapter: str | None = None

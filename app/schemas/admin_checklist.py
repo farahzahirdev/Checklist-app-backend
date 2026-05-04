@@ -181,13 +181,14 @@ class AdminQuestionResponse(BaseModel):
     question_id: str
     question_title: str
     security_level: SeverityLevel
-    audit_type: str
+    audit_type: str | None = None
     points: int
     answer_logic: AnswerLogic = "answer_only"
-    legal_requirement_title: str
-    legal_requirement_description: str
+    legal_requirement_title: str | None = None
+    legal_requirement_description: str | None = None
     explanation: str
     expected_implementation: str
+    why_this_matters: str | None = None
     how_it_works: str
     guidance_score_4: str | None = None
     guidance_score_3: str | None = None

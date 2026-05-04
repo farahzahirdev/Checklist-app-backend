@@ -198,6 +198,12 @@ def get_assessment_answers_with_reviews(
         )
         
         question_text = question_translation.question_text if question_translation else answer.question.question_code
+        explanation = question_translation.explanation if question_translation and question_translation.explanation else None
+        expected_implementation = question_translation.expected_implementation if question_translation and question_translation.expected_implementation else None
+        why_this_matters = question_translation.how_it_works if question_translation and question_translation.how_it_works else None
+        legal_requirement_title = question_translation.legal_requirement_title if question_translation and question_translation.legal_requirement_title else None
+        legal_requirement_description = question_translation.legal_requirement_description if question_translation and question_translation.legal_requirement_description else None
+        audit_type = answer.question.audit_type if hasattr(answer.question, 'audit_type') else None
         section_name = section_translation.title if section_translation else answer.question.section.section_code
         
         # Get review if exists
@@ -215,9 +221,16 @@ def get_assessment_answers_with_reviews(
         
         answer_with_reviews.append(AnswerWithReview(
             answer_id=answer.id,
-            question_id=answer.question_id,
-            question_code=answer.question.question_code,
+            # public `question_id` should be question code string per request
+            question_id=answer.question.question_code,
+            question_uuid=answer.question_id,
             question_text=question_text,
+            explanation=explanation,
+            audit_type=audit_type,
+            why_this_matters=why_this_matters,
+            legal_requirement_title=legal_requirement_title,
+            legal_requirement_description=legal_requirement_description,
+            expected_implementation=expected_implementation,
             section_code=answer.question.section.section_code,
             section_name=section_name,
             customer_answer=answer.answer.value if answer.answer else "Not answered",
