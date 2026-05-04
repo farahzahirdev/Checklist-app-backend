@@ -27,6 +27,7 @@ from app.models.checklist import (
 )
 from app.models.user import User
 from app.models.reference import Language
+from app.utils.audit_logger import AuditLogger
 from app.schemas.assessment_review import (
     AssessmentReviewCreate,
     AssessmentReviewUpdate,
@@ -46,6 +47,30 @@ from app.schemas.assessment_review import (
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _log_assessment_review_audit(
+    db: Session,
+    *,
+    action: str,
+    review_id: UUID,
+    actor_user_id: UUID | None = None,
+    target_user_id: UUID | None = None,
+    changes_summary: str | None = None,
+    after_data: dict | None = None,
+) -> None:
+    try:
+        AuditLogger.log_assessment_review_action(
+            db=db,
+            action=action,
+            review_id=review_id,
+            actor_user_id=actor_user_id,
+            target_user_id=target_user_id,
+            changes_summary=changes_summary,
+            after_data=after_data,
+        )
+    except Exception as e:
+        print(f"Error creating audit log for assessment review {review_id}: {e}")
 
 
 def get_assessment_for_review(
@@ -310,6 +335,15 @@ def get_or_create_assessment_review(
         )
         db.add(history)
         db.commit()
+
+        _log_assessment_review_audit(
+            db,
+            action="assessment_review_create",
+            review_id=review.id,
+            actor_user_id=reviewer_id,
+            changes_summary=f"Created assessment review for assessment {assessment_id}",
+            after_data={"assessment_id": str(assessment_id), "status": review.status},
+        )
     
     return review
 
@@ -378,6 +412,15 @@ def create_answer_review(
     db.add(history)
     
     db.commit()
+
+    _log_assessment_review_audit(
+        db,
+        action="answer_review_create",
+        review_id=assessment_review.id,
+        actor_user_id=reviewer_id,
+        changes_summary=f"Created answer review for answer {answer_id}",
+        after_data={"answer_id": str(answer_id), "suggestion_type": str(review.suggestion_type)},
+    )
     
     return AnswerReviewResponse.from_orm(review)
 
@@ -426,6 +469,15 @@ def update_answer_review(
     db.add(history)
     
     db.commit()
+
+    _log_assessment_review_audit(
+        db,
+        action="answer_review_update",
+        review_id=review.assessment_review_id,
+        actor_user_id=reviewer_id,
+        changes_summary=f"Updated answer review for answer {review.answer_id}",
+        after_data={"answer_id": str(review.answer_id)},
+    )
     
     return AnswerReviewResponse.from_orm(review)
 
@@ -461,6 +513,15 @@ def delete_answer_review(
     # Delete review
     db.delete(review)
     db.commit()
+
+    _log_assessment_review_audit(
+        db,
+        action="answer_review_delete",
+        review_id=assessment_review_id,
+        actor_user_id=reviewer_id,
+        changes_summary=f"Deleted answer review for answer {answer_id}",
+        after_data={"answer_id": str(answer_id)},
+    )
     
     return True
 
@@ -512,6 +573,15 @@ def update_assessment_review(
     db.add(history)
     
     db.commit()
+
+    _log_assessment_review_audit(
+        db,
+        action="assessment_review_submit" if update_data.get("status") == ReviewStatus.COMPLETED else "assessment_review_update",
+        review_id=review.id,
+        actor_user_id=reviewer_id,
+        changes_summary="Assessment review completed" if update_data.get("status") == ReviewStatus.COMPLETED else "Assessment review updated",
+        after_data={"assessment_id": str(assessment_id), "status": str(review.status)},
+    )
     
     # If the assessment review was completed, start the report review flow for the generated draft
     try:
@@ -637,6 +707,16 @@ def create_bulk_answer_reviews(
     
     # Commit all changes
     db.commit()
+
+    if success_count > 0:
+        _log_assessment_review_audit(
+            db,
+            action="answer_review_create",
+            review_id=assessment_review.id,
+            actor_user_id=reviewer_id,
+            changes_summary=f"Created {success_count} answer reviews for assessment {assessment_id}",
+            after_data={"assessment_id": str(assessment_id), "success_count": success_count, "failure_count": failure_count},
+        )
     
     return BulkAnswerReviewResponse(
         success_count=success_count,

@@ -43,6 +43,14 @@ from app.schemas.user_management import (
 from app.services.rbac import RBACService
 from app.services.user_management import UserManagementService, FixedPermissionSet
 from app.services.auth import get_password_validation_error
+from app.services.customer_payments import (
+    get_customer_payment_dashboard,
+    get_customer_payment_records,
+)
+from app.services.customer_assessments import (
+    get_customer_assessments,
+    get_customer_dashboard_enhanced,
+)
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -622,18 +630,20 @@ def view_customer_dashboard_as_admin(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=translate("user_is_not_a_customer", lang_code)
         )
-    
-    # TODO: Load actual customer dashboard data
-    # For now, return structure showing admin viewing as customer
-    
+
+    payment_dashboard = get_customer_payment_dashboard(db, customer_id)
+    payment_records = get_customer_payment_records(db, customer_id, skip=0, limit=100)
+    assessment_dashboard = get_customer_dashboard_enhanced(db, user_id=customer_id, lang_code=lang_code)
+    assessment_records = get_customer_assessments(db, user_id=customer_id, skip=0, limit=100, lang_code=lang_code)
+
     return {
         "user_id": customer_id,
         "user_role": "customer",
-        "viewed_as_role": current_user.role,  # Shows admin viewing it
+        "viewed_as_role": current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role),
         "if_customer": {
-            # Customer-specific dashboard data would go here
-            "recent_assessments": [],
-            "payment_status": None,
-            "available_checklists": [],
+            "payment_dashboard": payment_dashboard.model_dump(mode="json"),
+            "payment_records": payment_records.model_dump(mode="json"),
+            "assessment_dashboard": assessment_dashboard.model_dump(mode="json"),
+            "assessment_records": assessment_records.model_dump(mode="json"),
         },
     }

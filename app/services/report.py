@@ -24,6 +24,7 @@ from app.models.report import (
     ReportStatus,
 )
 from app.models.user import User
+from app.services.audit_log import create_audit_log
 from app.schemas.report import (
     ReportFindingItem,
     ReportResponse,
@@ -96,6 +97,31 @@ def _create_review_event(db: Session, *, report_id: UUID, actor_user_id: UUID, e
     db.add(ReportReviewEvent(report_id=report_id, actor_user_id=actor_user_id, event_type=event_type, event_note=note))
 
 
+def _log_report_audit(
+    db: Session,
+    *,
+    action: str,
+    report: Report,
+    actor_user_id: UUID,
+    changes_summary: str,
+    after_data: dict | None = None,
+) -> None:
+    try:
+        assessment = db.get(Assessment, report.assessment_id)
+        create_audit_log(
+            db=db,
+            action=action,
+            target_entity="report",
+            target_id=report.id,
+            actor_user_id=actor_user_id,
+            target_user_id=assessment.user_id if assessment else None,
+            after_json=after_data,
+            changes_summary=changes_summary,
+        )
+    except Exception as e:
+        print(f"Error creating audit log for report {report.id}: {e}")
+
+
 def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User, lang_code: str = "en") -> ReportResponse:
     assessment = db.get(Assessment, assessment_id)
     if assessment is None:
@@ -140,6 +166,16 @@ def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User, lang
 
     db.commit()
     db.refresh(report)
+
+    _log_report_audit(
+        db,
+        action="report_create",
+        report=report,
+        actor_user_id=actor.id,
+        changes_summary=f"Generated draft report for assessment {assessment_id}",
+        after_data={"assessment_id": str(assessment_id), "status": str(report.status)},
+    )
+
     return _serialize_report(db, report)
 
 
@@ -162,6 +198,16 @@ def start_review(db: Session, *, report_id: UUID, actor: User, payload: ReviewAc
     _create_review_event(db, report_id=report.id, actor_user_id=actor.id, event_type=ReportEventType.review_started, note=payload.note)
     db.commit()
     db.refresh(report)
+
+    _log_report_audit(
+        db,
+        action="report_update",
+        report=report,
+        actor_user_id=actor.id,
+        changes_summary=f"Started review for report {report_id}",
+        after_data={"status": str(report.status), "note": payload.note},
+    )
+
     return _serialize_report(db, report)
 
 
@@ -177,6 +223,16 @@ def request_changes(db: Session, *, report_id: UUID, actor: User, payload: Revie
     )
     db.commit()
     db.refresh(report)
+
+    _log_report_audit(
+        db,
+        action="report_changes_request",
+        report=report,
+        actor_user_id=actor.id,
+        changes_summary=f"Requested changes for report {report_id}",
+        after_data={"status": str(report.status), "note": payload.note},
+    )
+
     return _serialize_report(db, report)
 
 
@@ -188,6 +244,16 @@ def approve_report(db: Session, *, report_id: UUID, actor: User, payload: Review
     _create_review_event(db, report_id=report.id, actor_user_id=actor.id, event_type=ReportEventType.approved, note=payload.note)
     db.commit()
     db.refresh(report)
+
+    _log_report_audit(
+        db,
+        action="report_approve",
+        report=report,
+        actor_user_id=actor.id,
+        changes_summary=f"Approved report {report_id}",
+        after_data={"status": str(report.status), "note": payload.note},
+    )
+
     return _serialize_report(db, report)
 
 
@@ -293,6 +359,16 @@ def publish_report(db: Session, *, report_id: UUID, actor: User, final_pdf_stora
     )
     db.commit()
     db.refresh(report)
+
+    _log_report_audit(
+        db,
+        action="report_publish",
+        report=report,
+        actor_user_id=actor.id,
+        changes_summary=f"Published report {report_id}",
+        after_data={"status": str(report.status), "final_pdf_storage_key": final_pdf_storage_key},
+    )
+
     return _serialize_report(db, report)
 
 
@@ -335,6 +411,15 @@ def upsert_report_summary(
     )
     db.commit()
     db.refresh(summary)
+
+    _log_report_audit(
+        db,
+        action="report_update",
+        report=report,
+        actor_user_id=actor.id,
+        changes_summary=f"Updated report summary for section {payload.section_id}",
+        after_data={"section_id": str(payload.section_id), "chapter_code": payload.chapter_code},
+    )
 
     return ReportSummaryItem(
         id=summary.id,

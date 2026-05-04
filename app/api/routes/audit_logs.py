@@ -1,4 +1,5 @@
 """API endpoints for audit log management."""
+from datetime import timezone
 from uuid import UUID
 from typing import Optional, List
 
@@ -446,13 +447,28 @@ def get_review_activity_endpoint(
     from app.schemas.audit_log import AuditLogFilter
     
     date_from = datetime.now(timezone.utc) - timedelta(hours=hours)
-    
-    filters = AuditLogFilter(
-        target_entity="assessment_review",
-        date_from=date_from,
+
+    filters = AuditLogFilter(date_from=date_from)
+    response = get_audit_logs(db, filters=filters, skip=0, limit=200)
+    review_logs = [
+        log for log in response.logs
+        if log.target_entity in {"assessment_review", "report"}
+    ]
+
+    total = len(review_logs)
+    paged_logs = review_logs[skip: skip + limit]
+    pages = (total + limit - 1) // limit if limit > 0 else 0
+    page = (skip // limit) + 1 if limit > 0 else 1
+
+    return AuditLogListResponse(
+        logs=paged_logs,
+        total=total,
+        page=page,
+        size=limit,
+        pages=pages,
+        filters_applied={"date_from": date_from.isoformat(), "target_entities": ["assessment_review", "report"]},
+        generated_at=response.generated_at,
     )
-    
-    return get_audit_logs(db, filters=filters, skip=skip, limit=limit)
 
 
 @router.get(

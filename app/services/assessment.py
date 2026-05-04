@@ -22,6 +22,7 @@ from app.models.checklist import (
 )
 from app.models.payment import Payment, PaymentStatus
 from app.models.user import User, UserRole
+from app.utils.audit_logger import AuditLogger
 from app.schemas.assessment import (
     AssessmentAnswerResponse,
     AssessmentDetailResponse,
@@ -36,6 +37,28 @@ from app.schemas.admin_checklist import EvidenceRuleResponse
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _log_assessment_audit(
+    db: Session,
+    *,
+    action: str,
+    assessment: Assessment,
+    actor_user_id: UUID,
+    changes_summary: str,
+    after_data: dict | None = None,
+) -> None:
+    try:
+        AuditLogger.log_assessment_action(
+            db=db,
+            action=action,
+            assessment_id=assessment.id,
+            actor_user_id=actor_user_id,
+            changes_summary=changes_summary,
+            after_data=after_data,
+        )
+    except Exception as e:
+        print(f"Error creating audit log for assessment {assessment.id}: {e}")
 
 
 def _serialize_assessment(assessment: Assessment, *, is_new: bool) -> AssessmentSessionResponse:
@@ -206,6 +229,16 @@ def start_assessment(
     db.flush()
     db.commit()
     db.refresh(assessment)
+
+    _log_assessment_audit(
+        db,
+        action="assessment_create",
+        assessment=assessment,
+        actor_user_id=user.id,
+        changes_summary=f"Started assessment for checklist {checklist_id}",
+        after_data={"checklist_id": str(checklist_id), "status": str(assessment.status)},
+    )
+
     return _serialize_assessment(assessment, is_new=True)
 
 
@@ -502,6 +535,7 @@ def upsert_assessment_answer(
             AssessmentAnswer.question_id == question_id,
         )
     )
+    is_new_answer = existing is None
 
     # Convert integer to AnswerChoice if needed
     if isinstance(answer, int):
@@ -535,6 +569,15 @@ def upsert_assessment_answer(
     db.commit()
     db.refresh(assessment)  # Refresh assessment to get updated completion_percent
     db.refresh(existing)
+
+    _log_assessment_audit(
+        db,
+        action="assessment_answer_create" if is_new_answer else "assessment_answer_update",
+        assessment=assessment,
+        actor_user_id=user.id,
+        changes_summary=f"Answered question {question_id} in assessment {assessment_id}",
+        after_data={"question_id": str(question_id), "answer": answer_choice.value},
+    )
 
     return AssessmentAnswerResponse(
         assessment_id=assessment.id,
@@ -572,6 +615,15 @@ def submit_assessment(db: Session, *, user: User, assessment_id: UUID, lang_code
 
     db.commit()
     db.refresh(assessment)
+
+    _log_assessment_audit(
+        db,
+        action="assessment_submit",
+        assessment=assessment,
+        actor_user_id=user.id,
+        changes_summary=f"Submitted assessment {assessment_id}",
+        after_data={"status": str(assessment.status), "completion_percent": completion},
+    )
 
     # Auto-generate draft report when assessment is submitted
     import logging

@@ -653,7 +653,7 @@ def create_checklist_from_file(
             AuditLogger.log_checklist_action(
                 db=db,
                 actor_user_id=actor_id,
-                action="checklist_bulk_import",
+                action="checklist_create",
                 target_id=checklist.id,
                 before_json=None,
                 after_json={

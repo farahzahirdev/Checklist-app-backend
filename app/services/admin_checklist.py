@@ -95,6 +95,30 @@ def _format_version(version: int) -> str:
     return f"v{version}.0"
 
 
+def _log_checklist_audit(
+    db: Session,
+    *,
+    action: str,
+    checklist_id: uuid.UUID,
+    actor_user_id: uuid.UUID | None = None,
+    changes_summary: str | None = None,
+    before_data: dict | None = None,
+    after_data: dict | None = None,
+) -> None:
+    try:
+        AuditLogger.log_checklist_action(
+            db=db,
+            actor_user_id=actor_user_id,
+            action=action,
+            checklist_id=checklist_id,
+            before_data=before_data,
+            after_data=after_data,
+            changes_summary=changes_summary,
+        )
+    except Exception as e:
+        print(f"Error creating audit log for checklist {checklist_id}: {e}")
+
+
 def _to_checklist_response(checklist: Checklist, db: Session) -> AdminChecklistResponse:
     # Get translation for title/description
     translation = None
@@ -426,29 +450,31 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
         # Log error but don't fail checklist creation
         print(f"Error creating Stripe product for checklist {checklist.id}: {e}")
     
-    # Add audit logging
-    try:
-        AuditLogger.log_checklist_action(
-            db=db,
-            actor_user_id=actor.id,
-            action="checklist_created",
-            target_id=checklist.id,
-            before_json=None,
-            after_json={
-                "title": payload.title,
-                "status": payload.status.value if hasattr(payload.status, 'value') else str(payload.status),
-                "law_decree": payload.law_decree
-            },
-            changes_summary=f"Created checklist: {payload.title}"
-        )
-    except Exception as e:
-        # Log error but don't fail checklist creation
-        print(f"Error creating audit log for checklist {checklist.id}: {e}")
+    _log_checklist_audit(
+        db,
+        action="checklist_create",
+        checklist_id=checklist.id,
+        actor_user_id=actor.id,
+        changes_summary=f"Created checklist: {payload.title}",
+        after_data={
+            "title": payload.title,
+            "status": payload.status.value if hasattr(payload.status, "value") else str(payload.status),
+            "law_decree": payload.law_decree,
+        },
+    )
     
     return _to_checklist_response(checklist, db)
 
 
-def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminChecklistUpdateRequest, lang_code: str = "en") -> AdminChecklistResponse | None:
+def update_checklist(
+    db: Session,
+    *,
+    actor: User,
+    checklist_id,
+    payload: AdminChecklistUpdateRequest,
+    lang_code: str = "en",
+    audit_action: str = "checklist_update",
+) -> AdminChecklistResponse | None:
     checklist = db.get(Checklist, checklist_id)
     if checklist is None:
         return None
@@ -495,6 +521,21 @@ def update_checklist(db: Session, *, actor: User, checklist_id, payload: AdminCh
 
     db.commit()
     db.refresh(checklist)
+
+    if fields_updated:
+        _log_checklist_audit(
+            db,
+            action=audit_action,
+            checklist_id=checklist.id,
+            actor_user_id=actor.id,
+            changes_summary=f"Updated checklist: {checklist.id}",
+            after_data={
+                "title": payload.title,
+                "status": payload.status.value if payload.status and hasattr(payload.status, "value") else str(payload.status) if payload.status is not None else None,
+                "version": checklist.version,
+            },
+        )
+
     return _to_checklist_response(checklist, db)
 
 
@@ -514,6 +555,7 @@ def publish_checklist(db: Session, *, actor: User, checklist_id, payload: Publis
         checklist_id=checklist_id,
         payload=AdminChecklistUpdateRequest(status=payload.status),
         lang_code=lang_code,
+        audit_action="checklist_publish",
     )
 
 
@@ -550,6 +592,14 @@ def delete_checklist(db: Session, *, checklist_id) -> bool:
     # Delete the checklist (CASCADE will handle sections, questions, and translations)
     db.delete(checklist)
     db.commit()
+
+    _log_checklist_audit(
+        db,
+        action="checklist_delete",
+        checklist_id=checklist_id,
+        changes_summary=f"Deleted checklist {checklist_id}",
+    )
+
     return True
 
 
@@ -618,6 +668,15 @@ def create_section(db: Session, *, checklist_id, payload: AdminSectionCreateRequ
     db.refresh(section)
     # Load the translation for the response
     section._translation = _latest_section_translation(db, section.id)
+
+    _log_checklist_audit(
+        db,
+        action="checklist_version_update",
+        checklist_id=checklist_id,
+        changes_summary=f"Created section {section.section_code} in checklist {checklist_id}",
+        after_data={"section_id": str(section.id), "title": payload.title, "order": payload.order},
+    )
+
     return _to_section_response(section)
 
 
@@ -665,6 +724,15 @@ def update_section(db: Session, *, checklist_id, section_id, payload: AdminSecti
     db.commit()
     db.refresh(section)
     section._translation = _latest_section_translation(db, section.id)
+
+    _log_checklist_audit(
+        db,
+        action="checklist_version_update",
+        checklist_id=checklist_id,
+        changes_summary=f"Updated section {section_id} in checklist {checklist_id}",
+        after_data={"section_id": str(section.id), "title": payload.title, "order": payload.order},
+    )
+
     return _to_section_response(section)
 
 
@@ -676,6 +744,15 @@ def delete_section(db: Session, *, checklist_id, section_id) -> bool:
         return False
     db.delete(section)
     db.commit()
+
+    _log_checklist_audit(
+        db,
+        action="checklist_version_update",
+        checklist_id=checklist_id,
+        changes_summary=f"Deleted section {section_id} from checklist {checklist_id}",
+        after_data={"section_id": str(section_id)},
+    )
+
     return True
 
 def list_questions(
@@ -851,6 +928,14 @@ def reorder_sections(db: Session, *, checklist_id, section_orders: list[dict]) -
     
     for section in updated_sections:
         section._translation = _latest_section_translation(db, section.id)
+
+    _log_checklist_audit(
+        db,
+        action="checklist_version_update",
+        checklist_id=checklist_id,
+        changes_summary=f"Reordered {len(section_orders)} sections in checklist {checklist_id}",
+        after_data={"section_orders": section_orders},
+    )
     
     return [_to_section_response(section) for section in updated_sections]
 
@@ -994,6 +1079,14 @@ def reorder_questions(db: Session, *, checklist_id, section_id, question_orders:
     
     for question in updated_questions:
         question._translation = _latest_question_translation(db, question.id)
+
+    _log_checklist_audit(
+        db,
+        action="checklist_version_update",
+        checklist_id=checklist_id,
+        changes_summary=f"Reordered {len(question_orders)} questions in checklist {checklist_id} section {section_id}",
+        after_data={"section_id": str(section_id), "question_orders": question_orders},
+    )
     
     return [_to_question_response(question) for question in updated_questions]
 
@@ -1011,6 +1104,7 @@ def get_question(db: Session, *, checklist_id, section_id, question_id, lang_cod
     if question is None:
         return None
     question._translation = _latest_question_translation(db, question.id)
+
     return _to_question_response(question)
 
 def create_question(db: Session, *, checklist_id, section_id, payload: AdminQuestionCreateRequest, lang_code: str = "en") -> AdminQuestionResponse:
@@ -1102,6 +1196,15 @@ def create_question(db: Session, *, checklist_id, section_id, payload: AdminQues
     db.commit()
     db.refresh(question)
     question._translation = _latest_question_translation(db, question.id)
+
+    _log_checklist_audit(
+        db,
+        action="checklist_version_update",
+        checklist_id=checklist_id,
+        changes_summary=f"Created question {question.question_code} in checklist {checklist_id}",
+        after_data={"question_id": str(question.id), "section_id": str(section_id), "question_code": question.question_code},
+    )
+
     return _to_question_response(question)
 
 
@@ -1231,6 +1334,14 @@ def update_question(
     db.commit()
     db.refresh(question)
     question._translation = _latest_question_translation(db, question.id)
+
+    _log_checklist_audit(
+        db,
+        action="checklist_version_update",
+        checklist_id=checklist_id,
+        changes_summary=f"Updated question {question.question_code} in checklist {checklist_id}",
+        after_data={"question_id": str(question.id), "section_id": str(section_id), "question_code": question.question_code},
+    )
     return _to_question_response(question)
 
 
@@ -1246,4 +1357,13 @@ def delete_question(db: Session, *, checklist_id, section_id, question_id) -> bo
         return False
     db.delete(question)
     db.commit()
+
+    _log_checklist_audit(
+        db,
+        action="checklist_version_update",
+        checklist_id=checklist_id,
+        changes_summary=f"Deleted question {question_id} from checklist {checklist_id}",
+        after_data={"question_id": str(question_id), "section_id": str(section_id)},
+    )
+
     return True
