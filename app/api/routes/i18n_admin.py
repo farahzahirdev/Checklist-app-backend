@@ -9,14 +9,14 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.api.dependencies.auth import get_current_admin_user
+from app.api.dependencies.auth import require_admin_only
 from app.db.session import get_db
 from app.models.reference import Language
 from app.services.i18n_service import i18n
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin/i18n", tags=["admin-i18n"], dependencies=[Depends(get_current_admin_user)])
+router = APIRouter(prefix="/admin/i18n", tags=["admin-i18n"], dependencies=[Depends(require_admin_only())])
 
 
 @router.get("/languages")
