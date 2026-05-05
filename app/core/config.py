@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     assessment_completion_days: int = Field(default=7, alias="ASSESSMENT_COMPLETION_DAYS")
     celery_broker_url: str = Field(default="redis://localhost:6379/0", alias="CELERY_BROKER_URL")
     celery_result_backend: str = Field(default="redis://localhost:6379/1", alias="CELERY_RESULT_BACKEND")
+    # Cache settings (using Redis DB 2)
+    cache_redis_url: str = Field(default="redis://localhost:6379/2", alias="CACHE_REDIS_URL")
+    cache_default_ttl: int = Field(default=3600, alias="CACHE_DEFAULT_TTL")  # 1 hour
+    cache_max_memory_mb: int = Field(default=150, alias="CACHE_MAX_MEMORY_MB")  # t2.micro safe limit
+    cache_memory_warn_percent: int = Field(default=80, alias="CACHE_MEMORY_WARN_PERCENT")
+    cache_memory_critical_percent: int = Field(default=90, alias="CACHE_MEMORY_CRITICAL_PERCENT")
     # S3 storage settings
     aws_access_key_id: str = Field(default="", alias="AWS_ACCESS_KEY_ID")
     aws_secret_access_key: str = Field(default="", alias="AWS_SECRET_ACCESS_KEY")
