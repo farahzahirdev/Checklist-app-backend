@@ -19,7 +19,8 @@ from app.schemas.auth import (
     CustomerProfileResponse,
     UpdateProfileRequest,
 )
-from app.utils.i18n_messages import get_language_code, translate
+from app.utils.i18n import get_language_code
+from app.utils.i18n_messages import translate
 
 router = APIRouter(prefix="/customer", tags=["customer-profile"])
 
