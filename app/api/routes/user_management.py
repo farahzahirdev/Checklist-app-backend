@@ -265,6 +265,7 @@ def create_auditor_user(
 
 
 
+@router.get("/users", response_model=UserListResponse)
 def list_users(
     request: Request,
     skip: int = Query(0, ge=0),
