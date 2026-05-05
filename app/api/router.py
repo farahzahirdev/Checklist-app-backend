@@ -15,6 +15,7 @@ from app.api.routes.media import router as media_router
 from app.api.routes.payments import router as payments_router
 from app.api.routes.rbac import router as rbac_router
 from app.api.routes.user_management import router as user_management_router
+from app.api.routes.i18n_admin import router as i18n_admin_router
 
 from app.api.routes.report import router as report_router
 
@@ -40,3 +41,4 @@ api_router.include_router(customer_checklists_router)
 api_router.include_router(customer_reports_router)
 api_router.include_router(support_tickets_router)
 api_router.include_router(media_router)
+api_router.include_router(i18n_admin_router)

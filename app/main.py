@@ -5,6 +5,7 @@ from fastapi.openapi.utils import get_openapi
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.middleware.i18n import I18nMiddleware
 from app.schemas.access import AccessWindowResponse
 from app.schemas.admin_checklist import (
 	AdminChecklistCreateRequest,
@@ -125,6 +126,10 @@ app.add_middleware(
 	allow_methods=["*"],
 	allow_headers=["*"],
 )
+
+# Add I18n middleware for automatic language detection and context management
+app.add_middleware(I18nMiddleware)
+
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 
