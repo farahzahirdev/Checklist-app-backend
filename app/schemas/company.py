@@ -15,7 +15,7 @@ class CreateCompanyRequest(BaseModel):
     """Request to create a new company."""
     
     name: str = Field(..., min_length=1, max_length=255, description="Company name")
-    slug: str = Field(..., min_length=1, max_length=255, regex="^[a-z0-9-]+$", description="URL-friendly slug (lowercase, hyphens)")
+    slug: str = Field(..., min_length=1, max_length=255, pattern="^[a-z0-9-]+$", description="URL-friendly slug (lowercase, hyphens)")
     email: str | None = Field(None, description="Company contact email")
     website: str | None = Field(None, max_length=255, description="Company website URL")
     region: str | None = Field(None, max_length=100, description="Geographic region (e.g., EU, US, APAC)")
