@@ -10,17 +10,14 @@ from __future__ import annotations
 
 import argparse
 
-from sqlalchemy import func, select
+from sqlalchemy import text
 
 from app.db.session import SessionLocal
-from app.models.access_window import AccessWindow
-from app.models.assessment import Assessment
-from app.models.payment import Payment
-from app.models.report import Report
 
 
-def _count(session, model, *, where_clause) -> int:
-    return session.scalar(select(func.count()).select_from(model).where(where_clause)) or 0
+def _count(session, table_name: str) -> int:
+    res = session.execute(text(f"SELECT count(*) FROM {table_name} WHERE company_id IS NULL"))
+    return int(res.scalar() or 0)
 
 
 def main() -> int:
@@ -29,26 +26,28 @@ def main() -> int:
     args = parser.parse_args()
 
     with SessionLocal() as session:
-        targets = [
-            ("reports", Report, Report.company_id.is_(None)),
-            ("assessments", Assessment, Assessment.company_id.is_(None)),
-            ("payments", Payment, Payment.company_id.is_(None)),
-            ("access_windows", AccessWindow, AccessWindow.company_id.is_(None)),
-        ]
+        targets = ["reports", "assessments", "payments", "access_windows"]
 
         print("Tenantless row counts before cleanup:")
-        for label, model, where_clause in targets:
-            print(f"- {label}: {_count(session, model, where_clause=where_clause)}")
+        for table in targets:
+            print(f"- {table}: {_count(session, table)}")
 
         if not args.execute:
             print("Dry run only. Re-run with --execute to delete these rows.")
             return 0
 
         try:
-            deleted_reports = session.query(Report).filter(Report.company_id.is_(None)).delete(synchronize_session=False)
-            deleted_payments = session.query(Payment).filter(Payment.company_id.is_(None)).delete(synchronize_session=False)
-            deleted_assessments = session.query(Assessment).filter(Assessment.company_id.is_(None)).delete(synchronize_session=False)
-            deleted_access_windows = session.query(AccessWindow).filter(AccessWindow.company_id.is_(None)).delete(synchronize_session=False)
+            deleted_reports = session.execute(text("DELETE FROM reports WHERE company_id IS NULL RETURNING id"))
+            deleted_reports_count = len(deleted_reports.fetchall())
+
+            deleted_payments = session.execute(text("DELETE FROM payments WHERE company_id IS NULL RETURNING id"))
+            deleted_payments_count = len(deleted_payments.fetchall())
+
+            deleted_assessments = session.execute(text("DELETE FROM assessments WHERE company_id IS NULL RETURNING id"))
+            deleted_assessments_count = len(deleted_assessments.fetchall())
+
+            deleted_access_windows = session.execute(text("DELETE FROM access_windows WHERE company_id IS NULL RETURNING id"))
+            deleted_access_windows_count = len(deleted_access_windows.fetchall())
 
             session.commit()
         except Exception:
@@ -56,14 +55,14 @@ def main() -> int:
             raise
 
         print("Deleted rows:")
-        print(f"- reports: {deleted_reports}")
-        print(f"- payments: {deleted_payments}")
-        print(f"- assessments: {deleted_assessments}")
-        print(f"- access_windows: {deleted_access_windows}")
+        print(f"- reports: {deleted_reports_count}")
+        print(f"- payments: {deleted_payments_count}")
+        print(f"- assessments: {deleted_assessments_count}")
+        print(f"- access_windows: {deleted_access_windows_count}")
 
         print("Tenantless row counts after cleanup:")
-        for label, model, where_clause in targets:
-            print(f"- {label}: {_count(session, model, where_clause=where_clause)}")
+        for table in targets:
+            print(f"- {table}: {_count(session, table)}")
 
     return 0
 
