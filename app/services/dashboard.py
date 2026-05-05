@@ -30,7 +30,7 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def get_admin_dashboard(db: Session, *, lang_code: str = "en") -> AdminDashboardResponse:
+def get_admin_dashboard(db: Session, *, company_id: UUID | None = None, lang_code: str = "en") -> AdminDashboardResponse:
     now = _now()
     users_total = db.scalar(select(func.count(User.id))) or 0
     customers_total = db.scalar(
@@ -39,23 +39,20 @@ def get_admin_dashboard(db: Session, *, lang_code: str = "en") -> AdminDashboard
     checklists_published = db.scalar(
         select(func.count(Checklist.id)).where(Checklist.status_code_id == ChecklistStatus.to_id(ChecklistStatus.published))
     ) or 0
-    assessments_submitted = (
-        db.scalar(select(func.count(Assessment.id)).where(Assessment.status == AssessmentStatus.submitted)) or 0
-    )
-    reports_published = db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.published)) or 0
-    payments_succeeded = db.scalar(
-        select(func.count(Payment.id)).where(Payment.status == PaymentStatus.succeeded)
-    ) or 0
-    total_assessments = db.scalar(select(func.count(Assessment.id))) or 0
-    pending_review = db.scalar(select(func.count(Assessment.id)).where(Assessment.status == AssessmentStatus.submitted)) or 0
-    expired_assessments = db.scalar(
-        select(func.count(Assessment.id)).where(
-            or_(
-                Assessment.status == AssessmentStatus.expired,
-                Assessment.expires_at < now,
-            )
-        )
-    ) or 0
+    assessment_base = select(Assessment)
+    report_base = select(Report)
+    payment_base = select(Payment)
+    if company_id is not None:
+        assessment_base = assessment_base.where(Assessment.company_id == company_id)
+        report_base = report_base.where(Report.company_id == company_id)
+        payment_base = payment_base.where(Payment.company_id == company_id)
+
+    assessments_submitted = db.scalar(select(func.count()).select_from(assessment_base.where(Assessment.status == AssessmentStatus.submitted).subquery())) or 0
+    reports_published = db.scalar(select(func.count()).select_from(report_base.where(Report.status == ReportStatus.published).subquery())) or 0
+    payments_succeeded = db.scalar(select(func.count()).select_from(payment_base.where(Payment.status == PaymentStatus.succeeded).subquery())) or 0
+    total_assessments = db.scalar(select(func.count()).select_from(assessment_base.subquery())) or 0
+    pending_review = db.scalar(select(func.count()).select_from(assessment_base.where(Assessment.status == AssessmentStatus.submitted).subquery())) or 0
+    expired_assessments = db.scalar(select(func.count()).select_from(assessment_base.where(or_(Assessment.status == AssessmentStatus.expired, Assessment.expires_at < now)).subquery())) or 0
 
     return AdminDashboardResponse(
         users_total=users_total,
@@ -71,8 +68,8 @@ def get_admin_dashboard(db: Session, *, lang_code: str = "en") -> AdminDashboard
     )
 
 
-def get_admin_awaiting_review(db: Session, *, limit: int = 10, lang_code: str = "en") -> list[AdminAwaitingReviewItemResponse]:
-    rows = db.execute(
+def get_admin_awaiting_review(db: Session, *, limit: int = 10, company_id: UUID | None = None, lang_code: str = "en") -> list[AdminAwaitingReviewItemResponse]:
+    query = (
         select(Assessment, User.email, Checklist.version, Report.id, Report.status)
         .join(User, User.id == Assessment.user_id)
         .join(Checklist, Checklist.id == Assessment.checklist_id)
@@ -80,7 +77,10 @@ def get_admin_awaiting_review(db: Session, *, limit: int = 10, lang_code: str = 
         .where(Assessment.status == AssessmentStatus.submitted)
         .order_by(Assessment.submitted_at.desc())
         .limit(limit)
-    ).all()
+    )
+    if company_id is not None:
+        query = query.where(Assessment.company_id == company_id)
+    rows = db.execute(query).all()
 
     label_template = translate("checklist_label", lang_code)
     return [
@@ -151,14 +151,18 @@ def get_admin_activity_feed(db: Session, *, limit: int = 20, lang_code: str = "e
     return items[:limit]
 
 
-def get_admin_assessment_distribution(db: Session, *, lang_code: str = "en") -> AdminAssessmentDistributionResponse:
-    ready_to_start = db.scalar(
-        select(func.count(Assessment.id)).where(Assessment.status == AssessmentStatus.not_started)
-    ) or 0
-    in_progress = db.scalar(select(func.count(Assessment.id)).where(Assessment.status == AssessmentStatus.in_progress)) or 0
-    waiting_for_review = db.scalar(select(func.count(Assessment.id)).where(Assessment.status == AssessmentStatus.submitted)) or 0
-    published = db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.published)) or 0
-    expired = db.scalar(select(func.count(Assessment.id)).where(Assessment.status == AssessmentStatus.expired)) or 0
+def get_admin_assessment_distribution(db: Session, *, company_id: UUID | None = None, lang_code: str = "en") -> AdminAssessmentDistributionResponse:
+    assessment_base = select(Assessment)
+    report_base = select(Report)
+    if company_id is not None:
+        assessment_base = assessment_base.where(Assessment.company_id == company_id)
+        report_base = report_base.where(Report.company_id == company_id)
+
+    ready_to_start = db.scalar(select(func.count()).select_from(assessment_base.where(Assessment.status == AssessmentStatus.not_started).subquery())) or 0
+    in_progress = db.scalar(select(func.count()).select_from(assessment_base.where(Assessment.status == AssessmentStatus.in_progress).subquery())) or 0
+    waiting_for_review = db.scalar(select(func.count()).select_from(assessment_base.where(Assessment.status == AssessmentStatus.submitted).subquery())) or 0
+    published = db.scalar(select(func.count()).select_from(report_base.where(Report.status == ReportStatus.published).subquery())) or 0
+    expired = db.scalar(select(func.count()).select_from(assessment_base.where(Assessment.status == AssessmentStatus.expired).subquery())) or 0
 
     return AdminAssessmentDistributionResponse(
         ready_to_start=ready_to_start,
@@ -262,12 +266,16 @@ def get_admin_system_health(db: Session, *, lang_code: str = "en") -> AdminSyste
     )
 
 
-def get_auditor_dashboard(db: Session, *, lang_code: str = "en") -> AuditorDashboardResponse:
-    reports_under_review = db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.under_review)) or 0
-    reports_changes_requested = (
-        db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.changes_requested)) or 0
-    )
-    draft_reports_waiting = db.scalar(select(func.count(Report.id)).where(Report.status == ReportStatus.draft_generated)) or 0
+def get_auditor_dashboard(db: Session, *, company_id: UUID | None = None, lang_code: str = "en") -> AuditorDashboardResponse:
+    report_base = select(Report)
+    assessment_base = select(Assessment)
+    if company_id is not None:
+        report_base = report_base.where(Report.company_id == company_id)
+        assessment_base = assessment_base.where(Assessment.company_id == company_id)
+
+    reports_under_review = db.scalar(select(func.count()).select_from(report_base.where(Report.status == ReportStatus.under_review).subquery())) or 0
+    reports_changes_requested = db.scalar(select(func.count()).select_from(report_base.where(Report.status == ReportStatus.changes_requested).subquery())) or 0
+    draft_reports_waiting = db.scalar(select(func.count()).select_from(report_base.where(Report.status == ReportStatus.draft_generated).subquery())) or 0
     findings_total = db.scalar(select(func.count(ReportFinding.id))) or 0
 
     # Include a small set of non-sensitive admin-like metrics to help auditors visualise system health.
@@ -275,8 +283,8 @@ def get_auditor_dashboard(db: Session, *, lang_code: str = "en") -> AuditorDashb
     checklists_published = db.scalar(
         select(func.count(Checklist.id)).where(Checklist.status_code_id == ChecklistStatus.to_id(ChecklistStatus.published))
     ) or 0
-    assessments_submitted = db.scalar(select(func.count(Assessment.id)).where(Assessment.status == AssessmentStatus.submitted)) or 0
-    total_assessments = db.scalar(select(func.count(Assessment.id))) or 0
+    assessments_submitted = db.scalar(select(func.count()).select_from(assessment_base.where(Assessment.status == AssessmentStatus.submitted).subquery())) or 0
+    total_assessments = db.scalar(select(func.count()).select_from(assessment_base.subquery())) or 0
 
     return AuditorDashboardResponse(
         reports_under_review=reports_under_review,

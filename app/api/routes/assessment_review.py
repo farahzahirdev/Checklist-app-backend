@@ -53,11 +53,12 @@ router = APIRouter(prefix="/admin/assessment-review", tags=["assessment-review"]
 )
 def get_review_summary_endpoint(
     request: Request,
+    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> ReviewSummary:
     """Get review summary statistics."""
-    return get_review_summary(db)
+    return get_review_summary(db, company_id=company_id)
 
 
 @router.get(
@@ -71,12 +72,13 @@ def get_assessment_reviews(
     status: Optional[str] = Query(None, description="Filter by review status"),
     skip: int = Query(0, ge=0, description="Number of items to skip"),
     limit: int = Query(50, ge=1, le=200, description="Maximum number of items to return"),
+    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> List[AssessmentReviewResponse]:
     """Get assessment reviews for admin."""
     lang_code = get_language_code(request, db)
-    return get_assessment_reviews_for_admin(db, status=status, skip=skip, limit=limit, lang_code=lang_code)
+    return get_assessment_reviews_for_admin(db, status=status, skip=skip, limit=limit, company_id=company_id, lang_code=lang_code)
 
 
 @router.get(
@@ -88,12 +90,13 @@ def get_assessment_reviews(
 def get_assessment_answers(
     assessment_id: UUID,
     request: Request,
+    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> AssessmentAnswerListResponse:
     """Get assessment answers for review."""
     lang_code = get_language_code(request, db)
-    return get_assessment_answers_with_reviews(db, assessment_id, admin.id, lang_code)
+    return get_assessment_answers_with_reviews(db, assessment_id, company_id, admin.id, lang_code)
 
 
 @router.post(

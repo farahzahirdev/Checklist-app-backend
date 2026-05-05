@@ -12,11 +12,11 @@ from app.models.report import ReportStatus
 from app.services.report import get_customer_report_data
 
 
-def generate_report_pdf(db: Session, *, report_id: UUID, lang_code: str = "en") -> bytes:
+def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None = None, lang_code: str = "en") -> bytes:
     """Generate PDF report from HTML template"""
     
     # Get comprehensive report data
-    report_data = get_customer_report_data(db, report_id=report_id, lang_code=lang_code)
+    report_data = get_customer_report_data(db, report_id=report_id, company_id=company_id, lang_code=lang_code)
     
     # Verify report is published
     if report_data.report_status != ReportStatus.published:
@@ -73,11 +73,11 @@ def generate_report_pdf(db: Session, *, report_id: UUID, lang_code: str = "en") 
         )
 
 
-def generate_report_html_preview(db: Session, *, report_id: UUID, lang_code: str = "en") -> str:
+def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UUID | None = None, lang_code: str = "en") -> str:
     """Generate HTML preview of report (for testing/debugging)"""
     
     # Get comprehensive report data
-    report_data = get_customer_report_data(db, report_id=report_id, lang_code=lang_code)
+    report_data = get_customer_report_data(db, report_id=report_id, company_id=company_id, lang_code=lang_code)
     
     # Get template path
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')

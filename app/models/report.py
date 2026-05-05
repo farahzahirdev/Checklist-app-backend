@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from datetime import datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
 import uuid
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, UniqueConstraint, func
@@ -8,6 +11,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.assessment import PriorityLevel
+
+if TYPE_CHECKING:
+    from app.models.company import Company
 
 
 class ReportStatus(StrEnum):
@@ -34,6 +40,10 @@ class Report(Base):
     assessment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("assessments.id", ondelete="CASCADE"), nullable=False, unique=True
     )
+    # Tenant / Company the report is generated for (nullable for migration)
+    company_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     status: Mapped[ReportStatus] = mapped_column(
         Enum(ReportStatus, name="report_status", native_enum=True),
         nullable=False,
@@ -55,6 +65,7 @@ class Report(Base):
 
     # Relationships
     assessment = relationship("Assessment", back_populates="report")
+    company: Mapped["Company | None"] = relationship("Company")
 
 
 class ReportSectionSummary(Base):

@@ -8,6 +8,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.services.company_context import resolve_company_id, user_has_company_access
 from app.models.access_window import AccessWindow
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentEvidenceFile, AssessmentStatus, PriorityLevel
 from app.models.checklist import (
@@ -67,6 +68,7 @@ def _serialize_assessment(assessment: Assessment, *, is_new: bool) -> Assessment
         checklist_id=assessment.checklist_id,
         user_id=assessment.user_id,
         access_window_id=assessment.access_window_id,
+        company_id=assessment.company_id,
         status=assessment.status,
         started_at=assessment.started_at,
         expires_at=assessment.expires_at,
@@ -75,19 +77,18 @@ def _serialize_assessment(assessment: Assessment, *, is_new: bool) -> Assessment
     )
 
 
-def _latest_succeeded_payment(db: Session, *, user_id: UUID, checklist_id: UUID) -> Payment | None:
-    return db.scalar(
-        select(Payment)
-        .where(
-            Payment.user_id == user_id,
-            Payment.checklist_id == checklist_id,
-            Payment.status == PaymentStatus.succeeded,
-        )
-        .order_by(desc(Payment.paid_at), desc(Payment.created_at))
+def _latest_succeeded_payment(db: Session, *, user_id: UUID, checklist_id: UUID, company_id: UUID | None = None) -> Payment | None:
+    query = select(Payment).where(
+        Payment.user_id == user_id,
+        Payment.checklist_id == checklist_id,
+        Payment.status == PaymentStatus.succeeded,
     )
+    if company_id is not None:
+        query = query.where(Payment.company_id == company_id)
+    return db.scalar(query.order_by(desc(Payment.paid_at), desc(Payment.created_at)))
 
 
-def _active_access_window(db: Session, *, user_id: UUID, now: datetime) -> AccessWindow | None:
+def _active_access_window(db: Session, *, user_id: UUID, now: datetime, company_id: UUID | None = None) -> AccessWindow | None:
     """
     Get the most recent active access window for the user that hasn't been 
     used for a submitted assessment yet.
@@ -95,11 +96,10 @@ def _active_access_window(db: Session, *, user_id: UUID, now: datetime) -> Acces
     from sqlalchemy import and_, not_
     
     # Get active access windows (not expired)
-    access_windows = db.execute(
-        select(AccessWindow)
-        .where(AccessWindow.user_id == user_id, AccessWindow.expires_at > now)
-        .order_by(desc(AccessWindow.expires_at))
-    ).scalars().all()
+    access_window_query = select(AccessWindow).where(AccessWindow.user_id == user_id, AccessWindow.expires_at > now)
+    if company_id is not None:
+        access_window_query = access_window_query.where(AccessWindow.company_id == company_id)
+    access_windows = db.execute(access_window_query.order_by(desc(AccessWindow.expires_at))).scalars().all()
     
     # Check each access window to see if it has a submitted assessment
     for aw in access_windows:
@@ -116,15 +116,16 @@ def _active_access_window(db: Session, *, user_id: UUID, now: datetime) -> Acces
     return None
 
 
-def _ensure_access_window(db: Session, *, user: User, payment: Payment | None, now: datetime) -> AccessWindow:
+def _ensure_access_window(db: Session, *, user: User, payment: Payment | None, now: datetime, company_id: UUID | None = None) -> AccessWindow:
     settings = get_settings()
-    existing = _active_access_window(db, user_id=user.id, now=now)
+    existing = _active_access_window(db, user_id=user.id, now=now, company_id=company_id)
     if existing is not None:
         return existing
 
     access_window = AccessWindow(
         user_id=user.id,
         payment_id=payment.id if payment else None,
+        company_id=company_id,
         activated_at=now,
         expires_at=now + timedelta(days=settings.access_unlock_days),
     )
@@ -134,12 +135,14 @@ def _ensure_access_window(db: Session, *, user: User, payment: Payment | None, n
 
 
 def _get_active_assessment(
-    db: Session, *, user: User, checklist_id: UUID | None = None, lang_code: str = "en"
+    db: Session, *, user: User, checklist_id: UUID | None = None, company_id: UUID | None = None, lang_code: str = "en"
 ) -> Assessment:
     now = _now_utc()
     conditions = [Assessment.user_id == user.id, Assessment.expires_at > now]
     if checklist_id is not None:
         conditions.append(Assessment.checklist_id == checklist_id)
+    if company_id is not None:
+        conditions.append(Assessment.company_id == company_id)
     assessment = db.scalar(
         select(Assessment)
         .where(*conditions)
@@ -151,15 +154,19 @@ def _get_active_assessment(
     return assessment
 
 
-def get_current_assessment(db: Session, *, user: User, checklist_id: UUID | None = None, lang_code: str | None = None) -> AssessmentSessionResponse:
-    assessment = _get_active_assessment(db, user=user, checklist_id=checklist_id)
+def get_current_assessment(db: Session, *, user: User, checklist_id: UUID | None = None, company_id: UUID | None = None, lang_code: str | None = None) -> AssessmentSessionResponse:
+    assessment = _get_active_assessment(db, user=user, checklist_id=checklist_id, company_id=company_id)
     return _serialize_assessment(assessment, is_new=False)
 
 
 def start_assessment(
-    db: Session, *, user: User, checklist_id: UUID, lang_code: str = "en"
+    db: Session, *, user: User, checklist_id: UUID, company_id: UUID | None = None, lang_code: str = "en"
 ) -> AssessmentSessionResponse:
     now = _now_utc()
+    company_id = resolve_company_id(user, company_id)
+    if not user_has_company_access(db, user=user, company_id=company_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("forbidden", lang_code))
+
     checklist = db.get(Checklist, checklist_id)
     if checklist is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
@@ -167,16 +174,15 @@ def start_assessment(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("checklist_not_published", lang_code))
     
     # Check for existing assessment in progress (can resume)
-    existing = db.scalar(
-        select(Assessment)
-        .where(
-            Assessment.user_id == user.id,
-            Assessment.checklist_id == checklist_id,
-            Assessment.expires_at > now,
-            Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
-        )
-        .order_by(desc(Assessment.created_at))
+    existing_query = select(Assessment).where(
+        Assessment.user_id == user.id,
+        Assessment.checklist_id == checklist_id,
+        Assessment.expires_at > now,
+        Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
     )
+    if company_id is not None:
+        existing_query = existing_query.where(Assessment.company_id == company_id)
+    existing = db.scalar(existing_query.order_by(desc(Assessment.created_at)))
     if existing is not None:
         return _serialize_assessment(existing, is_new=False)
     
@@ -193,7 +199,7 @@ def start_assessment(
     if user.role == UserRole.admin:
         access_window = _ensure_access_window(db, user=user, payment=None, now=now)
     else:
-        payment = _latest_succeeded_payment(db, user_id=user.id, checklist_id=checklist_id)
+        payment = _latest_succeeded_payment(db, user_id=user.id, checklist_id=checklist_id, company_id=company_id)
         if payment is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("payment_required", lang_code))
         
@@ -213,12 +219,13 @@ def start_assessment(
                     detail=translate("assessment_already_submitted_with_this_payment", lang_code)
                 )
         
-        access_window = _ensure_access_window(db, user=user, payment=payment, now=now)
+        access_window = _ensure_access_window(db, user=user, payment=payment, now=now, company_id=company_id)
     
     settings = get_settings()
     assessment = Assessment(
         user_id=user.id,
         checklist_id=checklist_id,
+        company_id=company_id,
         access_window_id=access_window.id,
         started_at=now,
         status=AssessmentStatus.in_progress,
@@ -251,9 +258,12 @@ ANSWER_SCORES: dict[AnswerChoice, int] = {
 
 
 def _get_owned_active_assessment(
-    db: Session, *, user: User, assessment_id: UUID, lang_code: str = "en"
+    db: Session, *, user: User, assessment_id: UUID, company_id: UUID | None = None, lang_code: str = "en"
 ) -> Assessment:
-    assessment = db.scalar(select(Assessment).where(Assessment.id == assessment_id, Assessment.user_id == user.id))
+    query = select(Assessment).where(Assessment.id == assessment_id, Assessment.user_id == user.id)
+    if company_id is not None:
+        query = query.where(Assessment.company_id == company_id)
+    assessment = db.scalar(query)
     if assessment is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("assessment_not_found", lang_code))
     if assessment.status in {AssessmentStatus.submitted, AssessmentStatus.closed, AssessmentStatus.expired}:
@@ -500,6 +510,7 @@ def _serialize_assessment_detail(db: Session, assessment: Assessment) -> Assessm
         checklist_id=assessment.checklist_id,
         user_id=assessment.user_id,
         access_window_id=assessment.access_window_id,
+        company_id=assessment.company_id,
         status=assessment.status,
         started_at=assessment.started_at,
         expires_at=assessment.expires_at,
@@ -510,8 +521,8 @@ def _serialize_assessment_detail(db: Session, assessment: Assessment) -> Assessm
     )
 
 
-def get_current_assessment_detail(db: Session, *, user: User, checklist_id: UUID | None = None, lang_code: str | None = None) -> AssessmentDetailResponse:
-    assessment = _get_active_assessment(db, user=user, checklist_id=checklist_id)
+def get_current_assessment_detail(db: Session, *, user: User, checklist_id: UUID | None = None, company_id: UUID | None = None, lang_code: str | None = None) -> AssessmentDetailResponse:
+    assessment = _get_active_assessment(db, user=user, checklist_id=checklist_id, company_id=company_id)
     db.refresh(assessment)  # Ensure we have latest completion_percent
     return _serialize_assessment_detail(db, assessment)
 
@@ -521,12 +532,13 @@ def upsert_assessment_answer(
     *,
     user: User,
     assessment_id: UUID,
+    company_id: UUID | None = None,
     question_id: UUID,
     answer: AnswerChoice | int,
     note_text: str | None,
     lang_code: str = "en",
 ) -> AssessmentAnswerResponse:
-    assessment = _get_owned_active_assessment(db, user=user, assessment_id=assessment_id, lang_code=lang_code)
+    assessment = _get_owned_active_assessment(db, user=user, assessment_id=assessment_id, company_id=company_id, lang_code=lang_code)
     _question_for_assessment(db, assessment=assessment, question_id=question_id, lang_code=lang_code)
 
     existing = db.scalar(
@@ -589,8 +601,8 @@ def upsert_assessment_answer(
     )
 
 
-def submit_assessment(db: Session, *, user: User, assessment_id: UUID, lang_code: str = "en") -> AssessmentSubmitResponse:
-    assessment = _get_owned_active_assessment(db, user=user, assessment_id=assessment_id, lang_code=lang_code)
+def submit_assessment(db: Session, *, user: User, assessment_id: UUID, company_id: UUID | None = None, lang_code: str = "en") -> AssessmentSubmitResponse:
+    assessment = _get_owned_active_assessment(db, user=user, assessment_id=assessment_id, company_id=company_id, lang_code=lang_code)
     completion = _recompute_completion(db, assessment=assessment)
 
     # Validation removed - users can submit assessment at any completion level

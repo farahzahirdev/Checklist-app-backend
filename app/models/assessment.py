@@ -13,6 +13,8 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.assessment_review import AssessmentReview, AnswerReview
+    from app.models.company import Company
+    from app.models.report import Report
     from app.models.user import User
 
 
@@ -61,6 +63,10 @@ class Assessment(Base):
     __tablename__ = "assessments"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Tenant / Company the assessment belongs to (nullable for existing records)
+    company_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     checklist_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("checklists.id", ondelete="RESTRICT"), nullable=False)
     access_window_id: Mapped[uuid.UUID] = mapped_column(
@@ -86,6 +92,7 @@ class Assessment(Base):
 
     # Relationships
     user: Mapped["User"] = relationship("User")
+    company: Mapped["Company | None"] = relationship("Company")
     checklist: Mapped["Checklist"] = relationship("Checklist")
     answers: Mapped[list["AssessmentAnswer"]] = relationship(
         "AssessmentAnswer", back_populates="assessment", cascade="all, delete-orphan"

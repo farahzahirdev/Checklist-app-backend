@@ -51,6 +51,7 @@ def create_checkout_session_for_user(
     success_url: str,
     cancel_url: str,
     checklist_id: UUID | None = None,
+    company_id: UUID | None = None,
     quantity: int = 1,
     lang_code: str = "en",
     db: Session | None = None,
@@ -120,6 +121,9 @@ def create_checkout_session_for_user(
             }
         ]
         metadata = {"user_id": str(user_id)}
+    # Include company_id if provided so webhook can attribute payment to tenant
+    if company_id:
+        metadata["company_id"] = str(company_id)
     
     session = stripe_client.checkout.Session.create(
         payment_method_types=["card"],
@@ -199,6 +203,7 @@ def _ensure_access_window(db: Session, payment: Payment, paid_at: datetime) -> A
         checklist_id=payment.checklist_id,  # Link to checklist if payment is checklist-specific
         activated_at=paid_at,
         expires_at=paid_at + timedelta(days=settings.access_unlock_days),
+        company_id=payment.company_id,
     )
     db.add(access_window)
     db.flush()
@@ -233,6 +238,7 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
         metadata = data.get("metadata") or {}
         user_id_raw = metadata.get("user_id")
         checklist_id_raw = metadata.get("checklist_id")
+        company_id_raw = metadata.get("company_id")
         
         if user_id_raw is None:
             return None
@@ -271,6 +277,7 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
         payment = Payment(
             user_id=user_id,
             checklist_id=checklist_id,
+            company_id=UUID(company_id_raw) if company_id_raw else None,
             stripe_payment_intent_id=intent_id,
             amount_cents=int(data.get("amount") or data.get("amount_total") or 0),
             currency=str(data.get("currency") or data.get("currency_total") or "USD").upper(),

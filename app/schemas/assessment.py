@@ -13,6 +13,7 @@ from app.schemas.admin_checklist import EvidenceRuleResponse
 
 class StartAssessmentRequest(BaseModel):
     checklist_id: UUID
+    company_id: UUID | None = None
 
 
 class AssessmentSessionResponse(BaseModel):
@@ -20,6 +21,7 @@ class AssessmentSessionResponse(BaseModel):
     checklist_id: UUID
     user_id: UUID
     access_window_id: UUID
+    company_id: UUID | None = None
     status: AssessmentStatus
     started_at: datetime | None
     expires_at: datetime
@@ -92,6 +94,7 @@ class AssessmentDetailResponse(BaseModel):
     checklist_id: UUID
     user_id: UUID
     access_window_id: UUID
+    company_id: UUID | None = None
     status: AssessmentStatus
     started_at: datetime | None
     expires_at: datetime

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from app.api.dependencies.auth import require_roles
 from app.db.session import get_db
@@ -38,11 +39,12 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 )
 def admin_dashboard(
     request: Request,
+    company_id: UUID | None = None,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminDashboardResponse:
     lang_code = get_language_code(request, db)
-    return get_admin_dashboard(db, lang_code=lang_code)
+    return get_admin_dashboard(db, company_id=company_id, lang_code=lang_code)
 
 
 @router.get(
@@ -53,11 +55,12 @@ def admin_dashboard(
 )
 def admin_awaiting_review(
     request: Request,
+    company_id: UUID | None = None,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> list[AdminAwaitingReviewItemResponse]:
     lang_code = get_language_code(request, db)
-    return get_admin_awaiting_review(db, lang_code=lang_code)
+    return get_admin_awaiting_review(db, company_id=company_id, lang_code=lang_code)
 
 
 @router.get(
@@ -83,11 +86,12 @@ def admin_activity(
 )
 def admin_distribution(
     request: Request,
+    company_id: UUID | None = None,
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminAssessmentDistributionResponse:
     lang_code = get_language_code(request, db)
-    return get_admin_assessment_distribution(db, lang_code=lang_code)
+    return get_admin_assessment_distribution(db, company_id=company_id, lang_code=lang_code)
 
 
 @router.get(
@@ -128,11 +132,12 @@ def admin_system_health(
 )
 def auditor_dashboard(
     request: Request,
+    company_id: UUID | None = None,
     _auditor=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> AuditorDashboardResponse:
     lang_code = get_language_code(request, db)
-    return get_auditor_dashboard(db, lang_code=lang_code)
+    return get_auditor_dashboard(db, company_id=company_id, lang_code=lang_code)
 
 
 @router.get(

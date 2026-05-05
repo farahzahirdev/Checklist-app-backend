@@ -25,6 +25,12 @@ class Payment(Base):
         ForeignKey("checklists.id", ondelete="RESTRICT"),
         nullable=True,
     )
+    company_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("companies.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     stripe_payment_intent_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
     amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
@@ -34,3 +40,4 @@ class Payment(Base):
 
     user = relationship("User", back_populates="payments")
     access_windows = relationship("AccessWindow", back_populates="payment")
+    company = relationship("Company")

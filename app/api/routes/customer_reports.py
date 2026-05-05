@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -11,6 +11,7 @@ from app.models.report import Report, ReportStatus
 from app.models.user import User, UserRole
 from app.schemas.report import ReportResponse, CustomerReportDataResponse
 from app.services.report import get_report_by_assessment, get_customer_report_data
+from app.services.company_context import resolve_company_id, user_has_company_access
 from app.utils.i18n import get_language_code
 
 router = APIRouter(prefix="/customer/reports", tags=["customer-reports"])
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/customer/reports", tags=["customer-reports"])
 )
 def list_customer_reports(
     request: Request,
+    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[ReportResponse]:
@@ -35,11 +37,15 @@ def list_customer_reports(
         )
     
     lang_code = get_language_code(request, db)
+    resolved_company_id = resolve_company_id(current_user, company_id)
+    if not user_has_company_access(db, user=current_user, company_id=resolved_company_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only customers can access their reports")
     
     # Get all assessments for the customer
-    assessments = db.scalars(
-        select(Assessment).where(Assessment.user_id == current_user.id)
-    ).all()
+    assessment_query = select(Assessment).where(Assessment.user_id == current_user.id)
+    if resolved_company_id is not None:
+        assessment_query = assessment_query.where(Assessment.company_id == resolved_company_id)
+    assessments = db.scalars(assessment_query).all()
     
     reports = []
     for assessment in assessments:
@@ -64,6 +70,7 @@ def list_customer_reports(
 def get_customer_report_by_assessment(
     assessment_id: UUID,
     request: Request,
+    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
@@ -75,6 +82,7 @@ def get_customer_report_by_assessment(
         )
     
     lang_code = get_language_code(request, db)
+    resolved_company_id = resolve_company_id(current_user, company_id)
     
     # Verify the assessment belongs to the customer
     assessment = db.get(Assessment, assessment_id)
@@ -83,6 +91,8 @@ def get_customer_report_by_assessment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Assessment not found"
         )
+    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
     
     # Get the report
     report = get_report_by_assessment(db, assessment_id=assessment_id, lang_code=lang_code)
@@ -106,6 +116,7 @@ def get_customer_report_by_assessment(
 def get_customer_report(
     report_id: UUID,
     request: Request,
+    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
@@ -117,6 +128,7 @@ def get_customer_report(
         )
     
     lang_code = get_language_code(request, db)
+    resolved_company_id = resolve_company_id(current_user, company_id)
     
     # Get the report
     from app.services.report import get_report
@@ -129,6 +141,8 @@ def get_customer_report(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Report not found"
         )
+    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     
     # Only allow access to approved or published reports
     if report.status not in [ReportStatus.approved, ReportStatus.published]:
@@ -148,6 +162,7 @@ def get_customer_report(
 def download_customer_report_pdf(
     report_id: UUID,
     request: Request,
+    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -159,6 +174,7 @@ def download_customer_report_pdf(
         )
     
     lang_code = get_language_code(request, db)
+    resolved_company_id = resolve_company_id(current_user, company_id)
     
     # Get the report
     from app.services.report import get_report
@@ -171,6 +187,8 @@ def download_customer_report_pdf(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Report not found"
         )
+    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     
     # Only allow download of published reports
     if report.status != ReportStatus.published:
@@ -181,7 +199,7 @@ def download_customer_report_pdf(
     
     # Generate PDF (will be implemented in the next step)
     from app.services.pdf_generator import generate_report_pdf
-    pdf_content = generate_report_pdf(db, report_id=report_id, lang_code=lang_code)
+    pdf_content = generate_report_pdf(db, report_id=report_id, company_id=resolved_company_id, lang_code=lang_code)
     
     from fastapi.responses import Response
     return Response(
@@ -202,6 +220,7 @@ def download_customer_report_pdf(
 def get_customer_report_data_endpoint(
     report_id: UUID,
     request: Request,
+    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CustomerReportDataResponse:
@@ -213,6 +232,7 @@ def get_customer_report_data_endpoint(
         )
     
     lang_code = get_language_code(request, db)
+    resolved_company_id = resolve_company_id(current_user, company_id)
     
     # Get the report
     from app.services.report import get_report
@@ -225,6 +245,8 @@ def get_customer_report_data_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Report not found"
         )
+    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     
     # Only allow access to approved or published reports
     if report.status not in [ReportStatus.approved, ReportStatus.published]:
@@ -233,7 +255,7 @@ def get_customer_report_data_endpoint(
             detail="Report is not yet available for download"
         )
     
-    return get_customer_report_data(db, report_id=report_id, lang_code=lang_code)
+    return get_customer_report_data(db, report_id=report_id, company_id=resolved_company_id, lang_code=lang_code)
 
 
 @router.get(
@@ -244,6 +266,7 @@ def get_customer_report_data_endpoint(
 def preview_customer_report_html(
     report_id: UUID,
     request: Request,
+    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -255,6 +278,7 @@ def preview_customer_report_html(
         )
     
     lang_code = get_language_code(request, db)
+    resolved_company_id = resolve_company_id(current_user, company_id)
     
     # Get the report
     from app.services.report import get_report
@@ -267,6 +291,8 @@ def preview_customer_report_html(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Report not found"
         )
+    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     
     # Only allow access to approved or published reports
     if report.status not in [ReportStatus.approved, ReportStatus.published]:
@@ -277,7 +303,7 @@ def preview_customer_report_html(
     
     # Generate HTML preview
     from app.services.pdf_generator import generate_report_html_preview
-    html_content = generate_report_html_preview(db, report_id=report_id, lang_code=lang_code)
+    html_content = generate_report_html_preview(db, report_id=report_id, company_id=resolved_company_id, lang_code=lang_code)
     
     from fastapi.responses import HTMLResponse
     return HTMLResponse(content=html_content)

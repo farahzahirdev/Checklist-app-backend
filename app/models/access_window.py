@@ -27,3 +27,7 @@ class AccessWindow(Base):
 
     # Checklist selected after payment (nullable until user selects)
     checklist_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("checklists.id", ondelete="SET NULL"), nullable=True)
+    # Tenant / Company for which access was granted (nullable for legacy records)
+    company_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("companies.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    company = relationship("Company")

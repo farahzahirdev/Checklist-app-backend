@@ -73,6 +73,7 @@ def _serialize_report(db: Session, report: Report) -> ReportResponse:
     return ReportResponse(
         id=report.id,
         assessment_id=report.assessment_id,
+        company_id=report.company_id,
         status=report.status,
         draft_generated_at=report.draft_generated_at,
         reviewed_by=report.reviewed_by,
@@ -134,7 +135,12 @@ def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User, lang
         return _serialize_report(db, existing)
 
     now = _now()
-    report = Report(assessment_id=assessment_id, status=ReportStatus.draft_generated, draft_generated_at=now)
+    report = Report(
+        assessment_id=assessment_id,
+        company_id=assessment.company_id,
+        status=ReportStatus.draft_generated,
+        draft_generated_at=now,
+    )
     db.add(report)
     db.flush()
 
@@ -472,9 +478,11 @@ def list_report_findings(db: Session, *, report_id: UUID, lang_code: str = "en")
 
 
 
-def get_customer_report_data(db: Session, *, report_id: UUID, lang_code: str = "en") -> CustomerReportDataResponse:
+def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID | None = None, lang_code: str = "en") -> CustomerReportDataResponse:
     """Get comprehensive report data for customer PDF generation"""
     report = _get_report(db, report_id, lang_code)
+    if company_id is not None and report.company_id is not None and report.company_id != company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("report_not_found", lang_code))
     
     # Only allow approved/published reports
     if report.status not in [ReportStatus.approved, ReportStatus.published]:

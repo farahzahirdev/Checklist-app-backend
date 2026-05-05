@@ -76,6 +76,7 @@ def _log_assessment_review_audit(
 def get_assessment_for_review(
     db: Session, 
     assessment_id: UUID,
+    company_id: UUID | None = None,
     lang_code: str = "en"
 ) -> Optional[Assessment]:
     """Get assessment with all related data for review."""
@@ -99,8 +100,10 @@ def get_assessment_for_review(
         )
         .filter(Assessment.id == assessment_id)
         .filter(Assessment.status == AssessmentStatus.submitted)  # Only submitted assessments
-        .first()
     )
+    if company_id is not None:
+        assessment_query = assessment_query.filter(Assessment.company_id == company_id)
+    assessment = assessment_query.first()
     
     return assessment
 
@@ -108,6 +111,7 @@ def get_assessment_for_review(
 def get_assessment_answers_with_reviews(
     db: Session, 
     assessment_id: UUID,
+    company_id: UUID | None = None,
     reviewer_id: Optional[UUID] = None,
     lang_code: str = "en"
 ) -> AssessmentAnswerListResponse:
@@ -123,8 +127,10 @@ def get_assessment_answers_with_reviews(
             .joinedload(ChecklistTranslation.language)
         )
         .filter(Assessment.id == assessment_id)
-        .first()
     )
+    if company_id is not None:
+        assessment_query = assessment_query.filter(Assessment.company_id == company_id)
+    assessment = assessment_query.first()
     
     if not assessment:
         raise ValueError("Assessment not found")
@@ -726,42 +732,43 @@ def create_bulk_answer_reviews(
     )
 
 
-def get_review_summary(db: Session) -> ReviewSummary:
+def get_review_summary(db: Session, company_id: UUID | None = None) -> ReviewSummary:
     """Get summary statistics for reviews."""
     
     # Assessment review counts
-    pending_count = (
-        db.scalar(
-            select(func.count(AssessmentReview.id))
-            .filter(AssessmentReview.status == ReviewStatus.PENDING)
-        ) or 0
-    )
+    pending_query = select(func.count(AssessmentReview.id)).join(Assessment, Assessment.id == AssessmentReview.assessment_id)
+    if company_id is not None:
+        pending_query = pending_query.filter(Assessment.company_id == company_id)
+    pending_count = db.scalar(pending_query.filter(AssessmentReview.status == ReviewStatus.PENDING)) or 0
     
-    in_progress_count = (
-        db.scalar(
-            select(func.count(AssessmentReview.id))
-            .filter(AssessmentReview.status == ReviewStatus.IN_PROGRESS)
-        ) or 0
-    )
+    in_progress_query = select(func.count(AssessmentReview.id)).join(Assessment, Assessment.id == AssessmentReview.assessment_id)
+    if company_id is not None:
+        in_progress_query = in_progress_query.filter(Assessment.company_id == company_id)
+    in_progress_count = db.scalar(in_progress_query.filter(AssessmentReview.status == ReviewStatus.IN_PROGRESS)) or 0
     
-    completed_count = (
-        db.scalar(
-            select(func.count(AssessmentReview.id))
-            .filter(AssessmentReview.status == ReviewStatus.COMPLETED)
-        ) or 0
-    )
+    completed_query = select(func.count(AssessmentReview.id)).join(Assessment, Assessment.id == AssessmentReview.assessment_id)
+    if company_id is not None:
+        completed_query = completed_query.filter(Assessment.company_id == company_id)
+    completed_count = db.scalar(completed_query.filter(AssessmentReview.status == ReviewStatus.COMPLETED)) or 0
     
     # Answer review counts
-    total_answer_reviews = (
-        db.scalar(select(func.count(AnswerReview.id))) or 0
-    )
-    
-    total_action_required = (
-        db.scalar(
+    total_answer_reviews = db.scalar(select(func.count(AnswerReview.id))) or 0
+    if company_id is not None:
+        total_answer_reviews = db.scalar(
             select(func.count(AnswerReview.id))
-            .filter(AnswerReview.is_action_required == True)
+            .join(AssessmentReview, AssessmentReview.id == AnswerReview.assessment_review_id)
+            .join(Assessment, Assessment.id == AssessmentReview.assessment_id)
+            .where(Assessment.company_id == company_id)
         ) or 0
-    )
+    
+    total_action_required = db.scalar(select(func.count(AnswerReview.id)).filter(AnswerReview.is_action_required == True)) or 0
+    if company_id is not None:
+        total_action_required = db.scalar(
+            select(func.count(AnswerReview.id))
+            .join(AssessmentReview, AssessmentReview.id == AnswerReview.assessment_review_id)
+            .join(Assessment, Assessment.id == AssessmentReview.assessment_id)
+            .where(Assessment.company_id == company_id, AnswerReview.is_action_required == True)
+        ) or 0
     
     # Recent reviews
     recent_reviews = (
@@ -790,6 +797,7 @@ def get_assessment_reviews_for_admin(
     status: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
+    company_id: UUID | None = None,
     lang_code: str = "en"
 ) -> List[AssessmentReviewResponse]:
     """Get assessment reviews for admin dashboard."""
@@ -808,6 +816,8 @@ def get_assessment_reviews_for_admin(
     
     if status:
         query = query.filter(AssessmentReview.status == status)
+    if company_id is not None:
+        query = query.filter(Assessment.company_id == company_id)
     
     reviews = (
         query.order_by(desc(AssessmentReview.created_at))

@@ -6,6 +6,7 @@ from app.api.routes.assessment_review import router as assessment_review_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.company import router as company_router
 from app.api.routes.customer_profile import router as customer_profile_router
+from app.api.routes.customer_companies import router as customer_companies_router
 from app.api.routes.customer_reports import router as customer_reports_router
 from app.api.routes.audit_logs import router as audit_logs_router
 from app.api.routes.customer_assessments import router as customer_assessments_router
@@ -39,6 +40,7 @@ api_router.include_router(admin_checklists_router)
 api_router.include_router(rbac_router)
 api_router.include_router(user_management_router)
 api_router.include_router(company_router)
+api_router.include_router(customer_companies_router)
 api_router.include_router(report_router)
 api_router.include_router(access_router)
 api_router.include_router(customer_checklists_router)

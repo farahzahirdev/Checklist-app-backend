@@ -49,7 +49,7 @@ def start_assessment_route(
     db: Session = Depends(get_db),
 ) -> AssessmentSessionResponse:
     lang_code = get_language_code(http_request, db)
-    return start_assessment(db, user=current_user, checklist_id=request.checklist_id, lang_code=lang_code)
+    return start_assessment(db, user=current_user, checklist_id=request.checklist_id, company_id=request.company_id, lang_code=lang_code)
 
 
 @router.get(
@@ -63,12 +63,13 @@ def start_assessment_route(
 )
 def get_current_assessment_route(
     checklist_id: UUID | None = None,
+    company_id: UUID | None = None,
     http_request: Request = None,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentSessionResponse:
     lang_code = get_language_code(http_request, db) if http_request else None
-    return get_current_assessment(db, user=current_user, checklist_id=checklist_id, lang_code=lang_code)
+    return get_current_assessment(db, user=current_user, checklist_id=checklist_id, company_id=company_id, lang_code=lang_code)
 
 
 @router.get(
@@ -82,12 +83,13 @@ def get_current_assessment_route(
 )
 def get_current_assessment_detail_route(
     checklist_id: UUID | None = None,
+    company_id: UUID | None = None,
     http_request: Request = None,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentDetailResponse:
     lang_code = get_language_code(http_request, db) if http_request else None
-    return get_current_assessment_detail(db, user=current_user, checklist_id=checklist_id, lang_code=lang_code)
+    return get_current_assessment_detail(db, user=current_user, checklist_id=checklist_id, company_id=company_id, lang_code=lang_code)
 
 
 @router.get(
@@ -306,11 +308,12 @@ def save_bulk_answers_route(
 def submit_assessment_route(
     assessment_id: UUID,
     http_request: Request,
+    company_id: UUID | None = None,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentSubmitResponse:
     lang_code = get_language_code(http_request, db)
-    return submit_assessment(db, user=current_user, assessment_id=assessment_id, lang_code=lang_code)
+    return submit_assessment(db, user=current_user, assessment_id=assessment_id, company_id=company_id, lang_code=lang_code)
 
 @router.post(
     "/{assessment_id}/evidence",
