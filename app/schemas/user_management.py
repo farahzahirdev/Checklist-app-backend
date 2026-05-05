@@ -12,6 +12,64 @@ from pydantic import BaseModel, Field
 
 # User Management (Admins/Auditors)
 
+# Admin and Auditor Creation
+
+class CreateAdminRequest(BaseModel):
+    """Request to create a new admin user with all admin permissions."""
+    
+    email: str = Field(..., description="Admin email address")
+    password: str = Field(..., min_length=8, description="Strong password (min 8 chars)")
+    reason: str | None = Field(None, max_length=500, description="Reason for creating this admin")
+
+
+class CreateAuditorRequest(BaseModel):
+    """Request to create a new auditor user with read-only permissions."""
+    
+    email: str = Field(..., description="Auditor email address")
+    password: str = Field(..., min_length=8, description="Strong password (min 8 chars)")
+    reason: str | None = Field(None, max_length=500, description="Reason for creating this auditor")
+    custom_permissions: list[tuple[str, str]] | None = Field(
+        None,
+        description="Optional custom permissions instead of default auditor permissions"
+    )
+
+
+class CreateAdminResponse(BaseModel):
+    """Response after creating an admin user."""
+    
+    id: UUID
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
+    permissions_assigned: list[dict] = Field(
+        default=[],
+        description="List of all permissions granted"
+    )
+    message: str = "Admin user created successfully with full system access"
+    
+    class Config:
+        from_attributes = True
+
+
+class CreateAuditorResponse(BaseModel):
+    """Response after creating an auditor user."""
+    
+    id: UUID
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
+    permissions_assigned: list[dict] = Field(
+        default=[],
+        description="List of all permissions granted"
+    )
+    message: str = "Auditor user created successfully with read-only access"
+    
+    class Config:
+        from_attributes = True
+
+
 class UserChangeRoleRequest(BaseModel):
     """Request to change a user's role."""
     

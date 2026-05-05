@@ -82,27 +82,119 @@ def is_strong_password(password: str) -> bool:
     return get_password_validation_error(password) is None
 
 
-def register_user(db: Session, *, email: str, password: str, lang_code: str = "en") -> AuthResponse:
+def register_user(
+    db: Session,
+    *,
+    email: str,
+    password: str,
+    full_name: str | None = None,
+    username: str | None = None,
+    company_name: str | None = None,
+    job_title: str | None = None,
+    department: str | None = None,
+    company_industry: str | None = None,
+    company_size: str | None = None,
+    company_region: str | None = None,
+    lang_code: str = "en"
+) -> AuthResponse:
+    """
+    Register a new customer user with optional profile and company information.
+    
+    Args:
+        db: Database session
+        email: User email (required)
+        password: User password (required, must be strong)
+        full_name: User's full name (optional)
+        username: Unique username (optional)
+        company_name: User's company name (optional, can create company or assign existing)
+        job_title: User's job title (optional)
+        department: User's department (optional)
+        company_industry: Company industry classification (optional)
+        company_size: Company size (optional)
+        company_region: Geographic region (optional)
+        lang_code: Language code for error messages
+    
+    Returns:
+        AuthResponse with user and access token
+    """
+    from app.models.company import Company, UserCompanyAssignment
+    
     validation_error = get_password_validation_error(password)
     if validation_error is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=validation_error)
+    
     existing_user = _get_user_by_email(db, email)
     if existing_user is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=translate("email_already_registered", lang_code))
-
-    # Use UserManagementService to create user with default customer role and auto-assigned permissions
-    user = UserManagementService.create_user_with_role(
-        db,
+    
+    # Check username uniqueness if provided
+    if username:
+        existing_username = db.query(User).filter(User.username == username.lower()).first()
+        if existing_username:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("username_already_taken", lang_code))
+    
+    # Create user with optional profile info
+    user = User(
         email=email.lower(),
         password_hash=hash_password(password),
-        role_code="customer"
+        role=UserRole.customer.value,
+        is_active=True,
+        full_name=full_name,
+        username=username.lower() if username else None
     )
-
+    db.add(user)
+    db.flush()
+    
+    # Assign default customer permissions via RBAC
+    RBACService.assign_role_by_code(db, user.id, "customer", user.id)
+    
+    # If company information is provided, create or link to company
+    if company_name:
+        # Create slug from company name
+        slug = company_name.lower().replace(" ", "-").replace("_", "-")
+        slug = "".join(c for c in slug if c.isalnum() or c == "-")
+        
+        # Check if company with this slug already exists
+        existing_company = db.query(Company).filter(Company.slug == slug).first()
+        
+        if existing_company:
+            company = existing_company
+        else:
+            # Create new company
+            company = Company(
+                name=company_name,
+                slug=slug,
+                industry=company_industry,
+                size=company_size,
+                region=company_region,
+                is_active=True
+            )
+            db.add(company)
+            db.flush()
+        
+        # Set as user's primary company
+        user.primary_company_id = str(company.id)
+        user.job_title = job_title
+        user.department = department
+        
+        # Create user-company assignment
+        assignment = UserCompanyAssignment(
+            user_id=user.id,
+            company_id=company.id,
+            role="owner" if not existing_company else "staff",
+            job_title=job_title,
+            department=department,
+            is_active=True
+        )
+        db.add(assignment)
+    
+    db.commit()
+    db.refresh(user)
+    
     token = create_access_token(user_id=str(user.id), role=str(user.role))
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
     db.commit()
-    db.refresh(user)
-
+    
     # At registration, MFA is never enabled or required
     return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=True, mfa_enabled=False)
 

@@ -16,8 +16,25 @@ class LoginRequest(BaseModel):
 
 
 class RegistrationRequest(BaseModel):
+    """Customer sign-up request with optional profile and company info."""
+    
+    # Required
     email: EmailStr
     password: str = Field(min_length=8)
+    
+    # Optional: User profile
+    full_name: str | None = Field(None, max_length=255, description="User's full name")
+    username: str | None = Field(None, max_length=100, description="Unique username")
+    
+    # Optional: Company/Organization context
+    company_name: str | None = Field(None, max_length=255, description="User's company name")
+    job_title: str | None = Field(None, max_length=255, description="Job title")
+    department: str | None = Field(None, max_length=255, description="Department")
+    
+    # Optional: Company context for audit
+    company_industry: str | None = Field(None, max_length=50, description="Industry (finance, healthcare, tech, etc.)")
+    company_size: str | None = Field(None, max_length=50, description="Company size (startup, small, medium, large, enterprise)")
+    company_region: str | None = Field(None, max_length=100, description="Geographic region (EU, US, APAC, etc.)")
 
 
 class RoleAssignment(BaseModel):
@@ -51,8 +68,13 @@ class AuthUserResponse(BaseModel):
 
     id: UUID
     email: EmailStr
+    full_name: str | None = None
+    username: str | None = None
     role: UserRoleCode
     is_active: bool
+    primary_company_id: UUID | None = None
+    job_title: str | None = None
+    department: str | None = None
 
 
 class AuthResponse(BaseModel):
@@ -73,3 +95,42 @@ class MfaSetupDetailsResponse(BaseModel):
 
 class RoleUpdateResponse(BaseModel):
     user: AuthUserResponse
+
+
+class CustomerProfileResponse(BaseModel):
+    """Customer profile view with company context."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    email: EmailStr
+    full_name: str | None = None
+    username: str | None = None
+    job_title: str | None = None
+    department: str | None = None
+    primary_company_id: UUID | None = None
+    is_active: bool
+    created_at: str | None = None
+    updated_at: str | None = None
+    
+    # Company context
+    company_name: str | None = None
+    company_industry: str | None = None
+    company_size: str | None = None
+    company_region: str | None = None
+
+
+class UpdateProfileRequest(BaseModel):
+    """Update customer profile data."""
+    
+    full_name: str | None = Field(None, max_length=255, description="Full name")
+    username: str | None = Field(None, max_length=100, description="Unique username")
+    job_title: str | None = Field(None, max_length=255, description="Job title")
+    department: str | None = Field(None, max_length=255, description="Department")
+
+
+class ChangePasswordRequest(BaseModel):
+    """Change user password."""
+    
+    current_password: str = Field(min_length=1, description="Current password for verification")
+    new_password: str = Field(min_length=8, description="New password (must be strong)")
+    confirm_password: str = Field(min_length=8, description="Confirm new password")

@@ -93,7 +93,18 @@
     "file_upload_failed": "File upload failed.",
     "password_changed": "Password changed successfully.",
     "email_sent": "Email sent successfully.",
-    "data_exported": "Data exported successfully."
+    "data_exported": "Data exported successfully.",
+    "username_already_taken": "This username is already taken.",
+    "profile_retrieval_failed": "Failed to retrieve profile.",
+    "profile_update_failed": "Failed to update profile.",
+    "invalid_current_password": "Invalid current password.",
+    "password_mismatch": "New password and confirmation do not match.",
+    "new_password_same_as_current": "New password cannot be the same as current password.",
+    "password_change_failed": "Failed to change password.",
+    "password_too_short": "Password must be at least 8 characters.",
+    "missing_uppercase": "Password must contain at least one uppercase letter.",
+    "missing_lowercase": "Password must contain at least one lowercase letter.",
+    "missing_digit": "Password must contain at least one digit."
   },
   "cs": {
     "checklist_not_found": "Kontrolní seznam nebyl nalezen.",
@@ -188,6 +199,17 @@
     "file_upload_failed": "Nahrávání souboru se nezdařilo.",
     "password_changed": "Heslo bylo úspěšně změněno.",
     "email_sent": "E-mail byl úspěšně odeslán.",
-    "data_exported": "Data byla úspěšně exportována."
+    "data_exported": "Data byla úspěšně exportována.",
+    "username_already_taken": "Toto uživatelské jméno je již obsazeno.",
+    "profile_retrieval_failed": "Nepodařilo se načíst profil.",
+    "profile_update_failed": "Nepodařilo se aktualizovat profil.",
+    "invalid_current_password": "Neplatné aktuální heslo.",
+    "password_mismatch": "Nové heslo a potvrzení se neshodují.",
+    "new_password_same_as_current": "Nové heslo nemůže být stejné jako aktuální heslo.",
+    "password_change_failed": "Nepodařilo se změnit heslo.",
+    "password_too_short": "Heslo musí mít alespoň 8 znaků.",
+    "missing_uppercase": "Heslo musí obsahovat alespoň jedno velké písmeno.",
+    "missing_lowercase": "Heslo musí obsahovat alespoň jedno malé písmeno.",
+    "missing_digit": "Heslo musí obsahovat alespoň jednu číslici."
   }
 }

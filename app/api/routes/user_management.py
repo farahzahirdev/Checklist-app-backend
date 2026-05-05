@@ -21,6 +21,10 @@ from app.utils.i18n import get_language_code
 from app.utils.i18n_messages import translate
 from app.models.user import User, UserRole
 from app.schemas.user_management import (
+    CreateAdminRequest,
+    CreateAdminResponse,
+    CreateAuditorRequest,
+    CreateAuditorResponse,
     CustomerActivateRequest,
     CustomerBanRequest,
     CustomerDetailResponse,
@@ -60,7 +64,207 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # USER MANAGEMENT ROUTES (Admins and Auditors only)
 # ============================================================================
 
-@router.get("/users", response_model=UserListResponse)
+@router.post("/users/create-admin", response_model=CreateAdminResponse, status_code=status.HTTP_201_CREATED)
+def create_admin_user(
+    request: Request,
+    payload: CreateAdminRequest,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
+) -> dict:
+    """
+    Create a new admin user with full system access.
+    
+    Admin users get ALL permissions:
+    - checklist: read, create, update
+    - checklist_admin: create, update, delete, manage
+    - assessment: read, create, update, submit
+    - dashboard: read
+    - report: read, create
+    - user_management: read, manage
+    - payment_management: read, manage
+    - permission_management: manage
+    - audit_log: read, manage
+    
+    Only admins can create other admins.
+    """
+    lang_code = get_language_code(request, db)
+    
+    # Check permission
+    if not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=translate("only_admins_can_manage_users", lang_code)
+        )
+    
+    # Validate email uniqueness
+    existing_user = db.query(User).filter(User.email == payload.email.lower()).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate("email_already_exists", lang_code)
+        )
+    
+    # Validate password
+    validation_error = get_password_validation_error(payload.password)
+    if validation_error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate(validation_error, lang_code)
+        )
+    
+    # Create admin user with all admin permissions
+    try:
+        password_hash = hash_password(payload.password)
+        new_admin = UserManagementService.create_user_with_role(
+            db,
+            email=payload.email,
+            password_hash=password_hash,
+            role_code="admin"
+        )
+        
+        # Log audit trail
+        db.add(
+            AuditLog(
+                actor_user_id=current_user.id,
+                actor_role=str(current_user.role),
+                action=AuditAction.user_created,
+                target_entity="user",
+                target_id=new_admin.id,
+                target_user_id=new_admin.id,
+                changes_summary=f"Created admin user: {payload.reason or 'No reason provided'}",
+            )
+        )
+        db.commit()
+        db.refresh(new_admin)
+        
+        # Get all permissions assigned
+        permissions = RBACService.get_user_permissions(db, new_admin.id)
+        
+        return {
+            "id": new_admin.id,
+            "email": new_admin.email,
+            "role": new_admin.role,
+            "is_active": new_admin.is_active,
+            "created_at": new_admin.created_at,
+            "permissions_assigned": [
+                {"resource": p.resource, "action": p.action}
+                for p in permissions
+            ],
+            "message": "Admin user created successfully with full system access"
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/users/create-auditor", response_model=CreateAuditorResponse, status_code=status.HTTP_201_CREATED)
+def create_auditor_user(
+    request: Request,
+    payload: CreateAuditorRequest,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
+) -> dict:
+    """
+    Create a new auditor user with read-only permissions.
+    
+    Auditor users get read-only permissions:
+    - checklist: read
+    - assessment: read
+    - dashboard: read
+    - report: read
+    - user_management: read
+    - payment_management: read
+    - audit_log: read
+    
+    Optionally, custom permissions can be assigned instead of defaults.
+    Only admins can create auditors.
+    """
+    lang_code = get_language_code(request, db)
+    
+    # Check permission
+    if not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=translate("only_admins_can_manage_users", lang_code)
+        )
+    
+    # Validate email uniqueness
+    existing_user = db.query(User).filter(User.email == payload.email.lower()).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate("email_already_exists", lang_code)
+        )
+    
+    # Validate password
+    validation_error = get_password_validation_error(payload.password)
+    if validation_error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate(validation_error, lang_code)
+        )
+    
+    # Create auditor user with default or custom permissions
+    try:
+        password_hash = hash_password(payload.password)
+        new_auditor = UserManagementService.create_user_with_role(
+            db,
+            email=payload.email,
+            password_hash=password_hash,
+            role_code="auditor"
+        )
+        
+        # If custom permissions provided, assign them
+        if payload.custom_permissions:
+            UserManagementService.assign_custom_permissions_to_auditor(
+                db,
+                new_auditor.id,
+                payload.custom_permissions,
+                current_user.id
+            )
+        
+        # Log audit trail
+        db.add(
+            AuditLog(
+                actor_user_id=current_user.id,
+                actor_role=str(current_user.role),
+                action=AuditAction.user_created,
+                target_entity="user",
+                target_id=new_auditor.id,
+                target_user_id=new_auditor.id,
+                changes_summary=f"Created auditor user: {payload.reason or 'No reason provided'}",
+            )
+        )
+        db.commit()
+        db.refresh(new_auditor)
+        
+        # Get all permissions assigned
+        permissions = RBACService.get_user_permissions(db, new_auditor.id)
+        
+        return {
+            "id": new_auditor.id,
+            "email": new_auditor.email,
+            "role": new_auditor.role,
+            "is_active": new_auditor.is_active,
+            "created_at": new_auditor.created_at,
+            "permissions_assigned": [
+                {"resource": p.resource, "action": p.action}
+                for p in permissions
+            ],
+            "message": "Auditor user created successfully with read-only access"
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+
 def list_users(
     request: Request,
     skip: int = Query(0, ge=0),

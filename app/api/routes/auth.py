@@ -35,12 +35,25 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     "/register",
     response_model=AuthResponse,
     summary="Register User",
-    description="Creates a new customer account, hashes the password, and returns a signed bearer token.",
+    description="Creates a new customer account with optional profile and company information. All fields except email and password are optional.",
 )
 def register(request: RegistrationRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
     lang_code = get_language_code(http_request, db)
     try:
-        return register_user(db, email=request.email, password=request.password, lang_code=lang_code)
+        return register_user(
+            db,
+            email=request.email,
+            password=request.password,
+            full_name=request.full_name,
+            username=request.username,
+            company_name=request.company_name,
+            job_title=request.job_title,
+            department=request.department,
+            company_industry=request.company_industry,
+            company_size=request.company_size,
+            company_region=request.company_region,
+            lang_code=lang_code
+        )
     except HTTPException as exc:
         exc.detail = translate(exc.detail, lang_code)
         raise
