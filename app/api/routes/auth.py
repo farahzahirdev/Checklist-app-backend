@@ -100,9 +100,17 @@ def verify_login_mfa_challenge(request: MfaChallengeVerifyRequest, http_request:
     summary="Get Current User",
     description="Validates bearer token and returns authenticated user profile and MFA status.",
 )
-def me(http_request: Request, current_user=Depends(get_current_user)) -> AuthResponse:
-    lang_code = get_language_code(http_request, current_user.db) if hasattr(current_user, 'db') else None
-    return AuthResponse(user=serialize_user(current_user), mfa_enabled=bool(current_user.mfa_totp and current_user.mfa_totp.is_verified))
+def me(http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+    lang_code = get_language_code(http_request, db)
+    try:
+        current_user = get_current_user(
+            credentials=HTTPAuthorizationCredentials(scheme="bearer", credentials=http_request.headers.get("authorization", "").replace("Bearer ", "")),
+            db=db
+        )
+        return AuthResponse(user=serialize_user(current_user), mfa_enabled=bool(current_user.mfa_totp and current_user.mfa_totp.is_verified))
+    except HTTPException as exc:
+        exc.detail = translate(exc.detail, lang_code)
+        raise exc
 
 
 @router.post(

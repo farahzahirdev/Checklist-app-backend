@@ -17,43 +17,34 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
-    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    lang_code = get_language_code(request, db)
-    
     if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("missing_bearer_token", lang_code))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing_bearer_token")
 
     token = credentials.credentials.strip()
     if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("missing_bearer_token", lang_code))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing_bearer_token")
 
-    try:
-        claims = verify_signed_token(token)
-    except HTTPException as exc:
-        # Translate the detail from security module
-        exc.detail = translate(exc.detail, lang_code)
-        raise exc
+    claims = verify_signed_token(token)
 
     try:
         user_id = UUID(str(claims.get("sub", "")))
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("invalid_token_subject", lang_code)) from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token_subject") from exc
 
     user = db.get(User, user_id)
     if user is None or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("user_not_found", lang_code))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user_not_found")
 
     return user
 
 
 def require_roles(*allowed_roles: UserRole) -> Callable[[User], User]:
-    def dependency(request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
-        lang_code = get_language_code(request, db)
+    def dependency(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("insufficient_permissions", lang_code))
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="insufficient_permissions")
         return current_user
 
     return dependency
