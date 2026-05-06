@@ -16,6 +16,7 @@ from app.models.company import Company, UserCompanyAssignment
 from app.models.user import User
 from app.schemas.company import (
     CreateCompanyRequest,
+    UpdateCompanyRequest,
     CompanyResponse,
     CompanyListResponse,
     CompanyDetailResponse,
@@ -133,7 +134,7 @@ def get_company_detail(
 def update_company_customer(
     company_id: UUID,
     request: Request,
-    payload: CreateCompanyRequest,
+    payload: UpdateCompanyRequest,
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> Company:
