@@ -25,7 +25,6 @@ router = APIRouter(prefix="/customer/reports", tags=["customer-reports"])
 )
 def list_customer_reports(
     request: Request,
-    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[ReportResponse]:
@@ -37,7 +36,7 @@ def list_customer_reports(
         )
     
     lang_code = get_language_code(request, db)
-    resolved_company_id = resolve_company_id(current_user, company_id)
+    resolved_company_id = resolve_company_id(current_user, None)
     if not user_has_company_access(db, user=current_user, company_id=resolved_company_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only customers can access their reports")
     
@@ -70,7 +69,6 @@ def list_customer_reports(
 def get_customer_report_by_assessment(
     assessment_id: UUID,
     request: Request,
-    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
@@ -82,7 +80,7 @@ def get_customer_report_by_assessment(
         )
     
     lang_code = get_language_code(request, db)
-    resolved_company_id = resolve_company_id(current_user, company_id)
+    resolved_company_id = resolve_company_id(current_user, None)
     
     # Verify the assessment belongs to the customer
     assessment = db.get(Assessment, assessment_id)
@@ -116,7 +114,6 @@ def get_customer_report_by_assessment(
 def get_customer_report(
     report_id: UUID,
     request: Request,
-    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ReportResponse:
@@ -128,7 +125,7 @@ def get_customer_report(
         )
     
     lang_code = get_language_code(request, db)
-    resolved_company_id = resolve_company_id(current_user, company_id)
+    resolved_company_id = resolve_company_id(current_user, None)
     
     # Get the report
     from app.services.report import get_report
@@ -162,7 +159,6 @@ def get_customer_report(
 def download_customer_report_pdf(
     report_id: UUID,
     request: Request,
-    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -174,7 +170,7 @@ def download_customer_report_pdf(
         )
     
     lang_code = get_language_code(request, db)
-    resolved_company_id = resolve_company_id(current_user, company_id)
+    resolved_company_id = resolve_company_id(current_user, None)
     
     # Get the report
     from app.services.report import get_report
@@ -220,7 +216,6 @@ def download_customer_report_pdf(
 def get_customer_report_data_endpoint(
     report_id: UUID,
     request: Request,
-    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CustomerReportDataResponse:
@@ -232,7 +227,7 @@ def get_customer_report_data_endpoint(
         )
     
     lang_code = get_language_code(request, db)
-    resolved_company_id = resolve_company_id(current_user, company_id)
+    resolved_company_id = resolve_company_id(current_user, None)
     
     # Get the report
     from app.services.report import get_report
@@ -266,7 +261,6 @@ def get_customer_report_data_endpoint(
 def preview_customer_report_html(
     report_id: UUID,
     request: Request,
-    company_id: UUID | None = Query(None, description="Optional company/tenant filter"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -278,7 +272,7 @@ def preview_customer_report_html(
         )
     
     lang_code = get_language_code(request, db)
-    resolved_company_id = resolve_company_id(current_user, company_id)
+    resolved_company_id = resolve_company_id(current_user, None)
     
     # Get the report
     from app.services.report import get_report

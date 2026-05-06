@@ -25,13 +25,12 @@ router = APIRouter(prefix="/access", tags=["access"])
 def select_checklist(
     checklist_id: UUID,
     request: Request,
-    company_id: UUID | None = Query(None, description="Optional company/tenant ID for the active purchase flow"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     lang_code = get_language_code(request, db)
     now = datetime.now(timezone.utc)
-    resolved_company_id = resolve_company_id(current_user, company_id)
+    resolved_company_id = resolve_company_id(current_user, None)
     if not user_has_company_access(db, user=current_user, company_id=resolved_company_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("forbidden", lang_code))
 

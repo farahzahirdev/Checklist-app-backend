@@ -639,13 +639,31 @@ def get_customer(
             detail=translate("user_is_not_a_customer", lang_code)
         )
     
-    # Return customer with fixed permissions displayed
+    # Return customer with fixed permissions and company info
+    company_info = {}
+    if customer.primary_company_id:
+        from app.models.company import Company
+        company = db.query(Company).filter(Company.id == customer.primary_company_id).first()
+        if company:
+            company_info = {
+                "id": str(company.id),
+                "name": company.name,
+                "slug": company.slug,
+                "email": company.email,
+                "website": company.website,
+                "industry": company.industry,
+                "country": company.country,
+                "is_active": company.is_active,
+            }
+    
     return {
         "id": customer.id,
         "email": customer.email,
         "is_active": customer.is_active,
         "created_at": customer.created_at,
         "updated_at": customer.updated_at,
+        "primary_company_id": str(customer.primary_company_id) if customer.primary_company_id else None,
+        "company": company_info,
         "permissions": [
             {"resource": r, "action": a}
             for r, a in FixedPermissionSet.CUSTOMER_PERMISSIONS

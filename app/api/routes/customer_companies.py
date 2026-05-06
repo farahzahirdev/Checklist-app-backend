@@ -44,14 +44,15 @@ def list_my_companies(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
 ) -> dict:
-    """List companies the current user is assigned to."""
+    """List primary company for the current user (single-tenant)."""
     lang = get_language_code(request, db)
 
-    query = db.query(UserCompanyAssignment).filter(UserCompanyAssignment.user_id == current_user.id)
-    total = query.count()
-    assignments = query.order_by(desc(UserCompanyAssignment.assigned_at)).offset(skip).limit(limit).all()
-
-    companies = [a.company for a in assignments if a.company is not None]
+    companies = []
+    if current_user.primary_company_id:
+        company = db.query(Company).filter(Company.id == current_user.primary_company_id).first()
+        if company:
+            companies = [company]
+    
     return {"total": len(companies), "companies": companies, "skip": skip, "limit": limit}
 
 
@@ -110,15 +111,15 @@ def get_company_detail(
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> dict:
-    """Get company details if user is assigned to it."""
+    """Get primary company details for the current user (single-tenant)."""
     lang = get_language_code(request, db)
 
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail=translate("company_not_found", lang))
 
-    assignment = _user_assignment(db, current_user.id, company_id)
-    if not assignment and current_user.role != "admin":
+    # For single-tenant, user can only view their primary company
+    if str(current_user.primary_company_id) != str(company_id) and current_user.role != "admin":
         raise HTTPException(status_code=403, detail=translate("insufficient_permissions", lang))
 
     user_count = db.query(UserCompanyAssignment).filter(
@@ -136,15 +137,15 @@ def update_company_customer(
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> Company:
-    """Update company details if user is owner or manager."""
+    """Update primary company details (single-tenant)."""
     lang = get_language_code(request, db)
 
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
         raise HTTPException(status_code=404, detail=translate("company_not_found", lang))
 
-    assignment = _user_assignment(db, current_user.id, company_id)
-    if not assignment or assignment.role not in ("owner", "manager"):
+    # For single-tenant, user can only update their primary company
+    if str(current_user.primary_company_id) != str(company_id) and current_user.role != "admin":
         raise HTTPException(status_code=403, detail=translate("insufficient_permissions", lang))
 
     # Update permitted fields

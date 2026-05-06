@@ -125,7 +125,6 @@ def create_checkout_session(
     success_url: str = Query(..., description="URL to redirect after successful payment"),
     cancel_url: str = Query(..., description="URL to redirect if payment is cancelled"),
     checklist_id: UUID | None = Query(None, description="Optional checklist ID to purchase specific checklist"),
-    company_id: UUID | None = Query(None, description="Optional company/tenant ID to purchase checklist for"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -135,7 +134,7 @@ def create_checkout_session(
         success_url=success_url,
         cancel_url=cancel_url,
         checklist_id=checklist_id,
-        company_id=company_id,
+        company_id=None,
         lang_code=lang_code,
         db=db
     )
