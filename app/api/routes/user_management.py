@@ -659,6 +659,10 @@ def get_customer(
     return {
         "id": customer.id,
         "email": customer.email,
+        "full_name": customer.full_name,
+        "username": customer.username,
+        "job_title": customer.job_title,
+        "department": customer.department,
         "is_active": customer.is_active,
         "created_at": customer.created_at,
         "updated_at": customer.updated_at,
