@@ -7,6 +7,7 @@ from app.utils.i18n_messages import translate
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, File, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.api.dependencies.auth import require_roles, require_admin_or_auditor_for_read, require_admin_only
 from app.db.session import get_db
@@ -28,6 +29,15 @@ from app.schemas.admin_checklist import (
     AdminSectionResponse,
     AdminSectionUpdateRequest,
     PublishChecklistRequest,
+    ChecklistTranslationCreateRequest,
+    ChecklistTranslationUpdateRequest,
+    ChecklistTranslationResponse,
+    SectionTranslationCreateRequest,
+    SectionTranslationUpdateRequest,
+    SectionTranslationResponse,
+    QuestionTranslationCreateRequest,
+    QuestionTranslationUpdateRequest,
+    QuestionTranslationResponse,
 )
 from app.services.admin_checklist import (
     create_checklist,
@@ -48,6 +58,15 @@ from app.services.admin_checklist import (
     update_question,
     update_section,
 )
+from app.models.checklist import (
+    ChecklistTranslation,
+    ChecklistSectionTranslation,
+    ChecklistQuestionTranslation,
+    Checklist,
+    ChecklistSection,
+    ChecklistQuestion,
+)
+from app.models.reference import Language
 from app.schemas.bulk_checklist import (
     ColumnMapping,
     ColumnMappingResponse,
@@ -158,6 +177,78 @@ def admin_update_checklist(
     return checklist
 
 
+@router.post(
+    "/{checklist_id}/translations",
+    response_model=ChecklistTranslationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Checklist Translation",
+    description="Create a translation for checklist title/description in a specific language.",
+)
+def admin_create_checklist_translation(
+    checklist_id: UUID,
+    request: ChecklistTranslationCreateRequest,
+    http_request: Request,
+    _admin=Depends(require_admin_only()),
+    db: Session = Depends(get_db),
+) -> ChecklistTranslationResponse:
+    lang_code = get_language_code(http_request, db)
+    checklist = db.get(Checklist, checklist_id)
+    if checklist is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
+
+    language = db.scalar(select(Language).where(Language.code == request.language_code))
+    if language is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Language {request.language_code} not found")
+
+    existing = db.scalar(select(ChecklistTranslation).where(ChecklistTranslation.checklist_id == checklist_id, ChecklistTranslation.language_id == language.id))
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Translation for language {request.language_code} already exists")
+
+    translation = ChecklistTranslation(checklist_id=checklist_id, language_id=language.id, title=request.title, description=request.description)
+    db.add(translation)
+    db.commit()
+    db.refresh(translation)
+    return ChecklistTranslationResponse(checklist_id=checklist_id, language_code=request.language_code, title=translation.title, description=translation.description)
+
+
+@router.patch(
+    "/{checklist_id}/translations/{language_code}",
+    response_model=ChecklistTranslationResponse,
+    summary="Update Checklist Translation",
+    description="Update translation for a checklist in a given language.",
+)
+def admin_update_checklist_translation(
+    checklist_id: UUID,
+    language_code: str,
+    request: ChecklistTranslationUpdateRequest,
+    http_request: Request,
+    _admin=Depends(require_admin_only()),
+    db: Session = Depends(get_db),
+) -> ChecklistTranslationResponse:
+    lang_code = get_language_code(http_request, db)
+    checklist = db.get(Checklist, checklist_id)
+    if checklist is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
+
+    language = db.scalar(select(Language).where(Language.code == language_code))
+    if language is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Language {language_code} not found")
+
+    translation = db.scalar(select(ChecklistTranslation).where(ChecklistTranslation.checklist_id == checklist_id, ChecklistTranslation.language_id == language.id))
+    if translation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Translation for language {language_code} not found")
+
+    if request.title is not None:
+        translation.title = request.title
+    if request.description is not None:
+        translation.description = request.description
+
+    db.commit()
+    db.refresh(translation)
+    return ChecklistTranslationResponse(checklist_id=checklist_id, language_code=language_code, title=translation.title, description=translation.description)
+
+
+
 @router.patch(
     "/{checklist_id}/publish",
     response_model=AdminChecklistResponse,
@@ -258,6 +349,77 @@ def admin_create_section(
     return create_section(
         db, checklist_id=checklist_id, payload=request, lang_code=lang_code
     )
+
+
+@router.post(
+    "/{checklist_id}/sections/{section_id}/translations",
+    response_model=SectionTranslationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Section Translation",
+    description="Create a translation for a section title.",
+)
+def admin_create_section_translation(
+    checklist_id: UUID,
+    section_id: UUID,
+    request: SectionTranslationCreateRequest,
+    http_request: Request,
+    _admin=Depends(require_admin_only()),
+    db: Session = Depends(get_db),
+) -> SectionTranslationResponse:
+    lang_code = get_language_code(http_request, db)
+    section = db.scalar(select(ChecklistSection).where(ChecklistSection.id == section_id, ChecklistSection.checklist_id == checklist_id))
+    if section is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("section_not_found", lang_code))
+
+    language = db.scalar(select(Language).where(Language.code == request.language_code))
+    if language is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Language {request.language_code} not found")
+
+    existing = db.scalar(select(ChecklistSectionTranslation).where(ChecklistSectionTranslation.section_id == section_id, ChecklistSectionTranslation.language_id == language.id))
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Translation for language {request.language_code} already exists")
+
+    translation = ChecklistSectionTranslation(section_id=section_id, language_id=language.id, title=request.title)
+    db.add(translation)
+    db.commit()
+    db.refresh(translation)
+    return SectionTranslationResponse(section_id=section_id, language_code=request.language_code, title=translation.title)
+
+
+@router.patch(
+    "/{checklist_id}/sections/{section_id}/translations/{language_code}",
+    response_model=SectionTranslationResponse,
+    summary="Update Section Translation",
+    description="Update a section translation for a given language.",
+)
+def admin_update_section_translation(
+    checklist_id: UUID,
+    section_id: UUID,
+    language_code: str,
+    request: SectionTranslationUpdateRequest,
+    http_request: Request,
+    _admin=Depends(require_admin_only()),
+    db: Session = Depends(get_db),
+) -> SectionTranslationResponse:
+    lang_code = get_language_code(http_request, db)
+    section = db.scalar(select(ChecklistSection).where(ChecklistSection.id == section_id, ChecklistSection.checklist_id == checklist_id))
+    if section is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("section_not_found", lang_code))
+
+    language = db.scalar(select(Language).where(Language.code == language_code))
+    if language is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Language {language_code} not found")
+
+    translation = db.scalar(select(ChecklistSectionTranslation).where(ChecklistSectionTranslation.section_id == section_id, ChecklistSectionTranslation.language_id == language.id))
+    if translation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Translation for language {language_code} not found")
+
+    if request.title is not None:
+        translation.title = request.title
+
+    db.commit()
+    db.refresh(translation)
+    return SectionTranslationResponse(section_id=section_id, language_code=language_code, title=translation.title)
 
 
 @router.patch(
@@ -482,6 +644,135 @@ def admin_create_question(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate(str(exc), lang_code)) from exc
+
+
+@router.post(
+    "/{checklist_id}/sections/{section_id}/questions/{question_id}/translations",
+    response_model=QuestionTranslationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create Question Translation",
+    description="Create a translation entry for a question.",
+)
+def admin_create_question_translation(
+    checklist_id: UUID,
+    section_id: UUID,
+    question_id: UUID,
+    request: QuestionTranslationCreateRequest,
+    http_request: Request,
+    _admin=Depends(require_admin_only()),
+    db: Session = Depends(get_db),
+) -> QuestionTranslationResponse:
+    lang_code = get_language_code(http_request, db)
+    question = db.scalar(select(ChecklistQuestion).where(ChecklistQuestion.id == question_id, ChecklistQuestion.section_id == section_id, ChecklistQuestion.checklist_id == checklist_id))
+    if question is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("question_not_found", lang_code))
+
+    language = db.scalar(select(Language).where(Language.code == request.language_code))
+    if language is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Language {request.language_code} not found")
+
+    existing = db.scalar(select(ChecklistQuestionTranslation).where(ChecklistQuestionTranslation.question_id == question_id, ChecklistQuestionTranslation.language_id == language.id))
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Translation for language {request.language_code} already exists")
+
+    translation = ChecklistQuestionTranslation(
+        question_id=question_id,
+        language_id=language.id,
+        question_text=request.question_text,
+        explanation=request.explanation,
+        expected_implementation=request.expected_implementation,
+        how_it_works=request.how_it_works,
+        legal_requirement_title=request.legal_requirement_title,
+        legal_requirement_description=request.legal_requirement_description,
+        guidance_score_4=request.guidance_score_4,
+        guidance_score_3=request.guidance_score_3,
+        guidance_score_2=request.guidance_score_2,
+        guidance_score_1=request.guidance_score_1,
+        recommendation_template=request.recommendation_template,
+    )
+    db.add(translation)
+    db.commit()
+    db.refresh(translation)
+    return QuestionTranslationResponse(
+        question_id=question_id,
+        language_code=request.language_code,
+        question_text=translation.question_text,
+        explanation=translation.explanation,
+        expected_implementation=translation.expected_implementation,
+        how_it_works=translation.how_it_works,
+        legal_requirement_title=translation.legal_requirement_title,
+        legal_requirement_description=translation.legal_requirement_description,
+        guidance_score_4=translation.guidance_score_4,
+        guidance_score_3=translation.guidance_score_3,
+        guidance_score_2=translation.guidance_score_2,
+        guidance_score_1=translation.guidance_score_1,
+        recommendation_template=translation.recommendation_template,
+    )
+
+
+@router.patch(
+    "/{checklist_id}/sections/{section_id}/questions/{question_id}/translations/{language_code}",
+    response_model=QuestionTranslationResponse,
+    summary="Update Question Translation",
+    description="Update an existing question translation for the given language.",
+)
+def admin_update_question_translation(
+    checklist_id: UUID,
+    section_id: UUID,
+    question_id: UUID,
+    language_code: str,
+    request: QuestionTranslationUpdateRequest,
+    http_request: Request,
+    _admin=Depends(require_admin_only()),
+    db: Session = Depends(get_db),
+) -> QuestionTranslationResponse:
+    lang_code = get_language_code(http_request, db)
+    question = db.scalar(select(ChecklistQuestion).where(ChecklistQuestion.id == question_id, ChecklistQuestion.section_id == section_id, ChecklistQuestion.checklist_id == checklist_id))
+    if question is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("question_not_found", lang_code))
+
+    language = db.scalar(select(Language).where(Language.code == language_code))
+    if language is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Language {language_code} not found")
+
+    translation = db.scalar(select(ChecklistQuestionTranslation).where(ChecklistQuestionTranslation.question_id == question_id, ChecklistQuestionTranslation.language_id == language.id))
+    if translation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Translation for language {language_code} not found")
+
+    # Update provided fields
+    for field in [
+        "question_text",
+        "explanation",
+        "expected_implementation",
+        "how_it_works",
+        "legal_requirement_title",
+        "legal_requirement_description",
+        "guidance_score_4",
+        "guidance_score_3",
+        "guidance_score_2",
+        "guidance_score_1",
+        "recommendation_template",
+    ]:
+        if hasattr(request, field) and getattr(request, field) is not None:
+            setattr(translation, field, getattr(request, field))
+
+    db.commit()
+    db.refresh(translation)
+    return QuestionTranslationResponse(
+        question_id=question_id,
+        language_code=language_code,
+        question_text=translation.question_text,
+        explanation=translation.explanation,
+        expected_implementation=translation.expected_implementation,
+        how_it_works=translation.how_it_works,
+        legal_requirement_title=translation.legal_requirement_title,
+        legal_requirement_description=translation.legal_requirement_description,
+        guidance_score_4=translation.guidance_score_4,
+        guidance_score_3=translation.guidance_score_3,
+        guidance_score_2=translation.guidance_score_2,
+        guidance_score_1=translation.guidance_score_1,
+        recommendation_template=translation.recommendation_template,
+    )
 
 
 @router.patch(

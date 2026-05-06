@@ -211,3 +211,82 @@ class AdminQuestionListResponse(BaseModel):
     questions: list[AdminQuestionResponse]
     skip: int
     limit: int
+
+
+# Translation schemas for admin translation management
+class ChecklistTranslationCreateRequest(BaseModel):
+    language_code: str = Field(min_length=2, max_length=8)
+    title: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+
+
+class ChecklistTranslationUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+
+
+class ChecklistTranslationResponse(BaseModel):
+    checklist_id: UUID
+    language_code: str
+    title: str
+    description: str | None = None
+
+
+class SectionTranslationCreateRequest(BaseModel):
+    language_code: str = Field(min_length=2, max_length=8)
+    title: str = Field(min_length=1, max_length=255)
+
+
+class SectionTranslationUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+
+
+class SectionTranslationResponse(BaseModel):
+    section_id: UUID
+    language_code: str
+    title: str
+
+
+class QuestionTranslationCreateRequest(BaseModel):
+    language_code: str = Field(min_length=2, max_length=8)
+    question_text: str | None = None
+    explanation: str | None = None
+    expected_implementation: str | None = None
+    how_it_works: str | None = None
+    legal_requirement_title: str | None = None
+    legal_requirement_description: str | None = None
+    guidance_score_4: str | None = None
+    guidance_score_3: str | None = None
+    guidance_score_2: str | None = None
+    guidance_score_1: str | None = None
+    recommendation_template: str | None = None
+
+
+class QuestionTranslationUpdateRequest(BaseModel):
+    question_text: str | None = None
+    explanation: str | None = None
+    expected_implementation: str | None = None
+    how_it_works: str | None = None
+    legal_requirement_title: str | None = None
+    legal_requirement_description: str | None = None
+    guidance_score_4: str | None = None
+    guidance_score_3: str | None = None
+    guidance_score_2: str | None = None
+    guidance_score_1: str | None = None
+    recommendation_template: str | None = None
+
+
+class QuestionTranslationResponse(BaseModel):
+    question_id: UUID
+    language_code: str
+    question_text: str | None = None
+    explanation: str | None = None
+    expected_implementation: str | None = None
+    how_it_works: str | None = None
+    legal_requirement_title: str | None = None
+    legal_requirement_description: str | None = None
+    guidance_score_4: str | None = None
+    guidance_score_3: str | None = None
+    guidance_score_2: str | None = None
+    guidance_score_1: str | None = None
+    recommendation_template: str | None = None
