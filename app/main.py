@@ -1,14 +1,11 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from starlette.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.middleware.i18n import I18nMiddleware
-from app.services.i18n_service import i18n
-from app.utils.i18n_messages import translate
 from app.schemas.access import AccessWindowResponse
 from app.schemas.admin_checklist import (
 	AdminChecklistCreateRequest,
@@ -132,21 +129,6 @@ app.add_middleware(
 
 # Add I18n middleware for automatic language detection and context management
 app.add_middleware(I18nMiddleware)
-
-# Global exception handler for translating HTTPExceptions
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    # Get current language from middleware context
-    from app.services.i18n_service import get_current_language
-    lang_code = get_current_language()
-    
-    # Translate the error message
-    translated_detail = translate(exc.detail, lang_code)
-    
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": translated_detail}
-    )
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
 
