@@ -61,7 +61,7 @@ class I18nService:
     """
     
     DEFAULT_LANGUAGE = "cs"
-    SUPPORTED_LANGUAGES = ["en", "cs"]  # English, Czech (add more as needed)
+    SUPPORTED_LANGUAGES = ["en", "cs", "cz"]  # English, Czech (add more as needed)
     
     def __init__(self):
         self._language_cache: Dict[str, Language] = {}
@@ -81,13 +81,17 @@ class I18nService:
         # Try Accept-Language header
         if request:
             # Check query parameter first
-            if hasattr(request, 'query_params') and 'lang' in request.query_params:
+            if hasattr(request, 'query_params') and request.query_params.get('lang'):
                 lang_code = request.query_params.get('lang', '').lower()
             
-            # Check Accept-Language header
-            elif 'accept-language' in request.headers:
-                accept_language = request.headers.get('accept-language', '')
+            # Check Accept-Language header (case-insensitive)
+            elif 'accept-language' in request.headers or 'Accept-Language' in request.headers:
+                accept_language = request.headers.get('accept-language', '') or request.headers.get('Accept-Language', '')
                 lang_code = accept_language.split(',')[0].split('-')[0].lower()
+        
+        # Handle common language code variations
+        if lang_code == 'cz':
+            lang_code = 'cs'  # Czech is 'cs' not 'cz'
         
         # Validate language is supported
         if lang_code not in self.SUPPORTED_LANGUAGES:
