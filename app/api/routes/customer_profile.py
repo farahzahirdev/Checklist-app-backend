@@ -44,6 +44,11 @@ def _serialize_profile(user: User, db: Session) -> dict:
         "company_industry": None,
         "company_size": None,
         "company_region": None,
+        "company_email": None,
+        "company_website": None,
+        "company_slug": None,
+        "company_country": None,
+        "company_description": None,
     }
     
     # If user has a primary company, fetch its details
@@ -54,6 +59,11 @@ def _serialize_profile(user: User, db: Session) -> dict:
             profile_data["company_industry"] = company.industry
             profile_data["company_size"] = company.size
             profile_data["company_region"] = company.region
+            profile_data["company_email"] = company.email
+            profile_data["company_website"] = company.website
+            profile_data["company_slug"] = company.slug
+            profile_data["company_country"] = company.country
+            profile_data["company_description"] = company.description
     
     return profile_data
 
@@ -91,7 +101,7 @@ def get_profile(
     "/profile",
     response_model=CustomerProfileResponse,
     summary="Update Customer Profile",
-    description="Update customer's profile information (full name, username, job title, department).",
+    description="Update customer's profile information and optionally auto-create/update company details.",
 )
 def update_profile(
     request: UpdateProfileRequest,
@@ -100,7 +110,8 @@ def update_profile(
     http_request: Request = None,
 ) -> CustomerProfileResponse:
     """
-    Update the current user's profile information.
+    Update the current user's profile and optionally company information.
+    If company details are provided, auto-creates or updates company record.
     
     Args:
         request: Update data (all fields optional)
@@ -109,12 +120,14 @@ def update_profile(
         http_request: HTTP request for language detection
     
     Returns:
-        Updated CustomerProfileResponse
+        Updated CustomerProfileResponse with company context
     """
+    from app.models.company import Company
+    
     lang_code = get_language_code(http_request, db) if http_request else "en"
     
     try:
-        # Update fields if provided
+        # Update user profile fields if provided
         if request.full_name is not None:
             current_user.full_name = request.full_name.strip()
         
@@ -140,6 +153,98 @@ def update_profile(
         
         if request.department is not None:
             current_user.department = request.department.strip()
+        
+        # Handle company creation/update if any company fields provided
+        company_fields_provided = any([
+            request.company_name is not None,
+            request.company_slug is not None,
+            request.company_email is not None,
+            request.company_website is not None,
+            request.company_industry is not None,
+            request.company_country is not None,
+            request.company_size is not None,
+            request.company_description is not None,
+        ])
+        
+        if company_fields_provided:
+            # If user doesn't have a company, create one
+            if not current_user.primary_company_id:
+                # Generate slug if not provided
+                company_slug = request.company_slug
+                if not company_slug and request.company_name:
+                    company_slug = request.company_name.strip().lower().replace(" ", "-")
+                
+                if not company_slug:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Company name or slug is required to create a company"
+                    )
+                
+                # Check slug uniqueness
+                existing_slug = db.query(Company).filter(Company.slug == company_slug.lower()).first()
+                if existing_slug:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=translate("company_slug_exists", lang_code)
+                    )
+                
+                # Create new company
+                from app.models.company import UserCompanyAssignment
+                company = Company(
+                    name=request.company_name.strip() if request.company_name else "My Company",
+                    slug=company_slug.lower(),
+                    email=request.company_email.strip() if request.company_email else None,
+                    website=request.company_website.strip() if request.company_website else None,
+                    industry=request.company_industry.strip() if request.company_industry else None,
+                    country=request.company_country.strip() if request.company_country else None,
+                    size=request.company_size.strip() if request.company_size else None,
+                    description=request.company_description.strip() if request.company_description else None,
+                    is_active=True,
+                )
+                db.add(company)
+                db.flush()
+                
+                # Create assignment
+                assignment = UserCompanyAssignment(
+                    user_id=current_user.id,
+                    company_id=company.id,
+                    role="owner",
+                    is_active=True,
+                )
+                db.add(assignment)
+                current_user.primary_company_id = company.id
+            else:
+                # Update existing company
+                company = db.query(Company).filter(Company.id == current_user.primary_company_id).first()
+                if company:
+                    if request.company_name is not None:
+                        company.name = request.company_name.strip()
+                    if request.company_slug is not None:
+                        new_slug = request.company_slug.strip().lower()
+                        if new_slug != company.slug:
+                            # Check uniqueness
+                            existing_slug = db.query(Company).filter(
+                                Company.slug == new_slug,
+                                Company.id != company.id
+                            ).first()
+                            if existing_slug:
+                                raise HTTPException(
+                                    status_code=status.HTTP_400_BAD_REQUEST,
+                                    detail=translate("company_slug_exists", lang_code)
+                                )
+                        company.slug = new_slug
+                    if request.company_email is not None:
+                        company.email = request.company_email.strip() if request.company_email else None
+                    if request.company_website is not None:
+                        company.website = request.company_website.strip() if request.company_website else None
+                    if request.company_industry is not None:
+                        company.industry = request.company_industry.strip() if request.company_industry else None
+                    if request.company_country is not None:
+                        company.country = request.company_country.strip() if request.company_country else None
+                    if request.company_size is not None:
+                        company.size = request.company_size.strip() if request.company_size else None
+                    if request.company_description is not None:
+                        company.description = request.company_description.strip() if request.company_description else None
         
         db.commit()
         db.refresh(current_user)

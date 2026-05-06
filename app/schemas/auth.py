@@ -117,6 +117,11 @@ class CustomerProfileResponse(BaseModel):
     company_industry: str | None = None
     company_size: str | None = None
     company_region: str | None = None
+    company_email: str | None = None
+    company_website: str | None = None
+    company_slug: str | None = None
+    company_country: str | None = None
+    company_description: str | None = None
 
 
 class UpdateProfileRequest(BaseModel):
@@ -126,6 +131,16 @@ class UpdateProfileRequest(BaseModel):
     username: str | None = Field(None, max_length=100, description="Unique username")
     job_title: str | None = Field(None, max_length=255, description="Job title")
     department: str | None = Field(None, max_length=255, description="Department")
+    
+    # Company fields (auto-create/update if provided)
+    company_name: str | None = Field(None, max_length=255, description="Company name")
+    company_slug: str | None = Field(None, max_length=100, description="Company slug")
+    company_email: str | None = Field(None, description="Company email")
+    company_website: str | None = Field(None, description="Company website")
+    company_industry: str | None = Field(None, max_length=255, description="Industry")
+    company_country: str | None = Field(None, max_length=255, description="Country")
+    company_size: str | None = Field(None, max_length=100, description="Company size")
+    company_description: str | None = Field(None, description="Company description")
 
 
 class ChangePasswordRequest(BaseModel):
