@@ -26,7 +26,7 @@ class LanguageContext:
     Thread-safe language context manager for tracking current language in request.
     """
     
-    def __init__(self, lang_code: str = "en"):
+    def __init__(self, lang_code: str = "cs"):
         self.lang_code = lang_code
     
     def __enter__(self):
@@ -40,7 +40,7 @@ class LanguageContext:
 
 def get_current_language() -> str:
     """Get current language code from context."""
-    return getattr(_language_context, 'lang_code', 'en')
+    return getattr(_language_context, 'lang_code', 'cs')
 
 
 def set_current_language(lang_code: str) -> None:
@@ -60,7 +60,7 @@ class I18nService:
     - Error message translation
     """
     
-    DEFAULT_LANGUAGE = "en"
+    DEFAULT_LANGUAGE = "cs"
     SUPPORTED_LANGUAGES = ["en", "cs"]  # English, Czech (add more as needed)
     
     def __init__(self):

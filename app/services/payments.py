@@ -18,6 +18,7 @@ from app.models.user import User
 from app.schemas.payment import PaymentState
 from app.services.stripe_products import get_stripe_price_for_checklist
 from app.utils.i18n_messages import translate
+from app.services.company_context import resolve_company_id
 
 def _stripe_required(lang_code: str = "en") -> Any:
     settings = get_settings()
@@ -68,6 +69,11 @@ def create_checkout_session_for_user(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("user_not_found", lang_code))
+
+    # Resolve company and require it for non-admin users
+    resolved_company_id = resolve_company_id(user, company_id)
+    if resolved_company_id is None and getattr(user, "role", None) != "admin":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please set up a company before checkout.")
 
     # Ensure Stripe customer exists in DB, create on Stripe if missing
     if not user.stripe_customer_id:
@@ -122,8 +128,8 @@ def create_checkout_session_for_user(
         ]
         metadata = {"user_id": str(user_id)}
     # Include company_id if provided so webhook can attribute payment to tenant
-    if company_id:
-        metadata["company_id"] = str(company_id)
+    if resolved_company_id:
+        metadata["company_id"] = str(resolved_company_id)
     
     session = stripe_client.checkout.Session.create(
         payment_method_types=["card"],

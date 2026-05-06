@@ -20,9 +20,9 @@ def seed_checklist():
     db: Session = SessionLocal()
     try:
         # 1. Ensure at least one language exists
-        language = db.query(Language).filter_by(code="en").first()
+        language = db.query(Language).filter_by(code="cs").first()
         if not language:
-            language = Language(code="en", name="English", is_default=True, is_active=True)
+            language = Language(code="cs", name="Czech", is_default=True, is_active=True)
             db.add(language)
             db.commit()
             db.refresh(language)

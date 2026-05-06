@@ -164,6 +164,10 @@ def start_assessment(
 ) -> AssessmentSessionResponse:
     now = _now_utc()
     company_id = resolve_company_id(user, company_id)
+    # Require customers to have a company set up before starting assessments
+    if company_id is None and user.role != UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please set up a company before starting an assessment.")
+
     if not user_has_company_access(db, user=user, company_id=company_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("forbidden", lang_code))
 
@@ -685,19 +689,3 @@ def _validate_assessment_completion(db: Session, assessment: Assessment):
     """
     pass
 
-
-def _ensure_access_window(db: Session, *, user: User, payment: Payment | None, now: datetime) -> AccessWindow:
-    settings = get_settings()
-    existing = _active_access_window(db, user_id=user.id, now=now)
-    if existing is not None:
-        return existing
-
-    access_window = AccessWindow(
-        user_id=user.id,
-        payment_id=payment.id if payment else None,
-        activated_at=now,
-        expires_at=now + timedelta(days=settings.access_unlock_days),
-    )
-    db.add(access_window)
-    db.flush()
-    return access_window

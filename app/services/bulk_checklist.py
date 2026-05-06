@@ -102,7 +102,7 @@ def _get_or_create_language(db: Session) -> Language:
         lang = db.scalar(select(Language).limit(1))
     if not lang:
         # Create a default language if none exists
-        lang = Language(code="en", name="English", is_default=True)
+        lang = Language(code="cs", name="Czech", is_default=True)
         db.add(lang)
         db.flush()
     return lang

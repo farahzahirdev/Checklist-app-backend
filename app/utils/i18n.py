@@ -2,7 +2,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 from app.models.reference import Language
 
-DEFAULT_LANGUAGE_CODE = "en"
+DEFAULT_LANGUAGE_CODE = "cs"
 
 def get_language_code(request: Request, db: Session) -> str:
     # Try Accept-Language header
