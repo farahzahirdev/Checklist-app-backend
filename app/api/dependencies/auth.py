@@ -60,8 +60,9 @@ def get_optional_current_user(
         if user is None or not user.is_active:
             return None
         return user
-    except Exception:
-        # Any error in token verification returns None instead of raising
+    except Exception as e:
+        # Log the exception and return None
+        print(f"An error occurred: {e}")
         return None
 
 
