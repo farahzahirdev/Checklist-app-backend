@@ -55,26 +55,37 @@ PAGES_DATA = {
                     }
                 },
                 {
-                    "section_type": "how-it-works",
+                    "section_type": "cards",
                     "order": 2,
                     "data": {
-                        "title": "How It Works",
-                        "subtitle": "Get audit-ready in 3 simple steps",
-                        "steps": [
+                        "title": "What We Do",
+                        "cards": [
                             {
-                                "number": "1",
-                                "title": "Assessment",
-                                "description": "Complete comprehensive cybersecurity readiness assessment"
+                                "title": "What We Do",
+                                "content": "We are cybersecurity professionals with hands-on experience in audits, compliance, and incident response. Over the years, we have worked with organizations across different industries, helping them strengthen their security and prepare for audits with confidence."
                             },
                             {
-                                "number": "2", 
-                                "title": "Analysis",
-                                "description": "Get detailed analysis of your current security posture"
+                                "title": "Our Experience",
+                                "points": [
+                                    "Cybersecurity and audit expertise",
+                                    "ISO 27001, NIS2, and relevant requirements under the Czech Cybersecurity Act",
+                                    "Security assessments and incident response",
+                                    "Real-world experience across multiple industries"
+                                ]
                             },
                             {
-                                "number": "3",
-                                "title": "Improvement",
-                                "description": "Follow our guided recommendations to achieve audit readiness"
+                                "title": "Why This Product Exists",
+                                "content": "We saw that many organizations were unprepared not because of lack of effort, but because of unclear requirements, missing documentation, and the lack of a structured approach. Existing tools were either too complex or not focused on what really matters during an audit.<br /><strong>AuditReady was created to change that.</strong>"
+                            },
+                            {
+                                "title": "Our Approach",
+                                "content": "We believe audit preparation should be practical, clear, and evidence-based. That's why we built a solution that focuses on what really matters and guides you step by step.",
+                                "points": [
+                                    "Practical, not theoretical",
+                                    "Focused on real audit readiness",
+                                    "Evidence-based approach",
+                                    "Simple and structured workflow"
+                                ]
                             }
                         ]
                     }
@@ -83,19 +94,24 @@ PAGES_DATA = {
                     "section_type": "trust",
                     "order": 3,
                     "data": {
-                        "title": "Trusted by Security Teams",
-                        "badges": [
+                        "title": "Trust & Credentials",
+                        "subtitle": "We combine real-world experience with recognized knowledge and standards.",
+                        "cards": [
                             {
-                                "name": "ISO 27001",
-                                "description": "Compliant with international security standards"
+                                "title": "Real-World Experience",
+                                "content": "Years of hands-on work with audits, security assessments, and incident response."
                             },
                             {
-                                "name": "SOC 2 Type II",
-                                "description": "Certified for security controls and processes"
+                                "title": "Certifications",
+                                "content": "Industry-recognized certifications including CISSP, CySA+, and ISO 27001 Lead Auditor."
                             },
                             {
-                                "name": "GDPR Ready",
-                                "description": "Privacy and data protection compliant"
+                                "title": "Security Standards",
+                                "content": "Deep knowledge of frameworks such as NIS2, ISO 27001, and other international standards."
+                            },
+                            {
+                                "title": "Practical Partnerships",
+                                "content": "Collaboration with organizations to strengthen their security and achieve compliance goals."
                             }
                         ]
                     }
@@ -104,17 +120,17 @@ PAGES_DATA = {
                     "section_type": "cta",
                     "order": 4,
                     "data": {
-                        "title": "Start Your Audit Journey Today",
-                        "subtitle": "Join security teams who trust AuditReady for their audit preparation needs",
+                        "title": "Want to know more about our work?",
+                        "subtitle": "We're always open to new conversations about how we can help you and your organization stay secure and audit-ready.",
                         "buttons": [
                             {
-                                "text": "Get Started",
-                                "url": "/register",
+                                "text": "Contact Us",
+                                "url": "/contact",
                                 "primary": True
                             },
                             {
-                                "text": "View Demo",
-                                "url": "/demo",
+                                "text": "Explore Products",
+                                "url": "/products",
                                 "primary": False
                             }
                         ]
@@ -157,26 +173,37 @@ PAGES_DATA = {
                     }
                 },
                 {
-                    "section_type": "how-it-works",
+                    "section_type": "cards",
                     "order": 2,
                     "data": {
-                        "title": "Jak to funguje",
-                        "subtitle": "Buďte připraveni na audit ve 3 jednoduchých krocích",
-                        "steps": [
+                        "title": "Co děláme",
+                        "cards": [
                             {
-                                "number": "1",
-                                "title": "Hodnocení",
-                                "description": "Dokončete komplexní hodnocení připravenosti na kybernetickou bezpečnost"
+                                "title": "Co děláme",
+                                "content": "Pomáháme organizacím zhodnotit, v jakém stavu je jejich kybernetická bezpečnost a co je v praxi skutečně připravené. Vycházíme ze zkušeností z auditů a řízení bezpečnosti napříč různými organizacemi a zaměřujeme se na to, co dává smysl v reálném provozu."
                             },
                             {
-                                "number": "2",
-                                "title": "Analýza",
-                                "description": "Získejte detailní analýzu vašeho současného bezpečnostního postavení"
+                                "title": "Naše zkušenosti",
+                                "points": [
+                                    "Odbornost v oblasti kybernetické bezpečnosti a auditní přípravy",
+                                    "Praktická zkušenost s požadavky zákona o kybernetické bezpečnosti a navazujících vyhlášek",
+                                    "Znalost rámců a standardů, jako jsou ISO 27001 a NIST",
+                                    "Praxe z veřejného i soukromého sektoru"
+                                ]
                             },
                             {
-                                "number": "3",
-                                "title": "Zlepšení",
-                                "description": "Následujte naše doporučení pro dosažení připravenosti na audit"
+                                "title": "Proč to děláme",
+                                "content": "Pomáháme oddělit formální deklarace od skutečného stavu a ukázat, co organizace dokáže při kontrole doložit.<br /><strong>AuditReady vzniklo proto, aby to celé bylo jednodušší a srozumitelné.</strong>"
+                            },
+                            {
+                                "title": "Jak pracujeme",
+                                "content": "Pomáháme organizacím zlepšovat bezpečnost a připravit se na audit bez zbytečné složitosti.",
+                                "points": [
+                                    "Prakticky, ne teoreticky",
+                                    "Zaměřeno na skutečnou auditní připravenost",
+                                    "Doložitelnost a evidence",
+                                    "Jednoduchý a strukturovaný postup"
+                                ]
                             }
                         ]
                     }
@@ -185,19 +212,24 @@ PAGES_DATA = {
                     "section_type": "trust",
                     "order": 3,
                     "data": {
-                        "title": "Důvěřují nám bezpečnostní týmy",
-                        "badges": [
+                        "title": "Proč nám můžete věřit",
+                        "subtitle": "Stavíme na praktických zkušenostech, odborných znalostech a ověřených standardech.",
+                        "cards": [
                             {
-                                "name": "ISO 27001",
-                                "description": "Splňuje mezinárodní bezpečnostní standardy"
+                                "title": "Zkušenosti z praxe",
+                                "content": "Pomáháme oddělit formální deklarace od skutečného stavu a ukázat, co organizace dokáže při kontrole doložit."
                             },
                             {
-                                "name": "SOC 2 Type II",
-                                "description": "Certifikováno pro bezpečnostní kontroly a procesy"
+                                "title": "Certifikace",
+                                "content": "Disponujeme odbornými certifikacemi v oblasti kybernetické bezpečnosti a auditu, včetně CISSP, CISA a ISO 27001 Lead Auditor."
                             },
                             {
-                                "name": "GDPR Ready",
-                                "description": "Splňuje požadavky na ochranu osobních údajů"
+                                "title": "Standardy a metodiky",
+                                "content": "Opíráme se o ISO 27001, NIST frameworky, ITIL, TOGAF a další osvědčené přístupy pro řízení bezpečnosti, IT služeb a architektury."
+                            },
+                            {
+                                "title": "Spolupráce s organizacemi",
+                                "content": "Pomáháme organizacím zlepšovat bezpečnost a připravit se na audit bez zbytečné složitosti."
                             }
                         ]
                     }
@@ -206,17 +238,17 @@ PAGES_DATA = {
                     "section_type": "cta",
                     "order": 4,
                     "data": {
-                        "title": "Začněte svou auditní cestu ještě dnes",
-                        "subtitle": "Přidejte se k bezpečnostním týmům, které důvěřují AuditReady pro své potřeby přípravy na audit",
+                        "title": "Chcete vědět víc o tom, jak pracujeme?",
+                        "subtitle": "Jsme připraveni probrat, jak můžeme vaší organizaci pomoci lépe vyhodnotit stav kybernetické bezpečnosti a podpořit přípravu na audit nebo interní kontrolu.",
                         "buttons": [
                             {
-                                "text": "Začít",
-                                "url": "/register",
+                                "text": "Kontaktujte nás",
+                                "url": "/contact",
                                 "primary": True
                             },
                             {
-                                "text": "Ukázka",
-                                "url": "/demo",
+                                "text": "Zobrazit produkty",
+                                "url": "/products",
                                 "primary": False
                             }
                         ]
