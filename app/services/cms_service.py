@@ -55,6 +55,33 @@ class CMSService:
         
         return self.db.scalar(query)
 
+    def get_page_by_id(
+        self,
+        page_id: uuid.UUID,
+        language: str,
+        include_drafts: bool = False
+    ) -> Optional[Page]:
+        """
+        Get a page by ID and language.
+        
+        Args:
+            page_id: Page ID
+            language: Language code (e.g., 'cs', 'en')
+            include_drafts: If False, only returns published pages
+        
+        Returns:
+            Page object or None if not found
+        """
+        query = select(Page).where(
+            Page.id == page_id,
+            Page.language == language
+        )
+        
+        if not include_drafts:
+            query = query.where(Page.status == PageStatus.published.value)
+        
+        return self.db.scalar(query)
+
     def list_pages(
         self,
         language: Optional[str] = None,

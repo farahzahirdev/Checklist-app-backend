@@ -54,29 +54,36 @@ def list_pages(
 
 
 @router.get(
-    "/pages/{slug}",
+    "/pages/{identifier}",
     response_model=PageDetailResponse,
     summary="Get Page Details",
     description="Get full page details including all sections. Public endpoint if page is published."
 )
 def get_page(
-    slug: str,
+    identifier: str,
     language: Optional[str] = Query(None, description="Language code (defaults to 'en')"),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_current_user)
 ):
-    """Get a page by slug and language."""
+    """Get a page by ID or slug and language."""
     if not language:
         language = "en"
     
     cms_service = CMSService(db)
     is_admin = current_user and current_user.role == "admin"
-    page = cms_service.get_page_by_slug(slug, language, include_drafts=is_admin)
+    
+    # Try to parse as UUID first
+    try:
+        page_id = uuid.UUID(identifier)
+        page = cms_service.get_page_by_id(page_id, language, include_drafts=is_admin)
+    except ValueError:
+        # Not a UUID, treat as slug
+        page = cms_service.get_page_by_slug(identifier, language, include_drafts=is_admin)
     
     if not page:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Page '{slug}' not found"
+            detail=f"Page '{identifier}' not found"
         )
     
     # Build response with sections
