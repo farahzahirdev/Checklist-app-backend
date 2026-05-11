@@ -58,7 +58,7 @@ def create_audit_log(
     if actor_user_id:
         user = db.query(User).filter(User.id == actor_user_id).first()
         if user:
-            actor_role = user.role.value if user.role else None
+            actor_role = user.role if user.role else None
     
     audit_log = AuditLog(
         actor_user_id=actor_user_id,
@@ -528,7 +528,7 @@ def get_user_activity_summary(
         user_id=user_id,
         user_name=user.email,
         user_email=user.email,
-        user_role=user.role.value if user.role else "unknown",
+        user_role=user.role if user.role else "unknown",
         total_actions=total_actions,
         successful_actions=successful_actions,
         failed_actions=failed_actions,
@@ -777,7 +777,7 @@ def get_entity_audit_trail(
             "user_id": user_id,
             "user_name": user.email,
             "user_email": user.email,
-            "user_role": user.role.value if user.role else "unknown"
+            "user_role": user.role if user.role else "unknown"
         })
     
     # Change summary
