@@ -141,15 +141,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     except:
         lang_code = "en"
     
-    # Only translate if the detail is not already translated (doesn't contain accented characters)
     try:
-        # Check if detail is already translated (contains non-ASCII characters)
-        if any(ord(char) > 127 for char in str(exc.detail)):
-            # Already translated, use as-is
-            translated_detail = exc.detail
-        else:
-            # Not translated, translate it
-            translated_detail = translate(exc.detail, lang_code)
+        translated_detail = translate(exc.detail, lang_code)
     except:
         translated_detail = exc.detail
     
