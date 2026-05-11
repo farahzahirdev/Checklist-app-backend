@@ -31,10 +31,10 @@ def update_audit_actions_enum():
     with engine.connect() as conn:
         # Get current enum values
         result = conn.execute(text("""
-            SELECT unnest(enumlabel) as value 
+            SELECT enumlabel as value 
             FROM pg_enum 
             WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'audit_action')
-            ORDER BY value
+            ORDER BY enumlabel
         """))
         current_values = [row[0] for row in result.fetchall()]
         
@@ -58,10 +58,10 @@ def update_audit_actions_enum():
         
         # Verify the update
         result = conn.execute(text("""
-            SELECT unnest(enumlabel) as value 
+            SELECT enumlabel as value 
             FROM pg_enum 
             WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'audit_action')
-            ORDER BY value
+            ORDER BY enumlabel
         """))
         updated_values = [row[0] for row in result.fetchall()]
         
