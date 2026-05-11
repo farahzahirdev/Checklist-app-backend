@@ -324,14 +324,16 @@ def seed_database():
     
     try:
         # Get admin user ID (first admin user in system)
-        from app.models.user import User
-        admin_user = db.query(User).filter(User.role == "admin").first()
+        from app.models.user import User, UserRole
+        admin_user = db.query(User).filter(User.role == UserRole.admin.value).first()
+        
         if not admin_user:
             print("❌ Error: No admin user found in database")
+            print("   Create an admin user first via the application signup/admin creation")
             return
         
         admin_id = admin_user.id
-        print(f"✓ Using admin user: {admin_user.username}")
+        print(f"✓ Using admin user: {admin_user.username or admin_user.email}")
         
         # Check if pages already exist
         existing_count = db.query(Page).count()
@@ -344,9 +346,9 @@ def seed_database():
         # Seed all pages
         for slug, languages in PAGES_DATA.items():
             for lang, page_data in languages.items():
-                # Create page
+                # Create page with proper UUID
                 page = Page(
-                    id=f"{admin_id.hex[:12]}-{uuid4().hex[:20]}",
+                    id=uuid4(),
                     slug=slug,
                     language=lang,
                     title=page_data["title"],
@@ -362,7 +364,7 @@ def seed_database():
                 # Add sections
                 for section_data in page_data["sections"]:
                     section = PageSection(
-                        id=f"{admin_id.hex[:12]}-{uuid4().hex[:20]}",
+                        id=uuid4(),
                         page_id=page.id,
                         section_type=section_data["section_type"],
                         order=section_data["order"],
