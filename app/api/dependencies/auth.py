@@ -41,6 +41,30 @@ def get_current_user(
     return user
 
 
+def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """Get current user if authenticated, otherwise return None (no error)."""
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        return None
+
+    token = credentials.credentials.strip()
+    if not token:
+        return None
+
+    try:
+        claims = verify_signed_token(token)
+        user_id = UUID(str(claims.get("sub", "")))
+        user = db.get(User, user_id)
+        if user is None or not user.is_active:
+            return None
+        return user
+    except Exception:
+        # Any error in token verification returns None instead of raising
+        return None
+
+
 def require_roles(*allowed_roles: UserRole) -> Callable[[User], User]:
     def dependency(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:

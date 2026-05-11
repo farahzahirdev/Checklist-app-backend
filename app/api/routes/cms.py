@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Request
 from sqlalchemy.orm import Session
 
-from app.api.dependencies.auth import require_admin_only
+from app.api.dependencies.auth import require_admin_only, get_optional_current_user
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.cms import (
@@ -61,15 +61,12 @@ def list_pages(
 )
 def get_page(
     slug: str,
-    language: Optional[str] = Query(None, description="Language code (defaults to request language)"),
+    language: Optional[str] = Query(None, description="Language code (defaults to 'en')"),
     db: Session = Depends(get_db),
-    current_user: Optional[User] = None,
-    request: Request = None
+    current_user: Optional[User] = Depends(get_optional_current_user)
 ):
     """Get a page by slug and language."""
-    if not language and request:
-        language = get_language_code(request)
-    elif not language:
+    if not language:
         language = "en"
     
     cms_service = CMSService(db)
