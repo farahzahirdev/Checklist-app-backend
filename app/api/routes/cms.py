@@ -1,4 +1,5 @@
-from uuid import UUID, uuid
+import uuid
+from uuid import UUID
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, File, UploadFile, Request
