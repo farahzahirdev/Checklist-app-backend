@@ -159,7 +159,7 @@ PAGES_DATA = {
                             {
                                 "text": "Explore Products",
                                 "url": "/products",
-                                "primary": false
+                                "primary": False
                             }
                         ]
                     }
@@ -306,7 +306,7 @@ PAGES_DATA = {
                             {
                                 "text": "Zobrazit produkty",
                                 "url": "/products",
-                                "primary": false
+                                "primary": False
                             }
                         ]
                     }
@@ -359,7 +359,7 @@ PAGES_DATA = {
                             {
                                 "text": "View Products",
                                 "url": "/products/audit-readiness-checklist",
-                                "primary": false
+                                "primary": False
                             }
                         ]
                     }
@@ -379,7 +379,7 @@ PAGES_DATA = {
                             {
                                 "text": "View Products",
                                 "url": "/products/audit-readiness-checklist",
-                                "primary": false
+                                "primary": False
                             }
                         ]
                     }
@@ -430,7 +430,7 @@ PAGES_DATA = {
                             {
                                 "text": "Zobrazit produkty",
                                 "url": "/products/audit-readiness-checklist",
-                                "primary": false
+                                "primary": False
                             }
                         ]
                     }
@@ -450,7 +450,7 @@ PAGES_DATA = {
                             {
                                 "text": "Zobrazit produkty",
                                 "url": "/products/audit-readiness-checklist",
-                                "primary": false
+                                "primary": False
                             }
                         ]
                     }
