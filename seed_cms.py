@@ -29,11 +29,10 @@ PAGES_DATA = {
                     "section_type": "hero",
                     "order": 1,
                     "data": {
-                        "title": "Built by cybersecurity professionals",
-                        "subtitle": "cybersecurity",
-                        "accent": "professionals.",
-                        "description": "We simplify audit preparation for today's cybersecurity challenges. Our mission is to give security and compliance teams clarity, structure, and confidence - without complexity.",
-                        "kicker": "About Us",
+                        "title": "Be ready.",
+                        "subtitle": "Stay confident.",
+                        "description": "Practical tools that help you prepare for audits, close gaps, and prove security with confidence.",
+                        "kicker": "Cybersecurity Simplified",
                         "background_image": "/assets/cybersecurity-background-59ognpsy7izka4l9.png",
                         "mockup": {
                             "brand": "AuditReady",
