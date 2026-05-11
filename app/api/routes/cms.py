@@ -37,6 +37,7 @@ def list_pages(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """List all CMS pages for administration."""
@@ -100,6 +101,7 @@ def get_page(
 def create_page(
     data: PageCreate,
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """Create a new CMS page."""
@@ -131,6 +133,7 @@ def update_page(
     page_id: UUID,
     data: PageUpdate,
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """Update an existing CMS page."""
@@ -167,6 +170,7 @@ def toggle_publish_page(
     page_id: UUID,
     data: PagePublishToggle,
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """Publish or unpublish a page."""
@@ -205,6 +209,7 @@ def toggle_publish_page(
 def delete_page(
     page_id: UUID,
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """Delete a CMS page."""
@@ -235,6 +240,7 @@ def create_section(
     page_id: UUID,
     data: PageSectionCreate,
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """Create a new section for a page."""
@@ -263,6 +269,7 @@ def update_section(
     section_id: UUID,
     data: PageSectionUpdate,
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """Update a page section."""
@@ -290,6 +297,7 @@ def update_section(
 def delete_section(
     section_id: UUID,
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """Delete a page section."""
@@ -319,6 +327,7 @@ def list_images(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """List all CMS images."""
@@ -346,6 +355,7 @@ async def upload_image(
     file: UploadFile = File(...),
     alt_text: str = Query("", description="Alt text for accessibility"),
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """Upload a new image for CMS."""
@@ -400,6 +410,7 @@ def update_image(
     image_id: UUID,
     data: CMSImageUpdate,
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """Update image metadata."""
@@ -427,6 +438,7 @@ def update_image(
 def delete_image(
     image_id: UUID,
     db: Session = Depends(get_db),
+    request: Request = None,
     current_user: User = Depends(require_admin_only)
 ):
     """Delete an image."""
