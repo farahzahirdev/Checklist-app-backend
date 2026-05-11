@@ -91,6 +91,18 @@ class AuditAction(StrEnum):
     permission_delete = "permission_delete"
     role_permission_assign = "role_permission_assign"
     role_permission_revoke = "role_permission_revoke"
+    
+    # CMS actions
+    cms_page_create = "cms_page_create"
+    cms_page_update = "cms_page_update"
+    cms_page_delete = "cms_page_delete"
+    cms_page_publish = "cms_page_publish"
+    cms_section_create = "cms_section_create"
+    cms_section_update = "cms_section_update"
+    cms_section_delete = "cms_section_delete"
+    cms_image_upload = "cms_image_upload"
+    cms_image_update = "cms_image_update"
+    cms_image_delete = "cms_image_delete"
 
 
 class AuditLog(Base):

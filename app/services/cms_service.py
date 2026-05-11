@@ -131,7 +131,7 @@ class CMSService:
         # Log the action
         self.audit_logger.log_system_action(
             db=self.db,
-            action="create_cms_page",
+            action="cms_page_create",
             actor_user_id=user_id,
             after_data={"title": data.title, "slug": data.slug},
             changes_summary=f"Created CMS page: {data.title}"
@@ -187,7 +187,7 @@ class CMSService:
         if changes:
             self.audit_logger.log_system_action(
                 db=self.db,
-                action="update_cms_page",
+                action="cms_page_update",
                 actor_user_id=user_id,
                 before_data={"title": page.title},
                 after_data={"title": data.title or page.title},
@@ -214,7 +214,7 @@ class CMSService:
         # Log the action
         self.audit_logger.log_system_action(
             db=self.db,
-            action="delete_cms_page",
+            action="cms_page_delete",
             actor_user_id=user_id,
             after_data={"deleted": page.title},
             changes_summary=f"Deleted CMS page: {page.title}"
