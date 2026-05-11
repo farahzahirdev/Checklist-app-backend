@@ -4,6 +4,7 @@ from app.models.assessment import *
 from app.models.assessment_review import *
 from app.models.audit_log import *
 from app.models.checklist import *
+from app.models.cms import *
 from app.models.mfa_totp import *
 from app.models.password_reset import *
 from app.models.payment import *
