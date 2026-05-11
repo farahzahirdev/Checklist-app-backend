@@ -154,7 +154,7 @@ PAGES_DATA = {
                             {
                                 "text": "Contact Us",
                                 "url": "/contact",
-                                "primary": true
+                                "primary": True
                             },
                             {
                                 "text": "Explore Products",
@@ -301,7 +301,7 @@ PAGES_DATA = {
                             {
                                 "text": "Kontaktujte nás",
                                 "url": "/contact",
-                                "primary": true
+                                "primary": True
                             },
                             {
                                 "text": "Zobrazit produkty",
@@ -354,7 +354,7 @@ PAGES_DATA = {
                             {
                                 "text": "Get Access",
                                 "url": "/register",
-                                "primary": true
+                                "primary": True
                             },
                             {
                                 "text": "View Products",
@@ -374,7 +374,7 @@ PAGES_DATA = {
                             {
                                 "text": "Get Access",
                                 "url": "/register",
-                                "primary": true
+                                "primary": True
                             },
                             {
                                 "text": "View Products",
@@ -425,7 +425,7 @@ PAGES_DATA = {
                             {
                                 "text": "Získat přístup",
                                 "url": "/register",
-                                "primary": true
+                                "primary": True
                             },
                             {
                                 "text": "Zobrazit produkty",
@@ -445,7 +445,7 @@ PAGES_DATA = {
                             {
                                 "text": "Získat přístup",
                                 "url": "/register",
-                                "primary": true
+                                "primary": True
                             },
                             {
                                 "text": "Zobrazit produkty",
