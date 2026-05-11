@@ -9,7 +9,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user, get_db
+from app.api.dependencies.auth import get_current_user
+from app.api.dependencies import get_db
 from app.utils.i18n import get_language_code
 from app.utils.i18n_messages import translate
 from app.models.user import User
