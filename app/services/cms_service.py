@@ -129,13 +129,12 @@ class CMSService:
         self.db.flush()  # Get the ID without committing
         
         # Log the action
-        self.audit_logger.log_action(
+        self.audit_logger.log_system_action(
             db=self.db,
-            action="create",
-            entity_type="cms_page",
-            entity_id=str(page.id),
-            actor_id=user_id,
-            changes={"created": data.model_dump()}
+            action="create_cms_page",
+            actor_user_id=user_id,
+            after_data={"title": data.title, "slug": data.slug},
+            changes_summary=f"Created CMS page: {data.title}"
         )
         
         return page
@@ -186,13 +185,13 @@ class CMSService:
         
         # Log the action
         if changes:
-            self.audit_logger.log_action(
+            self.audit_logger.log_system_action(
                 db=self.db,
-                action="update",
-                entity_type="cms_page",
-                entity_id=str(page.id),
-                actor_id=user_id,
-                changes=changes
+                action="update_cms_page",
+                actor_user_id=user_id,
+                before_data={"title": page.title},
+                after_data={"title": data.title or page.title},
+                changes_summary=f"Updated CMS page: {page.title}"
             )
         
         return page
@@ -213,13 +212,12 @@ class CMSService:
             return False
         
         # Log the action
-        self.audit_logger.log_action(
+        self.audit_logger.log_system_action(
             db=self.db,
-            action="delete",
-            entity_type="cms_page",
-            entity_id=str(page.id),
-            actor_id=user_id,
-            changes={"deleted": page.title}
+            action="delete_cms_page",
+            actor_user_id=user_id,
+            after_data={"deleted": page.title},
+            changes_summary=f"Deleted CMS page: {page.title}"
         )
         
         self.db.delete(page)
