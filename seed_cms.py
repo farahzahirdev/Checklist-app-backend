@@ -18,6 +18,213 @@ from app.core.config import get_settings
 
 # Page content data structure - comprehensive content from all frontend pages
 PAGES_DATA = {
+    "home": {
+        "en": {
+            "title": "Home",
+            "meta_description": "AuditReady - Simplify your cybersecurity audit preparation",
+            "status": "published",
+            "content_type": "hero",
+            "sections": [
+                {
+                    "section_type": "hero",
+                    "order": 1,
+                    "data": {
+                        "title": "Built by cybersecurity professionals",
+                        "subtitle": "cybersecurity",
+                        "accent": "professionals.",
+                        "description": "We simplify audit preparation for today's cybersecurity challenges. Our mission is to give security and compliance teams clarity, structure, and confidence - without complexity.",
+                        "kicker": "About Us",
+                        "background_image": "/assets/cybersecurity-background-59ognpsy7izka4l9.png",
+                        "mockup": {
+                            "brand": "AuditReady",
+                            "nav": {
+                                "dashboard": "Dashboard",
+                                "checklists": "Checklists",
+                                "reports": "Reports",
+                                "settings": "Settings"
+                            },
+                            "dashboard": {
+                                "title": "Dashboard",
+                                "metrics": {
+                                    "overallReadiness": "Overall Readiness",
+                                    "completed": "Completed",
+                                    "openFindings": "Open Findings"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "section_type": "how-it-works",
+                    "order": 2,
+                    "data": {
+                        "title": "How It Works",
+                        "subtitle": "Get audit-ready in 3 simple steps",
+                        "steps": [
+                            {
+                                "number": "1",
+                                "title": "Assessment",
+                                "description": "Complete comprehensive cybersecurity readiness assessment"
+                            },
+                            {
+                                "number": "2", 
+                                "title": "Analysis",
+                                "description": "Get detailed analysis of your current security posture"
+                            },
+                            {
+                                "number": "3",
+                                "title": "Improvement",
+                                "description": "Follow our guided recommendations to achieve audit readiness"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "trust",
+                    "order": 3,
+                    "data": {
+                        "title": "Trusted by Security Teams",
+                        "badges": [
+                            {
+                                "name": "ISO 27001",
+                                "description": "Compliant with international security standards"
+                            },
+                            {
+                                "name": "SOC 2 Type II",
+                                "description": "Certified for security controls and processes"
+                            },
+                            {
+                                "name": "GDPR Ready",
+                                "description": "Privacy and data protection compliant"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "cta",
+                    "order": 4,
+                    "data": {
+                        "title": "Start Your Audit Journey Today",
+                        "subtitle": "Join security teams who trust AuditReady for their audit preparation needs",
+                        "buttons": [
+                            {
+                                "text": "Get Started",
+                                "url": "/register",
+                                "primary": True
+                            },
+                            {
+                                "text": "View Demo",
+                                "url": "/demo",
+                                "primary": False
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "cs": {
+            "title": "Domů",
+            "meta_description": "AuditReady - Zjednodušte si přípravu na kybernetický audit",
+            "status": "published",
+            "content_type": "hero",
+            "sections": [
+                {
+                    "section_type": "hero",
+                    "order": 1,
+                    "data": {
+                        "title": "Audit-Ready, Zjednodušeně.",
+                        "subtitle": "kybernetická",
+                        "accent": "bezpečnost.",
+                        "description": "Transformujte přípravu na audit z chaosu do jasnosti. Naše komplexní platforma dává bezpečnostním týmům strukturu a sebedůvěru pro zvládnutí jakéhokoli kybernetického auditu.",
+                        "kicker": "Profesionální příprava na audit",
+                        "mockup": {
+                            "brand": "AuditReady",
+                            "nav": {
+                                "dashboard": "Dashboard",
+                                "checklists": "Checklisty",
+                                "reports": "Reporty",
+                                "settings": "Nastavení"
+                            },
+                            "dashboard": {
+                                "title": "Dashboard",
+                                "metrics": {
+                                    "overallReadiness": "Celková připravenost",
+                                    "completed": "Dokončeno",
+                                    "openFindings": "Otevřená zjištění"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "section_type": "how-it-works",
+                    "order": 2,
+                    "data": {
+                        "title": "Jak to funguje",
+                        "subtitle": "Buďte připraveni na audit ve 3 jednoduchých krocích",
+                        "steps": [
+                            {
+                                "number": "1",
+                                "title": "Hodnocení",
+                                "description": "Dokončete komplexní hodnocení připravenosti na kybernetickou bezpečnost"
+                            },
+                            {
+                                "number": "2",
+                                "title": "Analýza",
+                                "description": "Získejte detailní analýzu vašeho současného bezpečnostního postavení"
+                            },
+                            {
+                                "number": "3",
+                                "title": "Zlepšení",
+                                "description": "Následujte naše doporučení pro dosažení připravenosti na audit"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "trust",
+                    "order": 3,
+                    "data": {
+                        "title": "Důvěřují nám bezpečnostní týmy",
+                        "badges": [
+                            {
+                                "name": "ISO 27001",
+                                "description": "Splňuje mezinárodní bezpečnostní standardy"
+                            },
+                            {
+                                "name": "SOC 2 Type II",
+                                "description": "Certifikováno pro bezpečnostní kontroly a procesy"
+                            },
+                            {
+                                "name": "GDPR Ready",
+                                "description": "Splňuje požadavky na ochranu osobních údajů"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "cta",
+                    "order": 4,
+                    "data": {
+                        "title": "Začněte svou auditní cestu ještě dnes",
+                        "subtitle": "Přidejte se k bezpečnostním týmům, které důvěřují AuditReady pro své potřeby přípravy na audit",
+                        "buttons": [
+                            {
+                                "text": "Začít",
+                                "url": "/register",
+                                "primary": True
+                            },
+                            {
+                                "text": "Ukázka",
+                                "url": "/demo",
+                                "primary": False
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    },
     "about-us": {
         "en": {
             "title": "About Us",
