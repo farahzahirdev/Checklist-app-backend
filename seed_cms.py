@@ -147,26 +147,51 @@ PAGES_DATA = {
                     "section_type": "hero",
                     "order": 1,
                     "data": {
-                        "title": "Audit-Ready, Zjednodušeně.",
+                        "title": "Vytvořeno\nodborníky na\nkybernetickou bezpečnost.",
                         "subtitle": "kybernetická",
                         "accent": "bezpečnost.",
-                        "description": "Transformujte přípravu na audit z chaosu do jasnosti. Naše komplexní platforma dává bezpečnostním týmům strukturu a sebedůvěru pro zvládnutí jakéhokoli kybernetického auditu.",
-                        "kicker": "Profesionální příprava na audit",
+                        "description": "Pomáháme organizacím rychle zjistit, co je skutečně připravené na audit a co zatím chybí. AuditReady přináší bezpečnostním a compliance týmům přehled, strukturu a jistotu v tom, co lze doložit, kde jsou mezery a na co se zaměřit před dalším auditem.",
+                        "kicker": "O nás",
                         "mockup": {
                             "brand": "AuditReady",
                             "nav": {
-                                "dashboard": "Dashboard",
+                                "dashboard": "Přehled",
                                 "checklists": "Checklisty",
                                 "reports": "Reporty",
                                 "settings": "Nastavení"
                             },
                             "dashboard": {
-                                "title": "Dashboard",
+                                "title": "Přehled",
                                 "metrics": {
                                     "overallReadiness": "Celková připravenost",
                                     "completed": "Dokončeno",
                                     "openFindings": "Otevřená zjištění"
+                                },
+                                "overallReadiness": {
+                                    "value": "72%",
+                                    "progress": "72%"
+                                },
+                                "completed": {
+                                    "value": "18/25",
+                                    "progress": "72%"
+                                },
+                                "openFindings": {
+                                    "value": "7",
+                                    "progress": "28%"
                                 }
+                            },
+                            "activity": {
+                                "title": "Poslední aktivita",
+                                "items": [
+                                    "Audit Readiness Checklist",
+                                    "Balíček dokumentace",
+                                    "NIS2 gap analýza"
+                                ]
+                            },
+                            "domains": {
+                                "title": "Klíčové oblasti",
+                                "current": "Aktuálně",
+                                "target": "Cíl"
                             }
                         }
                     }
@@ -179,7 +204,7 @@ PAGES_DATA = {
                         "cards": [
                             {
                                 "title": "Co děláme",
-                                "content": "Pomáháme organizacím zhodnotit, v jakém stavu je jejich kybernetická bezpečnost a co je v praxi skutečně připravené. Vycházíme ze zkušeností z auditů a řízení bezpečnosti napříč různými organizacemi a zaměřujeme se na to, co dává smysl v reálném provozu."
+                                "content": "Pomáháme organizacím zhodnotit, v jakém stavu je jejich kybernetická bezpečnost a co je v praxi skutečně připravené.\nVycházíme ze zkušeností z auditů a řízení bezpečnosti napříč různými organizacemi a zaměřujeme se na to, co dává smysl v reálném provozu.\nSoustředíme se na to, aby bezpečnost nebyla jen deklarovaná, ale také skutečně doložitelná."
                             },
                             {
                                 "title": "Naše zkušenosti",
