@@ -5,9 +5,9 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserRoleCode(IntEnum):
-    admin = 0
+    customer = 0
     auditor = 1
-    customer = 2
+    admin = 2
 
 
 class LoginRequest(BaseModel):
