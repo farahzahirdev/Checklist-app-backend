@@ -138,6 +138,7 @@ def _serialize_report(db: Session, report: Report) -> ReportResponse:
         final_pdf_published_at=report.final_pdf_published_at,
         findings_count=findings_count,
         summaries_count=summaries_count,
+        section_overviews=_build_report_section_overviews(db, report),
     )
 
 
@@ -493,30 +494,16 @@ def upsert_report_summary(
         after_data={"section_id": str(payload.section_id), "chapter_code": payload.chapter_code},
     )
 
-    return ReportSummaryItem(
-        id=summary.id,
-        section_id=summary.section_id,
-        chapter_code=summary.chapter_code,
-        summary_text=summary.summary_text,
-        created_at=summary.created_at,
-        updated_at=summary.updated_at,
+    return _build_summary_item(
+        db,
+        report=report,
+        summary=summary,
     )
 
 
 def list_report_summaries(db: Session, *, report_id: UUID, lang_code: str = "en") -> list[ReportSummaryItem]:
-    _get_report(db, report_id, lang_code)
-    rows = db.scalars(select(ReportSectionSummary).where(ReportSectionSummary.report_id == report_id).order_by(desc(ReportSectionSummary.updated_at))).all()
-    return [
-        ReportSummaryItem(
-            id=row.id,
-            section_id=row.section_id,
-            chapter_code=row.chapter_code,
-            summary_text=row.summary_text,
-            created_at=row.created_at,
-            updated_at=row.updated_at,
-        )
-        for row in rows
-    ]
+    report = _get_report(db, report_id, lang_code)
+    return _build_report_section_overviews(db, report)
 
 
 def list_report_findings(db: Session, *, report_id: UUID, lang_code: str = "en") -> list[ReportFindingItem]:
@@ -534,6 +521,93 @@ def list_report_findings(db: Session, *, report_id: UUID, lang_code: str = "en")
         )
         for row in rows
     ]
+
+
+def _build_summary_item(
+    db: Session,
+    *,
+    report: Report,
+    summary: ReportSectionSummary,
+    section_score: dict[str, Any] | None = None,
+) -> ReportSummaryItem:
+    return ReportSummaryItem(
+        id=summary.id,
+        report_id=report.id,
+        section_id=summary.section_id,
+        section_code=(section_score or {}).get("section_code"),
+        section_title=(section_score or {}).get("section_title"),
+        chapter_code=summary.chapter_code,
+        summary_text=summary.summary_text,
+        score=(section_score or {}).get("score"),
+        max_score=(section_score or {}).get("max_score"),
+        percentage=(section_score or {}).get("percentage"),
+        question_count=(section_score or {}).get("question_count"),
+        answered_question_count=(section_score or {}).get("answered_question_count"),
+        created_by=summary.created_by,
+        updated_by=summary.updated_by,
+        created_at=summary.created_at,
+        updated_at=summary.updated_at,
+    )
+
+
+def _build_report_section_overviews(db: Session, report: Report) -> list[ReportSummaryItem]:
+    assessment = db.get(Assessment, report.assessment_id)
+    if assessment is None:
+        return []
+
+    section_scores = _calculate_section_scores(db, assessment)
+    summary_rows = db.scalars(
+        select(ReportSectionSummary)
+        .where(ReportSectionSummary.report_id == report.id)
+        .order_by(desc(ReportSectionSummary.updated_at))
+    ).all()
+
+    summary_rows_by_section_id = {row.section_id: row for row in summary_rows if row.section_id is not None}
+    summary_rows_by_chapter_code = {
+        (row.chapter_code or "").strip().lower(): row
+        for row in summary_rows
+        if row.chapter_code is not None
+    }
+
+    overviews: list[ReportSummaryItem] = []
+    matched_summary_ids: set[UUID] = set()
+
+    for section_score in section_scores:
+        section_id = section_score.get("section_id")
+        section_code = section_score.get("section_code")
+        summary_row = summary_rows_by_section_id.get(section_id)
+        if summary_row is None and section_code:
+            summary_row = summary_rows_by_chapter_code.get(str(section_code).strip().lower())
+        if summary_row is not None:
+            matched_summary_ids.add(summary_row.id)
+
+        overviews.append(
+            ReportSummaryItem(
+                id=summary_row.id if summary_row else None,
+                report_id=report.id,
+                section_id=section_id,
+                section_code=section_code,
+                section_title=section_score.get("section_title"),
+                chapter_code=summary_row.chapter_code if summary_row else section_code,
+                summary_text=summary_row.summary_text if summary_row else None,
+                score=section_score.get("score"),
+                max_score=section_score.get("max_score"),
+                percentage=section_score.get("percentage"),
+                question_count=section_score.get("question_count"),
+                answered_question_count=section_score.get("answered_question_count"),
+                created_by=summary_row.created_by if summary_row else None,
+                updated_by=summary_row.updated_by if summary_row else None,
+                created_at=summary_row.created_at if summary_row else None,
+                updated_at=summary_row.updated_at if summary_row else None,
+            )
+        )
+
+    for summary_row in summary_rows:
+        if summary_row.id in matched_summary_ids:
+            continue
+        overviews.append(_build_summary_item(db, report=report, summary=summary_row))
+
+    return overviews
 
 
 

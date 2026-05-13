@@ -8,12 +8,22 @@ from app.models.report import ReportStatus
 
 
 class ReportSummaryItem(BaseModel):
-    id: UUID
+    id: UUID | None = None
+    report_id: UUID | None = None
     section_id: UUID | None = None
+    section_code: str | None = None
+    section_title: str | None = None
     chapter_code: str | None = None
-    summary_text: str
-    created_at: datetime
-    updated_at: datetime
+    summary_text: str | None = None
+    score: int | None = None
+    max_score: int | None = None
+    percentage: float | None = None
+    question_count: int | None = None
+    answered_question_count: int | None = None
+    created_by: UUID | None = None
+    updated_by: UUID | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class ReportFindingItem(BaseModel):
@@ -48,6 +58,7 @@ class ReportResponse(BaseModel):
     final_pdf_published_at: datetime | None = None
     findings_count: int
     summaries_count: int
+    section_overviews: list[ReportSummaryItem] = Field(default_factory=list)
 
 
 class GenerateDraftReportRequest(BaseModel):
