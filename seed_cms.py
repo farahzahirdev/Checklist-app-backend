@@ -89,7 +89,7 @@ PAGES_DATA = {
                         "title": "Built by cybersecurity professionals",
                         "subtitle": "cybersecurity",
                         "accent": "professionals.",
-                        "description": "We simplify audit preparation for today's cybersecurity challenges. Our mission is to give security and compliance teams clarity, structure, and confidence - without complexity.",
+                        "description": "We simplify audit preparation for today's cybersecurity challenges. Our mission is to give security and compliance teams clarity, structure, and confidence - without the complexity.",
                         "kicker": "About Us",
                         "background_image": "/assets/cybersecurity-background-59ognpsy7izka4l9.png",
                         "mockup": {
@@ -647,7 +647,7 @@ PAGES_DATA = {
                     "order": 1,
                     "data": {
                         "title": "Contact Us",
-                        "subtitle": "Have a question about audit readiness or product?",
+                        "subtitle": "Have a question about audit readiness or the product?",
                         "kicker": "Contact Us",
                         "form": {
                             "name": "Name",
@@ -686,7 +686,7 @@ PAGES_DATA = {
                     }
                 },
                 {
-                    "section_type": "bottom-cta",
+                    "section_type": "cta",
                     "order": 3,
                     "data": {
                         "title": "Start your assessment today",
@@ -757,7 +757,7 @@ PAGES_DATA = {
                     }
                 },
                 {
-                    "section_type": "bottom-cta",
+                    "section_type": "cta",
                     "order": 3,
                     "data": {
                         "title": "Začněte s hodnocením ještě dnes",
@@ -801,7 +801,7 @@ PAGES_DATA = {
                     "data": {
                         "title": "Quick Answers",
                         "subtitle": "Click a question to expand details.",
-                        "questions": [
+                        "items": [
                             {
                                 "question": "When does my 7-day window begin?",
                                 "answer": "The 7-day completion window starts only when you click Start Assessment, not immediately after payment."
@@ -812,7 +812,7 @@ PAGES_DATA = {
                             },
                             {
                                 "question": "How is access unlocked after payment?",
-                                "answer": "Access is unlocked automatically after Stripe webhook confirmation is processed by backend."
+                                "answer": "Access is unlocked automatically after Stripe webhook confirmation is processed by the backend."
                             },
                             {
                                 "question": "Which roles are supported?",
@@ -824,7 +824,7 @@ PAGES_DATA = {
                             },
                             {
                                 "question": "How do I get my final report?",
-                                "answer": "After completing checklist, your report is available in Reports area for download and sharing."
+                                "answer": "After completing the checklist, your report is available in the Reports area for download and sharing."
                             }
                         ]
                     }
@@ -834,11 +834,14 @@ PAGES_DATA = {
                     "order": 3,
                     "data": {
                         "title": "Still have questions?",
-                        "subtitle": "Reach out and we'll help you get answers you need.",
-                        "button": {
-                            "text": "Contact Us",
-                            "url": "/contact"
-                        }
+                        "subtitle": "Reach out and we'll help you get the answers you need.",
+                        "buttons": [
+                            {
+                                "text": "Contact Us",
+                                "url": "/contact",
+                                "primary": True
+                            }
+                        ]
                     }
                 }
             ]
@@ -864,7 +867,7 @@ PAGES_DATA = {
                     "data": {
                         "title": "Rychlé odpovědi",
                         "subtitle": "Kliknutím na otázku zobrazíte detail.",
-                        "questions": [
+                        "items": [
                             {
                                 "question": "Kdy začíná 7denní období?",
                                 "answer": "Sedmidenní okno začíná až ve chvíli, kdy kliknete na 'Start Assessment', ne hned po platbě."
@@ -898,10 +901,13 @@ PAGES_DATA = {
                     "data": {
                         "title": "Máte další otázky?",
                         "subtitle": "Napište nám a pomůžeme vám získat odpovědi, které potřebujete.",
-                        "button": {
-                            "text": "Kontaktujte nás",
-                            "url": "/contact"
-                        }
+                        "buttons": [
+                            {
+                                "text": "Kontaktujte nás",
+                                "url": "/contact",
+                                "primary": True
+                            }
+                        ]
                     }
                 }
             ]
@@ -1575,39 +1581,30 @@ def seed_database():
         admin_id = admin_user.id
         print(f"✓ Using admin user: {admin_user.username or admin_user.email}")
         
-        # Check if pages already exist
+        # Reset existing CMS pages before reseeding so the content always matches the current defaults.
         existing_count = db.query(Page).count()
         if existing_count > 0:
-            print(f"⚠ CMS already contains {existing_count} pages. Updating legal pages only.")
+            existing_section_count = db.query(PageSection).count()
+            print(f"⚠ CMS already contains {existing_count} pages and {existing_section_count} sections. Resetting and reseeding.")
+            db.query(PageSection).delete(synchronize_session=False)
+            db.query(Page).delete(synchronize_session=False)
+            db.flush()
 
-            created_count = 0
-            updated_count = 0
-            for slug in ("privacy-policy", "cookies"):
-                for lang, page_data in PAGES_DATA[slug].items():
-                    created = upsert_page(slug, lang, page_data, admin_id)
-                    if created:
-                        created_count += 1
-                        print(f"✓ Created {slug} ({lang})")
-                    else:
-                        updated_count += 1
-                        print(f"✓ Updated {slug} ({lang})")
-
-            db.commit()
-            print(f"\n✅ Legal pages synced (created: {created_count}, updated: {updated_count})")
-            return
-        
         seeded = 0
-        
+
         # Seed all pages
         for slug, languages in PAGES_DATA.items():
             for lang, page_data in languages.items():
                 upsert_page(slug, lang, page_data, admin_id)
-                
+
                 seeded += 1
                 print(f"✓ Seeded {slug} ({lang})")
-        
+
         db.commit()
-        print(f"\n✅ Successfully seeded {seeded} pages into CMS")
+        if existing_count > 0:
+            print(f"\n✅ CMS reset complete; reseeded {seeded} pages")
+        else:
+            print(f"\n✅ Successfully seeded {seeded} pages into CMS")
         
     except Exception as e:
         db.rollback()
