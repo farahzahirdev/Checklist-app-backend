@@ -774,14 +774,26 @@ def get_review_summary(db: Session, company_id: UUID | None = None) -> ReviewSum
         ) or 0
     
     # Recent reviews
-    recent_reviews = (
-        db.query(AssessmentReview)
-        .options(joinedload(AssessmentReview.assessment).joinedload(Assessment.user))
+    # Fetch recent review IDs first to avoid ORDER/LIMIT subquery issues when
+    # combined with joinedload(). Then load full objects for those IDs.
+    id_rows = (
+        db.query(AssessmentReview.id)
         .order_by(desc(AssessmentReview.created_at))
         .limit(5)
         .all()
     )
-    
+    recent_ids = [r[0] for r in id_rows]
+    if recent_ids:
+        recent_reviews = (
+            db.query(AssessmentReview)
+            .options(joinedload(AssessmentReview.assessment).joinedload(Assessment.user))
+            .filter(AssessmentReview.id.in_(recent_ids))
+            .order_by(desc(AssessmentReview.created_at))
+            .all()
+        )
+    else:
+        recent_reviews = []
+
     recent_review_responses = [AssessmentReviewResponse.from_orm(r) for r in recent_reviews]
     
     return ReviewSummary(
@@ -817,8 +829,23 @@ def get_assessment_reviews_for_admin(
         )
     )
     
+    # Normalize incoming status strings to DB enum values. Frontend may send
+    # 'pending_review' label; DB enum uses 'pending'. If mapping fails, ignore
+    # the filter.
+    status_enum_value = None
     if status:
-        query = query.filter(AssessmentReview.status == status)
+        s = status.lower()
+        if s in ("pending", "pending_review"):
+            status_enum_value = ReviewStatus.PENDING
+        elif s in ("in_progress", "inprogress", "in-progress"):
+            status_enum_value = ReviewStatus.IN_PROGRESS
+        elif s in ("completed",):
+            status_enum_value = ReviewStatus.COMPLETED
+        elif s in ("changes_requested", "changesrequested", "changes-requested"):
+            status_enum_value = ReviewStatus.CHANGES_REQUESTED
+        elif s in ("rejected",):
+            status_enum_value = ReviewStatus.REJECTED
+
     if company_id is not None:
         query = query.filter(Assessment.company_id == company_id)
     
@@ -826,12 +853,10 @@ def get_assessment_reviews_for_admin(
     # generating a subquery with ORDER/LIMIT that can cause DB errors in some
     # environments when joinedload() is used. Then load the full objects with
     # joinedload on those IDs.
-    id_query = (
-        db.query(AssessmentReview.id)
-        .filter(*query._criterion if hasattr(query, '_criterion') and query._criterion is not None else [])
-    )
-    if status:
-        id_query = id_query.filter(AssessmentReview.status == status)
+    # Build id_query from scratch to avoid relying on Query internals.
+    id_query = db.query(AssessmentReview.id)
+    if status_enum_value is not None:
+        id_query = id_query.filter(AssessmentReview.status == status_enum_value)
     if company_id is not None:
         id_query = id_query.join(Assessment, Assessment.id == AssessmentReview.assessment_id).filter(Assessment.company_id == company_id)
 
