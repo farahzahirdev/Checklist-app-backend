@@ -606,7 +606,10 @@ def update_assessment_review(
                 start_review(db, report_id=report.id, actor=reviewer_user, payload=payload)
     except Exception:
         # Do not fail the review update if report start fails; log could be added here.
+        db.rollback()
         pass
+
+    db.refresh(review)
 
     return AssessmentReviewResponse.from_orm(review)
 
