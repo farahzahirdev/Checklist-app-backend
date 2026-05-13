@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.cms import (
     PageCreate, PageUpdate, PageDetailResponse, PageListResponse,
-    PageSectionCreate, PageSectionUpdate, PageSectionResponse,
+    PageSectionCreate, PageSectionCreateRequest, PageSectionUpdate, PageSectionResponse,
     CMSImageCreate, CMSImageResponse, CMSImageUpdate, CMSImageUploadResponse,
     PagePublishToggle
 )
@@ -240,8 +240,7 @@ def delete_page(
     description="Admin only: Create a new section within a page."
 )
 def create_section(
-    page_id: UUID,
-    data: PageSectionCreate,
+    data: PageSectionCreateRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_only())
 ):
@@ -249,7 +248,14 @@ def create_section(
     cms_service = CMSService(db)
     
     try:
-        section = cms_service.create_section(page_id, data)
+        section = cms_service.create_section(
+            data.page_id,
+            PageSectionCreate(
+                section_type=data.section_type,
+                order=data.order,
+                data=data.data,
+            ),
+        )
         db.commit()
     except ValueError as e:
         db.rollback()

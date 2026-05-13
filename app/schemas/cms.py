@@ -19,6 +19,10 @@ class PageSectionCreate(PageSectionBase):
     pass
 
 
+class PageSectionCreateRequest(PageSectionCreate):
+    page_id: UUID
+
+
 class PageSectionUpdate(BaseModel):
     section_type: Optional[str] = None
     order: Optional[int] = None
