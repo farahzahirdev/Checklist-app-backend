@@ -221,6 +221,17 @@ def list_findings_route(
     summary="Approve Report",
     description="Approves a report for publication and stores reviewer approval metadata.",
 )
+def approve_report_route(
+    report_id: UUID,
+    request: Request,
+    payload: ReviewActionRequest,
+    admin=Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+) -> ReportResponse:
+    lang_code = get_language_code(request, db)
+    return approve_report(db, report_id=report_id, actor=admin, payload=payload, lang_code=lang_code)
+
+
 @router.post(
     "/{report_id}/publish",
     response_model=ReportResponse,
@@ -230,7 +241,7 @@ def list_findings_route(
         "This endpoint enforces approval-before-publish."
     ),
 )
-def publish_approved_report_route(
+def publish_report_route(
     report_id: UUID,
     request: Request,
     payload: PublishReportRequest,
