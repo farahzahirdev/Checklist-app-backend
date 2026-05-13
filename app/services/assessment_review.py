@@ -822,10 +822,42 @@ def get_assessment_reviews_for_admin(
     if company_id is not None:
         query = query.filter(Assessment.company_id == company_id)
     
-    reviews = (
-        query.order_by(desc(AssessmentReview.created_at))
+    # First select only the IDs with ordering/limit/offset to avoid SQLAlchemy
+    # generating a subquery with ORDER/LIMIT that can cause DB errors in some
+    # environments when joinedload() is used. Then load the full objects with
+    # joinedload on those IDs.
+    id_query = (
+        db.query(AssessmentReview.id)
+        .filter(*query._criterion if hasattr(query, '_criterion') and query._criterion is not None else [])
+    )
+    if status:
+        id_query = id_query.filter(AssessmentReview.status == status)
+    if company_id is not None:
+        id_query = id_query.join(Assessment, Assessment.id == AssessmentReview.assessment_id).filter(Assessment.company_id == company_id)
+
+    id_sub = (
+        id_query.order_by(desc(AssessmentReview.created_at))
         .offset(skip)
         .limit(limit)
+    )
+
+    ids = [r[0] for r in id_sub.all()]
+
+    if not ids:
+        return []
+
+    reviews = (
+        db.query(AssessmentReview)
+        .options(
+            joinedload(AssessmentReview.assessment)
+            .joinedload(Assessment.user),
+            joinedload(AssessmentReview.assessment)
+            .joinedload(Assessment.checklist)
+            .joinedload(Checklist.translations)
+            .joinedload(ChecklistTranslation.language),
+        )
+        .filter(AssessmentReview.id.in_(ids))
+        .order_by(desc(AssessmentReview.created_at))
         .all()
     )
     
