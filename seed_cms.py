@@ -5,6 +5,7 @@ Usage: python seed_cms.py
 """
 
 import os
+import re
 import sys
 from uuid import uuid4
 from sqlalchemy.orm import Session
@@ -15,6 +16,62 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
 from app.db.session import get_db, SessionLocal
 from app.models.cms import Page, PageSection
 from app.core.config import get_settings
+
+
+SCRIPT_DIR = os.path.dirname(__file__)
+LEGAL_DOCS_DIR = os.path.join(SCRIPT_DIR, "legal_docs")
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+
+
+def _extract_html_fragment(raw_html: str) -> str:
+    """Keep the meaningful HTML fragment from Word-exported documents."""
+    fragment_match = re.search(r"<!--StartFragment-->(.*?)<!--EndFragment-->", raw_html, flags=re.IGNORECASE | re.DOTALL)
+    if fragment_match:
+        return fragment_match.group(1).strip()
+
+    body_match = re.search(r"<body[^>]*>(.*?)</body>", raw_html, flags=re.IGNORECASE | re.DOTALL)
+    if body_match:
+        return body_match.group(1).strip()
+
+    return raw_html.strip()
+
+
+def _load_legal_html(filename: str, fallback: str) -> str:
+    """Load legal page HTML from project root; use fallback when unavailable."""
+    candidate_paths = [
+        os.path.join(LEGAL_DOCS_DIR, filename),
+        os.path.join(SCRIPT_DIR, filename),
+        os.path.join(PROJECT_ROOT, filename),
+    ]
+    for file_path in candidate_paths:
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return _extract_html_fragment(f.read())
+        except OSError:
+            continue
+    return fallback
+
+
+PRIVACY_POLICY_HTML_CS = _load_legal_html(
+    "AuditReady_Privacy_Policy.html",
+    "Vaše soukromí je pro nás důležité. Tyto zásady ochrany osobních údajů vysvětlují, jak shromažďujeme a používáme vaše informace.",
+)
+
+COOKIE_POLICY_HTML_CS = _load_legal_html(
+    "AuditReady_Cookie_Policy.html",
+    "Používáme cookies ke zlepšení vaší zkušenosti. Zjistěte více o tom, jak je používáme.",
+)
+
+# Optional English legal documents (if provided by client as translated HTML files)
+PRIVACY_POLICY_HTML_EN = _load_legal_html(
+    "AuditReady_Privacy_Policy_en.html",
+    "Your privacy is important to us. This privacy policy explains how we collect and use your information. We are committed to protecting your personal data and ensuring transparency in our data practices.",
+)
+
+COOKIE_POLICY_HTML_EN = _load_legal_html(
+    "AuditReady_Cookie_Policy_en.html",
+    "We use cookies to enhance your experience. Learn more about how we use them. Cookies help us analyze traffic, personalize content, and improve our services to better meet your needs.",
+)
 
 # Page content data structure - comprehensive content from all frontend pages
 PAGES_DATA = {
@@ -1370,7 +1427,7 @@ PAGES_DATA = {
                     "order": 1,
                     "data": {
                         "title": "Privacy Policy",
-                        "content": "Your privacy is important to us. This privacy policy explains how we collect and use your information. We are committed to protecting your personal data and ensuring transparency in our data practices."
+                        "content": PRIVACY_POLICY_HTML_EN
                     }
                 }
             ]
@@ -1386,7 +1443,7 @@ PAGES_DATA = {
                     "order": 1,
                     "data": {
                         "title": "Zásady ochrany osobních údajů",
-                        "content": "Vaše soukromí je pro nás důležité. Tyto zásady ochrany osobních údajů vysvětlují, jak shromažďujeme a používáme vaše informace. Jsme zavázáni chránit vaše osobní údaje a zajistit transparentnost v našich datových postupech."
+                        "content": PRIVACY_POLICY_HTML_CS
                     }
                 }
             ]
@@ -1438,7 +1495,7 @@ PAGES_DATA = {
                     "order": 1,
                     "data": {
                         "title": "Cookie Policy",
-                        "content": "We use cookies to enhance your experience. Learn more about how we use them. Cookies help us analyze traffic, personalize content, and improve our services to better meet your needs."
+                        "content": COOKIE_POLICY_HTML_EN
                     }
                 }
             ]
@@ -1454,7 +1511,7 @@ PAGES_DATA = {
                     "order": 1,
                     "data": {
                         "title": "Zásady cookies",
-                        "content": "Používáme cookies ke zlepšení vaší zkušenosti. Zjistěte více o tom, jak je používáme. Cookies nám pomáhají analyzovat provoz, personalizovat obsah a zlepšovat naše služby, aby lépe vyhovovaly vašim potřebám."
+                        "content": COOKIE_POLICY_HTML_CS
                     }
                 }
             ]
@@ -1465,6 +1522,45 @@ PAGES_DATA = {
 def seed_database():
     """Seed the CMS database with initial content."""
     db: Session = SessionLocal()
+
+    def upsert_page(slug: str, lang: str, page_data: dict, admin_id):
+        page = db.query(Page).filter(Page.slug == slug, Page.language == lang).first()
+        created = False
+
+        if page is None:
+            page = Page(
+                id=uuid4(),
+                slug=slug,
+                language=lang,
+                title=page_data["title"],
+                meta_description=page_data["meta_description"],
+                status=page_data["status"],
+                content_type=page_data["content_type"],
+                created_by_id=admin_id,
+                updated_by_id=admin_id,
+            )
+            db.add(page)
+            db.flush()
+            created = True
+        else:
+            page.title = page_data["title"]
+            page.meta_description = page_data["meta_description"]
+            page.status = page_data["status"]
+            page.content_type = page_data["content_type"]
+            page.updated_by_id = admin_id
+            db.query(PageSection).filter(PageSection.page_id == page.id).delete(synchronize_session=False)
+
+        for section_data in page_data["sections"]:
+            section = PageSection(
+                id=uuid4(),
+                page_id=page.id,
+                section_type=section_data["section_type"],
+                order=section_data["order"],
+                data=section_data["data"],
+            )
+            db.add(section)
+
+        return created
     
     try:
         # Get admin user ID (first admin user in system)
@@ -1482,7 +1578,22 @@ def seed_database():
         # Check if pages already exist
         existing_count = db.query(Page).count()
         if existing_count > 0:
-            print(f"⚠ CMS already contains {existing_count} pages. Skipping seed.")
+            print(f"⚠ CMS already contains {existing_count} pages. Updating legal pages only.")
+
+            created_count = 0
+            updated_count = 0
+            for slug in ("privacy-policy", "cookies"):
+                for lang, page_data in PAGES_DATA[slug].items():
+                    created = upsert_page(slug, lang, page_data, admin_id)
+                    if created:
+                        created_count += 1
+                        print(f"✓ Created {slug} ({lang})")
+                    else:
+                        updated_count += 1
+                        print(f"✓ Updated {slug} ({lang})")
+
+            db.commit()
+            print(f"\n✅ Legal pages synced (created: {created_count}, updated: {updated_count})")
             return
         
         seeded = 0
@@ -1490,31 +1601,7 @@ def seed_database():
         # Seed all pages
         for slug, languages in PAGES_DATA.items():
             for lang, page_data in languages.items():
-                # Create page with proper UUID
-                page = Page(
-                    id=uuid4(),
-                    slug=slug,
-                    language=lang,
-                    title=page_data["title"],
-                    meta_description=page_data["meta_description"],
-                    status=page_data["status"],
-                    content_type=page_data["content_type"],
-                    created_by_id=admin_id,
-                    updated_by_id=admin_id,
-                )
-                db.add(page)
-                db.flush()  # Get page ID
-                
-                # Add sections
-                for section_data in page_data["sections"]:
-                    section = PageSection(
-                        id=uuid4(),
-                        page_id=page.id,
-                        section_type=section_data["section_type"],
-                        order=section_data["order"],
-                        data=section_data["data"],
-                    )
-                    db.add(section)
+                upsert_page(slug, lang, page_data, admin_id)
                 
                 seeded += 1
                 print(f"✓ Seeded {slug} ({lang})")
