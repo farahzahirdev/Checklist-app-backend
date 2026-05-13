@@ -10,7 +10,8 @@ Separate endpoints for managing:
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Security, status, Query
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
@@ -58,6 +59,7 @@ from app.services.customer_assessments import (
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 # ============================================================================
@@ -767,36 +769,48 @@ def switch_admin_role_for_testing(
             detail=translate("only_admins_can_switch_roles", lang_code)
         )
     
-    # TODO: Generate temporary JWT with different role claim
     # TODO: Log this action for audit trail
-    
+
     from datetime import datetime, timedelta
-    from app.core.security import create_access_token
+    from app.core.security import create_signed_token
     
     expires_at = datetime.utcnow() + timedelta(minutes=payload.duration_minutes)
     
+    original_role = current_user.role
+
     # Remove all existing roles for the user (simulate switch)
     from app.models.rbac import UserRoleAssignment
+    original_role_assignments = db.query(UserRoleAssignment).filter(UserRoleAssignment.user_id == current_user.id).all()
+    original_role_ids = [str(assignment.role_id) for assignment in original_role_assignments]
     db.query(UserRoleAssignment).filter(UserRoleAssignment.user_id == current_user.id).delete()
-    db.commit()
+
+    # Update the visible role so the frontend shell reflects the active session.
+    current_user.role = payload.switch_to_role
+    db.flush()
 
     # Assign the switched role
     from app.services.rbac import RBACService
     RBACService.assign_role_by_code(db, current_user.id, payload.switch_to_role, current_user.id)
     db.commit()
 
-    # Create temporary token with switched role (for testing purposes)
-    temp_token = create_access_token(
-        user_id=str(current_user.id),
-        role=payload.switch_to_role,
-        ttl_minutes=payload.duration_minutes
+    # Create temporary token with switched role and the original role snapshot.
+    temp_token = create_signed_token(
+        {
+            "sub": str(current_user.id),
+            "role": payload.switch_to_role,
+            "role_switch_active": True,
+            "original_role": original_role,
+            "original_role_ids": original_role_ids,
+        },
+        ttl_minutes=payload.duration_minutes,
+        token_type="access",
     )
 
     return {
         "switched_to_role": payload.switch_to_role,
         "temporary_token": temp_token,
         "expires_at": expires_at,
-        "original_role": current_user.role,
+        "original_role": original_role,
         "note": "User's roles in the database have been temporarily switched for testing. Remember to revert after testing."
     }
 
@@ -805,16 +819,46 @@ def switch_admin_role_for_testing(
 def end_admin_role_switch(
     request: Request,
     payload: AdminRoleSwitchEndRequest,
+    credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme),
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> dict:
     """End role switch and return to admin role."""
     lang_code = get_language_code(request, db)
-    if current_user.role != UserRole.admin.value:
+
+    switch_session_claims: dict | None = None
+    if credentials and credentials.scheme.lower() == "bearer" and credentials.credentials.strip():
+        from app.core.security import verify_signed_token
+
+        try:
+                        switch_session_claims = verify_signed_token(credentials.credentials.strip())
+        except Exception:
+            switch_session_claims = None
+
+    if current_user.role != UserRole.admin.value and not switch_session_claims:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=translate("user_must_be_admin_or_role_switch_must_have_expired", lang_code)
         )
+
+    if switch_session_claims:
+        from app.models.rbac import UserRoleAssignment
+        from app.services.rbac import RBACService
+
+        original_role = str(switch_session_claims.get("original_role") or UserRole.admin.value)
+        original_role_ids = switch_session_claims.get("original_role_ids") or []
+
+        db.query(UserRoleAssignment).filter(UserRoleAssignment.user_id == current_user.id).delete()
+        current_user.role = original_role
+
+        if isinstance(original_role_ids, list):
+            for role_id_text in original_role_ids:
+                try:
+                    role_id = UUID(str(role_id_text))
+                except ValueError:
+                    continue
+                RBACService.assign_role_to_user(db, current_user.id, role_id, current_user.id)
+        db.commit()
     
     return {"status": "success", "message": translate("returned_to_admin_role", lang_code)}
 
