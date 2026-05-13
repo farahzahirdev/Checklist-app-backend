@@ -374,6 +374,7 @@ class TestAssessmentAPI:
         assert response.status_code == 200
         data = response.json()
         assert "report_id" in data
+        assert "report_code" in data
 
 class TestAdminChecklistsAPI:
     """Test admin checklist management endpoints"""

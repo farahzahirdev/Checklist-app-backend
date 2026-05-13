@@ -29,6 +29,15 @@ class ReportFindingItem(BaseModel):
 class ReportResponse(BaseModel):
     id: UUID
     assessment_id: UUID
+    report_code: str | None = None
+    company_id: UUID | None = None
+    company_name: str | None = None
+    company_website: str | None = None
+    company_industry: str | None = None
+    company_size: str | None = None
+    company_region: str | None = None
+    company_country: str | None = None
+    company_description: str | None = None
     status: ReportStatus
     draft_generated_at: datetime | None = None
     reviewed_by: UUID | None = None
@@ -59,14 +68,50 @@ class UpsertReportSummaryRequest(BaseModel):
     summary_text: str = Field(min_length=10, max_length=5000)
 
 
+class ReportQuestionScoreItem(BaseModel):
+    question_id: UUID
+    question_code: str
+    question_title: str
+    report_domain: str | None = None
+    score: int
+    max_score: int
+    percentage: float
+
+
+class ReportSectionScoreItem(BaseModel):
+    section_id: UUID
+    section_code: str
+    section_title: str
+    report_domain: str | None = None
+    score: int
+    max_score: int
+    percentage: float
+    question_count: int
+    answered_question_count: int
+    question_scores: list[ReportQuestionScoreItem] = Field(default_factory=list)
+
+
+class ReportScoreDistributionItem(BaseModel):
+    score: int
+    count: int
+    percentage: float
+
 
 
 class CustomerReportDataResponse(BaseModel):
     """Comprehensive report data for customer-facing PDF generation"""
-    report_id: UUID
+    report_id: str
+    report_uuid: UUID
     assessment_id: UUID
     customer_name: str
     customer_email: str
+    company_name: str | None = None
+    company_website: str | None = None
+    company_industry: str | None = None
+    company_size: str | None = None
+    company_region: str | None = None
+    company_country: str | None = None
+    company_description: str | None = None
     checklist_title: str
     assessment_date: datetime
     report_status: ReportStatus
@@ -74,13 +119,21 @@ class CustomerReportDataResponse(BaseModel):
     # Score data
     overall_score: float
     max_possible_score: int
+    total_score_percentage: float
     completion_percentage: float
+    total_questions: int
+    answered_questions: int
+    standard_covered_all: bool
+    question_score_distribution: list[ReportScoreDistributionItem] = Field(default_factory=list)
     
     # Section scores for radar chart
-    section_scores: list[dict] = Field(description="List of {section_name, score, max_score, percentage}")
+    section_scores: list[ReportSectionScoreItem] = Field(description="List of section score summaries with per-question percentages")
     
     # Chapter overview
     chapter_data: list[dict] = Field(description="List of {chapter_code, title, score, findings_count, recommendations}")
+
+    # Domain overview
+    domain_data: list[dict] = Field(default_factory=list, description="List of {domain, title, score, max_score, percentage, question_count}")
     
     # Findings (nonconformities/weak points)
     findings: list[dict] = Field(description="List of {question_text, answer, priority, recommendation}")

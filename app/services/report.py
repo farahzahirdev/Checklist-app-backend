@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import re
 from typing import Any
+from urllib.parse import urlparse
 from uuid import UUID
 
 from app.services.admin_checklist import _latest_section_translation
@@ -23,6 +25,7 @@ from app.models.report import (
     ReportSectionSummary,
     ReportStatus,
 )
+from app.models.company import Company
 from app.models.user import User
 from app.services.audit_log import create_audit_log
 from app.schemas.report import (
@@ -55,6 +58,48 @@ def _report_counts(db: Session, report_id: UUID) -> tuple[int, int]:
     return findings, summaries
 
 
+def _company_identifier(company: Company | None) -> str:
+    if company is None:
+        return "UNKNOWN"
+
+    candidates: list[str] = []
+    if company.website:
+        parsed = urlparse(company.website if "//" in company.website else f"https://{company.website}")
+        host = parsed.netloc or parsed.path
+        if host:
+            candidates.append(host.split(":")[0])
+    if company.slug:
+        candidates.append(company.slug)
+    if company.name:
+        candidates.append(company.name)
+
+    for candidate in candidates:
+        token = re.sub(r"[^A-Za-z0-9]+", "", candidate.split(".")[0]).upper()
+        if token:
+            return token[:24]
+
+    return "UNKNOWN"
+
+
+def _report_code(report: Report, company: Company | None) -> str:
+    reference_time = report.draft_generated_at or report.created_at or _now()
+    return f"CKB-{reference_time:%Y}-%m%d-{_company_identifier(company)}-{reference_time:%H%M%S}"
+
+
+def _report_company(report: Report, db: Session) -> Company | None:
+    if report.company is not None:
+        return report.company
+
+    if report.company_id is not None:
+        return db.get(Company, report.company_id)
+
+    assessment = db.get(Assessment, report.assessment_id)
+    if assessment is not None and assessment.company_id is not None:
+        return db.get(Company, assessment.company_id)
+
+    return None
+
+
 def _question_content(db: Session, question_id: UUID) -> tuple[str, str | None]:
     translation = db.scalar(
         select(ChecklistQuestionTranslation)
@@ -70,10 +115,19 @@ def _question_content(db: Session, question_id: UUID) -> tuple[str, str | None]:
 
 def _serialize_report(db: Session, report: Report) -> ReportResponse:
     findings_count, summaries_count = _report_counts(db, report.id)
+    company = _report_company(report, db)
     return ReportResponse(
         id=report.id,
         assessment_id=report.assessment_id,
+        report_code=report.report_code or _report_code(report, company),
         company_id=report.company_id,
+        company_name=company.name if company else None,
+        company_website=company.website if company else None,
+        company_industry=company.industry if company else None,
+        company_size=company.size if company else None,
+        company_region=company.region if company else None,
+        company_country=company.country if company else None,
+        company_description=company.description if company else None,
         status=report.status,
         draft_generated_at=report.draft_generated_at,
         reviewed_by=report.reviewed_by,
@@ -136,6 +190,7 @@ def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User, lang
 
     now = _now()
     report = Report(
+        report_code=None,
         assessment_id=assessment_id,
         company_id=assessment.company_id,
         status=ReportStatus.draft_generated,
@@ -143,6 +198,8 @@ def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User, lang
     )
     db.add(report)
     db.flush()
+    draft_company = db.get(Company, assessment.company_id) if assessment.company_id is not None else None
+    report.report_code = _report_code(report, draft_company)
 
     answers = db.scalars(select(AssessmentAnswer).where(AssessmentAnswer.assessment_id == assessment_id)).all()
     for answer in answers:
@@ -273,6 +330,7 @@ def list_reports(db: Session, *, status: str | None = None, skip: int = 0, limit
         .options(
             joinedload(Report.assessment).joinedload(Assessment.user),
             joinedload(Report.assessment).joinedload(Assessment.checklist).joinedload(Checklist.translations),
+            joinedload(Report.company),
         )
         .order_by(desc(Report.created_at))
     )
@@ -329,6 +387,14 @@ def list_reports(db: Session, *, status: str | None = None, skip: int = 0, limit
         report_items.append({
             "id": str(report.id),
             "assessment_id": str(report.assessment_id),
+            "report_code": report.report_code or _report_code(report, report.company),
+            "company_id": str(report.company_id) if report.company_id else None,
+            "company_name": report.company.name if report.company else None,
+            "company_website": report.company.website if report.company else None,
+            "company_industry": report.company.industry if report.company else None,
+            "company_size": report.company.size if report.company else None,
+            "company_region": report.company.region if report.company else None,
+            "company_country": report.company.country if report.company else None,
             "customer_email": report.assessment.user.email if report.assessment.user else None,
             "customer_name": report.assessment.user.email if report.assessment.user else None,
             "checklist_title": checklist_title,
@@ -496,6 +562,10 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
     user = db.get(User, assessment.user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    company = report.company or (db.get(Company, report.company_id) if report.company_id else None)
+    if company is None and assessment.company_id is not None:
+        company = db.get(Company, assessment.company_id)
     
     # Get checklist data
     from app.models.checklist import Checklist, ChecklistSection, ChecklistSectionTranslation
@@ -509,6 +579,8 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
     
     # Calculate scores and gather data
     section_scores = _calculate_section_scores(db, assessment)
+    domain_data = _calculate_domain_data(db, assessment)
+    question_score_distribution, total_questions, answered_questions = _calculate_question_distribution(db, assessment)
     chapter_data = _calculate_chapter_data(db, assessment)
     findings = _get_customer_findings(db, report_id)
     section_summaries = _get_section_summaries_for_customer(db, report_id)
@@ -517,21 +589,39 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
     # Calculate overall score
     overall_score = sum(s['score'] for s in section_scores)
     max_possible_score = sum(s['max_score'] for s in section_scores)
+    total_score_percentage = round((overall_score / max_possible_score * 100), 1) if max_possible_score > 0 else 0
     completion_percentage = float(assessment.completion_percent)
+    standard_covered_all = answered_questions >= total_questions and total_questions > 0
+
+    report_code = report.report_code or _report_code(report, company)
     
     return CustomerReportDataResponse(
-        report_id=report.id,
+        report_id=report_code,
+        report_uuid=report.id,
         assessment_id=assessment.id,
         customer_name=user.email,
         customer_email=user.email,
+        company_name=company.name if company else None,
+        company_website=company.website if company else None,
+        company_industry=company.industry if company else None,
+        company_size=company.size if company else None,
+        company_region=company.region if company else None,
+        company_country=company.country if company else None,
+        company_description=company.description if company else None,
         checklist_title=checklist_title,
         assessment_date=assessment.submitted_at or assessment.created_at,
         report_status=report.status,
         overall_score=overall_score,
         max_possible_score=max_possible_score,
+        total_score_percentage=total_score_percentage,
         completion_percentage=completion_percentage,
+        total_questions=total_questions,
+        answered_questions=answered_questions,
+        standard_covered_all=standard_covered_all,
+        question_score_distribution=question_score_distribution,
         section_scores=section_scores,
         chapter_data=chapter_data,
+        domain_data=domain_data,
         findings=findings,
         section_summaries=section_summaries,
         public_suggestions=public_suggestions,
@@ -582,28 +672,159 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
         # Calculate section score
         total_score = 0
         max_score = 0
+        question_scores: list[dict] = []
+        answered_count = 0
         
         for question in questions:
             max_score += 4  # Maximum score per question is 4 (Yes answer)
             answer = answer_map.get(question.id)
+            question_translation = _latest_question_translation(db, question.id)
+            question_title = question_translation.question_text if question_translation else question.question_code
             if answer and answer.answer_score is not None:
-                total_score += answer.answer_score
+                total_score += int(answer.answer_score)
+                answered_count += 1
+            question_score = int(answer.answer_score) if answer and answer.answer_score is not None else 0
+            question_scores.append({
+                "question_id": question.id,
+                "question_code": question.question_code,
+                "question_title": question_title,
+                "report_domain": question.report_domain,
+                "score": question_score,
+                "max_score": 4,
+                "percentage": round((question_score / 4 * 100), 1) if 4 > 0 else 0,
+            })
         
         # Get section translation
         translation = _latest_section_translation(db, section.id)
-        section_name = translation.title if translation else section.section_code
+        section_title = translation.title if translation else section.section_code
+        section_domain = next((q.report_domain for q in questions if q.report_domain), None)
         
         percentage = (total_score / max_score * 100) if max_score > 0 else 0
         
         section_scores.append({
-            "section_name": section_name,
+            "section_name": section_title,
+            "section_title": section_title,
+            "section_code": section.section_code,
+            "section_domain": section_domain,
             "section_id": section.id,
             "score": total_score,
             "max_score": max_score,
-            "percentage": round(percentage, 1)
+            "percentage": round(percentage, 1),
+            "question_count": len(questions),
+            "answered_question_count": answered_count,
+            "question_scores": question_scores,
         })
     
     return section_scores
+
+
+def _calculate_domain_data(db: Session, assessment: Assessment) -> list[dict]:
+    from app.models.checklist import ChecklistQuestion
+
+    questions = db.scalars(
+        select(ChecklistQuestion)
+        .where(
+            ChecklistQuestion.checklist_id == assessment.checklist_id,
+            ChecklistQuestion.is_active.is_(True),
+        )
+    ).all()
+
+    domain_map: dict[str, dict[str, Any]] = {}
+    for question in questions:
+        domain = question.report_domain or "General"
+        domain_item = domain_map.setdefault(
+            domain,
+            {
+                "domain": domain,
+                "title": domain,
+                "score": 0,
+                "max_score": 0,
+                "question_count": 0,
+            },
+        )
+        domain_item["question_count"] += 1
+        domain_item["max_score"] += 4
+
+    question_ids = [q.id for q in questions]
+    answers = db.scalars(
+        select(AssessmentAnswer)
+        .where(
+            AssessmentAnswer.assessment_id == assessment.id,
+            AssessmentAnswer.question_id.in_(question_ids),
+        )
+    ).all()
+    answer_map = {a.question_id: a for a in answers}
+
+    for question in questions:
+        domain = question.report_domain or "General"
+        answer = answer_map.get(question.id)
+        if answer and answer.answer_score is not None:
+            domain_map[domain]["score"] += int(answer.answer_score)
+
+    domain_data = []
+    for domain, data in domain_map.items():
+        max_score = data["max_score"]
+        domain_data.append({
+            "domain": domain,
+            "title": data["title"],
+            "score": data["score"],
+            "max_score": max_score,
+            "percentage": round((data["score"] / max_score * 100), 1) if max_score > 0 else 0,
+            "question_count": data["question_count"],
+        })
+
+    return sorted(domain_data, key=lambda x: x["domain"])
+
+
+def _calculate_question_distribution(db: Session, assessment: Assessment) -> tuple[list[dict], int, int]:
+    from app.models.checklist import ChecklistQuestion
+
+    questions = db.scalars(
+        select(ChecklistQuestion)
+        .where(
+            ChecklistQuestion.checklist_id == assessment.checklist_id,
+            ChecklistQuestion.is_active.is_(True),
+        )
+    ).all()
+    total_questions = len(questions)
+
+    question_ids = [q.id for q in questions]
+    answers = db.scalars(
+        select(AssessmentAnswer)
+        .where(
+            AssessmentAnswer.assessment_id == assessment.id,
+            AssessmentAnswer.question_id.in_(question_ids),
+        )
+    ).all()
+    answer_map = {a.question_id: a for a in answers}
+
+    distribution = {score: 0 for score in range(0, 5)}
+    answered_questions = 0
+    for question in questions:
+        answer = answer_map.get(question.id)
+        score = int(answer.answer_score) if answer and answer.answer_score is not None else 0
+        if answer and answer.answer_score is not None:
+            answered_questions += 1
+        distribution[score] += 1
+
+    question_distribution = [
+        {
+            "score": score,
+            "count": count,
+            "percentage": round((count / total_questions * 100), 1) if total_questions > 0 else 0,
+        }
+        for score, count in sorted(distribution.items(), reverse=True)
+    ]
+    return question_distribution, total_questions, answered_questions
+
+
+def _latest_question_translation(db: Session, question_id: UUID):
+    return db.scalar(
+        select(ChecklistQuestionTranslation)
+        .where(ChecklistQuestionTranslation.question_id == question_id)
+        .order_by(desc(ChecklistQuestionTranslation.created_at))
+        .limit(1)
+    )
 
 
 def _calculate_chapter_data(db: Session, assessment: Assessment) -> list[dict]:

@@ -283,6 +283,10 @@
         <!-- Report Information -->
         <div class="report-info">
             <div class="info-item">
+                <div class="info-label">Report Code</div>
+                <div class="info-value">{{ report_id }}</div>
+            </div>
+            <div class="info-item">
                 <div class="info-label">Customer Name</div>
                 <div class="info-value">{{ customer_name }}</div>
             </div>
@@ -303,9 +307,25 @@
                 <div class="info-value">{{ "%.1f"|format(completion_percentage) }}%</div>
             </div>
             <div class="info-item">
+                <div class="info-label">Score Coverage</div>
+                <div class="info-value">{{ "%.1f"|format(total_score_percentage) }}%</div>
+            </div>
+            <div class="info-item">
                 <div class="info-label">Report Status</div>
                 <div class="info-value">{{ report_status.value.replace('_', ' ').title() }}</div>
             </div>
+            {% if company_name %}
+            <div class="info-item">
+                <div class="info-label">Company</div>
+                <div class="info-value">{{ company_name }}</div>
+            </div>
+            {% endif %}
+            {% if company_website %}
+            <div class="info-item">
+                <div class="info-label">Website</div>
+                <div class="info-value">{{ company_website }}</div>
+            </div>
+            {% endif %}
         </div>
         
         <!-- Scores Overview -->

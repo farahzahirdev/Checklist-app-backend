@@ -81,7 +81,7 @@ def get_assessment_for_review(
 ) -> Optional[Assessment]:
     """Get assessment with all related data for review."""
     
-    assessment = (
+    assessment_query = (
         db.query(Assessment)
         .options(
             joinedload(Assessment.user),
@@ -118,7 +118,7 @@ def get_assessment_answers_with_reviews(
     """Get all assessment answers with their reviews."""
     
     # Get assessment with customer info
-    assessment = (
+    assessment_query = (
         db.query(Assessment)
         .options(joinedload(Assessment.user))
         .options(
