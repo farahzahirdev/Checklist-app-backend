@@ -20,6 +20,7 @@ from app.core.security import (
 )
 from app.models.audit_log import AuditAction, AuditLog
 from app.models.mfa_totp import MfaTotp
+from app.models.company import Company
 from app.models.user import User, UserRole
 from app.schemas.auth import AuthResponse, AuthUserResponse, MfaSetupDetailsResponse, UserRoleCode
 from app.services.rbac import RBACService
@@ -40,10 +41,55 @@ def _code_to_role(role_code: UserRoleCode) -> str:
     return role_code.name
 
 
-def serialize_user(user: User) -> AuthUserResponse:
+def serialize_user(user: User, db: Session | None = None) -> AuthUserResponse:
     if user.role is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="user_role_missing")
-    return AuthUserResponse(id=user.id, email=user.email, role=_role_to_code(user.role), is_active=bool(user.is_active))
+
+    company_data: dict[str, str | None] = {
+        "company_name": None,
+        "company_slug": None,
+        "company_industry": None,
+        "company_size": None,
+        "company_region": None,
+        "company_email": None,
+        "company_website": None,
+        "company_country": None,
+        "company_description": None,
+    }
+
+    if db is not None and user.primary_company_id not in (None, ""):
+        company_id = user.primary_company_id
+        company = None
+        try:
+            company = db.scalar(select(Company).where(Company.id == UUID(str(company_id))))
+        except ValueError:
+            company = None
+
+        if company is not None:
+            company_data.update(
+                {
+                    "company_name": company.name,
+                    "company_slug": company.slug,
+                    "company_industry": company.industry,
+                    "company_size": company.size,
+                    "company_region": company.region,
+                    "company_email": company.email,
+                    "company_website": company.website,
+                    "company_country": company.country,
+                    "company_description": company.description,
+                }
+            )
+
+    return AuthUserResponse(
+        id=user.id,
+        email=user.email,
+        role=_role_to_code(user.role),
+        is_active=bool(user.is_active),
+        primary_company_id=user.primary_company_id,
+        job_title=user.job_title,
+        department=user.department,
+        **company_data,
+    )
 
 
 def _get_user_by_email(db: Session, email: str) -> User | None:
@@ -196,7 +242,7 @@ def register_user(
     db.commit()
     
     # At registration, MFA is never enabled or required
-    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=True, mfa_enabled=False)
+    return AuthResponse(user=serialize_user(user, db), access_token=token, mfa_required=True, mfa_enabled=False)
 
 
 def authenticate_user(db: Session, *, email: str, password: str, lang_code: str = "en") -> AuthResponse:
@@ -220,7 +266,7 @@ def authenticate_user(db: Session, *, email: str, password: str, lang_code: str 
         if mfa_enabled:
             challenge_token = create_mfa_challenge_token(user_id=str(user.id), role=str(user.role))
             return AuthResponse(
-                user=serialize_user(user),
+                user=serialize_user(user, db),
                 access_token=None,
                 challenge_token=challenge_token,
                 mfa_required=True,
@@ -230,12 +276,12 @@ def authenticate_user(db: Session, *, email: str, password: str, lang_code: str 
             token = create_access_token(user_id=str(user.id), role=str(user.role))
             _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
             db.commit()
-            return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=False)
+            return AuthResponse(user=serialize_user(user, db), access_token=token, mfa_required=False, mfa_enabled=False)
     # For other users, keep existing logic
     if mfa_enabled:
         challenge_token = create_mfa_challenge_token(user_id=str(user.id), role=str(user.role))
         return AuthResponse(
-            user=serialize_user(user),
+            user=serialize_user(user, db),
             access_token=None,
             challenge_token=challenge_token,
             mfa_required=True,
@@ -244,7 +290,7 @@ def authenticate_user(db: Session, *, email: str, password: str, lang_code: str 
     token = create_access_token(user_id=str(user.id), role=str(user.role))
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
     db.commit()
-    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=False)
+    return AuthResponse(user=serialize_user(user, db), access_token=token, mfa_required=False, mfa_enabled=False)
 
 
 def verify_mfa_challenge(db: Session, *, challenge_token: str, code: str, lang_code: str = "en") -> AuthResponse:
@@ -274,7 +320,7 @@ def verify_mfa_challenge(db: Session, *, challenge_token: str, code: str, lang_c
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
     db.commit()
 
-    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=True)
+    return AuthResponse(user=serialize_user(user, db), access_token=token, mfa_required=False, mfa_enabled=True)
 
 
 def start_mfa_enrollment(db: Session, *, user: User, lang_code: str = "en") -> MfaSetupDetailsResponse:
@@ -334,7 +380,7 @@ def confirm_mfa_enrollment(db: Session, *, user: User, code: str, lang_code: str
     _audit(db, actor_user=user, action=AuditAction.auth_mfa_verify, target_entity="user", target_id=user.id)
     db.commit()
 
-    return AuthResponse(user=serialize_user(user), access_token=token, mfa_required=False, mfa_enabled=True)
+    return AuthResponse(user=serialize_user(user, db), access_token=token, mfa_required=False, mfa_enabled=True)
 
 
 def update_user_role(db: Session, *, actor_user: User, user_id: UUID, role_code: UserRoleCode, lang_code: str = "en") -> AuthResponse:
@@ -350,4 +396,4 @@ def update_user_role(db: Session, *, actor_user: User, user_id: UUID, role_code:
     db.commit()
     db.refresh(user)
 
-    return AuthResponse(user=serialize_user(user), mfa_required=False, mfa_enabled=bool(_get_mfa_record(db, user.id)))
+    return AuthResponse(user=serialize_user(user, db), mfa_required=False, mfa_enabled=bool(_get_mfa_record(db, user.id)))

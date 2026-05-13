@@ -75,6 +75,15 @@ class AuthUserResponse(BaseModel):
     primary_company_id: UUID | None = None
     job_title: str | None = None
     department: str | None = None
+    company_name: str | None = None
+    company_slug: str | None = None
+    company_industry: str | None = None
+    company_size: str | None = None
+    company_region: str | None = None
+    company_email: str | None = None
+    company_website: str | None = None
+    company_country: str | None = None
+    company_description: str | None = None
 
 
 class AuthResponse(BaseModel):
