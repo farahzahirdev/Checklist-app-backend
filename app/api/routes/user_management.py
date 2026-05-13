@@ -776,12 +776,15 @@ def switch_admin_role_for_testing(
     
     expires_at = datetime.utcnow() + timedelta(minutes=payload.duration_minutes)
     
+    # CRITICAL: Must read original role BEFORE any modifications
     original_role = current_user.role
+    print(f"[ROLE-SWITCH-START] User {current_user.id}: current_user.role={current_user.role}, original_role will be={original_role}")
 
     # Remove all existing roles for the user (simulate switch)
     from app.models.rbac import UserRoleAssignment
     original_role_assignments = db.query(UserRoleAssignment).filter(UserRoleAssignment.user_id == current_user.id).all()
     original_role_ids = [str(assignment.role_id) for assignment in original_role_assignments]
+    print(f"[ROLE-SWITCH-START] Removing {len(original_role_assignments)} role assignments")
     db.query(UserRoleAssignment).filter(UserRoleAssignment.user_id == current_user.id).delete()
 
     # Update the visible role so the frontend shell reflects the active session.
@@ -800,8 +803,7 @@ def switch_admin_role_for_testing(
     # Verify the change was committed
     db.refresh(current_user)
     print(f"[ROLE-SWITCH] After refresh from DB: current_user.role={current_user.role}")
-
-    # Create temporary token with switched role and the original role snapshot.
+    print(f"[ROLE-SWITCH-TOKEN] Creating token with role={payload.switch_to_role}, original_role={original_role}, original_role_ids={original_role_ids}")
     temp_token = create_signed_token(
         {
             "sub": str(current_user.id),
