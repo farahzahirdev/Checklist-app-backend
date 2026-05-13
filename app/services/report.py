@@ -494,11 +494,8 @@ def upsert_report_summary(
         after_data={"section_id": str(payload.section_id), "chapter_code": payload.chapter_code},
     )
 
-    return _build_summary_item(
-        db,
-        report=report,
-        summary=summary,
-    )
+    overviews = _build_report_section_overviews(db, report)
+    return next((item for item in overviews if item.id == summary.id), _build_summary_item(report=report, summary=summary))
 
 
 def list_report_summaries(db: Session, *, report_id: UUID, lang_code: str = "en") -> list[ReportSummaryItem]:
@@ -524,7 +521,6 @@ def list_report_findings(db: Session, *, report_id: UUID, lang_code: str = "en")
 
 
 def _build_summary_item(
-    db: Session,
     *,
     report: Report,
     summary: ReportSectionSummary,
@@ -605,7 +601,7 @@ def _build_report_section_overviews(db: Session, report: Report) -> list[ReportS
     for summary_row in summary_rows:
         if summary_row.id in matched_summary_ids:
             continue
-        overviews.append(_build_summary_item(db, report=report, summary=summary_row))
+        overviews.append(_build_summary_item(report=report, summary=summary_row))
 
     return overviews
 

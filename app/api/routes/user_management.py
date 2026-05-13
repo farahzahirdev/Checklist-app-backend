@@ -856,8 +856,13 @@ def end_admin_role_switch(
         original_role = str(switch_session_claims.get("original_role") or UserRole.admin.value)
         original_role_ids = switch_session_claims.get("original_role_ids") or []
 
+        print(f"[ROLE-RESTORE] Token claims: {switch_session_claims}")
+        print(f"[ROLE-RESTORE] Original role from claims: {original_role}")
+        print(f"[ROLE-RESTORE] Before restore: current_user.role={current_user.role}")
+
         db.query(UserRoleAssignment).filter(UserRoleAssignment.user_id == current_user.id).delete()
         current_user.role = original_role
+        print(f"[ROLE-RESTORE] After assignment: current_user.role={current_user.role}")
 
         if isinstance(original_role_ids, list):
             for role_id_text in original_role_ids:
@@ -867,6 +872,9 @@ def end_admin_role_switch(
                     continue
                 RBACService.assign_role_to_user(db, current_user.id, role_id, current_user.id)
         db.commit()
+        print(f"[ROLE-RESTORE] After commit: current_user.role={current_user.role}")
+        db.refresh(current_user)
+        print(f"[ROLE-RESTORE] After refresh: current_user.role={current_user.role}")
     
     return {"status": "success", "message": translate("returned_to_admin_role", lang_code)}
 
