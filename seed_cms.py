@@ -1393,26 +1393,56 @@ PAGES_DATA = {
                         "items": [
                             {
                                 "title": "Before an Audit",
-                                "body": "Assess your readiness, close gaps, and avoid surprises during the audit."
+                                "description": "Assess your readiness, close gaps, and avoid surprises during the audit."
                             },
                             {
                                 "title": "Internal Review",
-                                "body": "Validate your current security and compliance posture and ensure controls are in place and effective."
+                                "description": "Validate your current security and compliance posture and ensure controls are in place and effective."
                             },
                             {
                                 "title": "Gap Analysis",
-                                "body": "Compare your environment with regulatory requirements, identify weak areas, and prioritize what to fix first."
+                                "description": "Compare your environment with regulatory requirements, identify weak areas, and prioritize what to fix first."
                             },
                             {
                                 "title": "Documentation Readiness",
-                                "body": "Understand what needs to be documented and prepare policies, procedures, and evidence with confidence."
+                                "description": "Understand what needs to be documented and prepare policies, procedures, and evidence with confidence."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "cards",
+                    "order": 4,
+                    "data": {
+                        "title": "Who it's for",
+                        "subtitle": "Built for teams that need to prove security, close gaps, and stay audit-ready.",
+                        "cards": [
+                            {
+                                "title": "Compliance & GRC Teams",
+                                "content": "Stay on top of frameworks and regulatory requirements.",
+                                "icon": "check"
+                            },
+                            {
+                                "title": "IT & Security Teams",
+                                "content": "Identify gaps and prioritize what matters most.",
+                                "icon": "users"
+                            },
+                            {
+                                "title": "Management",
+                                "content": "Get clear insights and prove your organization is prepared.",
+                                "icon": "target"
+                            },
+                            {
+                                "title": "Auditors & Consultants",
+                                "content": "Save time with structured, consistent assessments.",
+                                "icon": "users"
                             }
                         ]
                     }
                 },
                 {
                     "section_type": "how-it-works",
-                    "order": 4,
+                    "order": 5,
                     "data": {
                         "title": "How it works",
                         "subtitle": "A simple 5-step process to go from uncertainty to audit-ready.",
@@ -1442,14 +1472,14 @@ PAGES_DATA = {
                 },
                 {
                     "section_type": "cards",
-                    "order": 5,
+                    "order": 6,
                     "data": {
                         "title": "What you get",
                         "subtitle": "Clear outputs, practical guidance, and audit-ready results you can use right away.",
-                        "items": [
+                        "cards": [
                             {
                                 "title": "Clear Gap Analysis",
-                                "body": "See where you stand and what needs improvement before the audit begins.",
+                                "content": "See where you stand and what needs improvement before the audit begins.",
                                 "points": [
                                     "Visual maturity overview",
                                     "Section-by-section scoring",
@@ -1458,7 +1488,7 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Structured Report",
-                                "body": "A professional report you can review internally and share with confidence.",
+                                "content": "A professional report you can review internally and share with confidence.",
                                 "points": [
                                     "Executive summary",
                                     "Detailed findings",
@@ -1467,7 +1497,7 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Actionable Recommendations",
-                                "body": "Know what to fix next, in what order, and where to focus first.",
+                                "content": "Know what to fix next, in what order, and where to focus first.",
                                 "points": [
                                     "Prioritized by risk and impact",
                                     "Practical next steps",
@@ -1476,7 +1506,7 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Stronger Audit Readiness",
-                                "body": "Move into your audit with more confidence, clearer evidence, and less uncertainty.",
+                                "content": "Move into your audit with more confidence, clearer evidence, and less uncertainty.",
                                 "points": [
                                     "Identify gaps early",
                                     "Improve with evidence",
@@ -1488,7 +1518,7 @@ PAGES_DATA = {
                 },
                 {
                     "section_type": "cta",
-                    "order": 6,
+                    "order": 7,
                     "data": {
                         "title": "Ready to close your gaps and get audit-ready?",
                         "subtitle": "Start your assessment now and see where you stand.",
@@ -1557,26 +1587,56 @@ PAGES_DATA = {
                         "items": [
                             {
                                 "title": "Před auditem",
-                                "body": "Zhodnoťte připravenost, uzavřete mezery a vyhněte se překvapením během auditu."
+                                "description": "Zhodnoťte připravenost, uzavřete mezery a vyhněte se překvapením během auditu."
                             },
                             {
                                 "title": "Interní kontrola",
-                                "body": "Ověřte aktuální bezpečnostní a compliance stav a ujistěte se, že opatření fungují."
+                                "description": "Ověřte aktuální bezpečnostní a compliance stav a ujistěte se, že opatření fungují."
                             },
                             {
                                 "title": "Gap analýza",
-                                "body": "Porovnejte prostředí s požadavky, najděte slabá místa a stanovte priority oprav."
+                                "description": "Porovnejte prostředí s požadavky, najděte slabá místa a stanovte priority oprav."
                             },
                             {
                                 "title": "Připravenost dokumentace",
-                                "body": "Získejte jasno, co je potřeba zdokumentovat, a připravte zásady, postupy a důkazy."
+                                "description": "Získejte jasno, co je potřeba zdokumentovat, a připravte zásady, postupy a důkazy."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "cards",
+                    "order": 4,
+                    "data": {
+                        "title": "Pro koho je to",
+                        "subtitle": "Vytvořeno pro týmy, které potřebují prokázat bezpečnost, uzavřít mezery a být připravené na audit.",
+                        "cards": [
+                            {
+                                "title": "Compliance & GRC týmy",
+                                "content": "Mějte přehled o rámcích a regulatorních požadavcích.",
+                                "icon": "check"
+                            },
+                            {
+                                "title": "IT & Security týmy",
+                                "content": "Identifikujte mezery a stanovte priority toho nejdůležitějšího.",
+                                "icon": "users"
+                            },
+                            {
+                                "title": "Vedení",
+                                "content": "Získejte jasné informace a prokažte připravenost organizace.",
+                                "icon": "target"
+                            },
+                            {
+                                "title": "Auditoři & konzultanti",
+                                "content": "Ušetřete čas díky strukturovanému a konzistentnímu hodnocení.",
+                                "icon": "users"
                             }
                         ]
                     }
                 },
                 {
                     "section_type": "how-it-works",
-                    "order": 4,
+                    "order": 5,
                     "data": {
                         "title": "Jak to funguje",
                         "subtitle": "Jednoduchý 5krokový proces od nejistoty k auditní připravenosti.",
@@ -1606,14 +1666,14 @@ PAGES_DATA = {
                 },
                 {
                     "section_type": "cards",
-                    "order": 5,
+                    "order": 6,
                     "data": {
                         "title": "Co získáte",
                         "subtitle": "Jasné výstupy, praktické vedení a audit-ready výsledky, které můžete hned použít.",
-                        "items": [
+                        "cards": [
                             {
                                 "title": "Jasná gap analýza",
-                                "body": "Uvidíte, kde jste a co je potřeba zlepšit dříve, než audit začne.",
+                                "content": "Uvidíte, kde jste a co je potřeba zlepšit dříve, než audit začne.",
                                 "points": [
                                     "Vizuální přehled zralosti",
                                     "Skóre po jednotlivých sekcích",
@@ -1622,7 +1682,7 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Strukturovaný report",
-                                "body": "Profesionální report pro interní použití i sdílení s jistotou.",
+                                "content": "Profesionální report pro interní použití i sdílení s jistotou.",
                                 "points": [
                                     "Executive summary",
                                     "Detailní zjištění",
@@ -1631,7 +1691,7 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Doporučení k dalším krokům",
-                                "body": "Budete vědět, co opravit jako další, v jakém pořadí a na co se zaměřit.",
+                                "content": "Budete vědět, co opravit jako další, v jakém pořadí a na co se zaměřit.",
                                 "points": [
                                     "Prioritizováno dle rizika a dopadu",
                                     "Praktické další kroky",
@@ -1640,7 +1700,7 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Lepší auditní připravenost",
-                                "body": "Jděte do auditu s větší jistotou, lepšími důkazy a menší nejistotou.",
+                                "content": "Jděte do auditu s větší jistotou, lepšími důkazy a menší nejistotou.",
                                 "points": [
                                     "Odhalte mezery včas",
                                     "Zlepšujte s důkazy",
@@ -1652,7 +1712,7 @@ PAGES_DATA = {
                 },
                 {
                     "section_type": "cta",
-                    "order": 6,
+                    "order": 7,
                     "data": {
                         "title": "Chcete uzavřít mezery a být audit-ready?",
                         "subtitle": "Začněte hodnocení a zjistěte, kde jste.",
