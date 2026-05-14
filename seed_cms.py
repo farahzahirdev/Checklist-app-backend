@@ -1484,6 +1484,7 @@ PAGES_DATA = {
                             {
                                 "title": "Clear Gap Analysis",
                                 "body": "See where you stand and what needs improvement before the audit begins.",
+                                "tone": "success",
                                 "points": [
                                     "Visual maturity overview",
                                     "Section-by-section scoring",
@@ -1493,6 +1494,7 @@ PAGES_DATA = {
                             {
                                 "title": "Structured Report",
                                 "body": "A professional report you can review internally and share with confidence.",
+                                "tone": "info",
                                 "points": [
                                     "Executive summary",
                                     "Detailed findings",
@@ -1502,6 +1504,7 @@ PAGES_DATA = {
                             {
                                 "title": "Actionable Recommendations",
                                 "body": "Know what to fix next, in what order, and where to focus first.",
+                                "tone": "warning",
                                 "points": [
                                     "Prioritized by risk and impact",
                                     "Practical next steps",
@@ -1511,6 +1514,7 @@ PAGES_DATA = {
                             {
                                 "title": "Stronger Audit Readiness",
                                 "body": "Move into your audit with more confidence, clearer evidence, and less uncertainty.",
+                                "tone": "primary",
                                 "points": [
                                     "Identify gaps early",
                                     "Improve with evidence",
@@ -1673,7 +1677,7 @@ PAGES_DATA = {
                     }
                 },
                 {
-                    "section_type": "cards",
+                    "section_type": "what-you-get",
                     "order": 6,
                     "data": {
                         "title": "Co získáte",
@@ -1681,7 +1685,8 @@ PAGES_DATA = {
                         "cards": [
                             {
                                 "title": "Jasná gap analýza",
-                                "content": "Uvidíte, kde jste a co je potřeba zlepšit dříve, než audit začne.",
+                                "body": "Uvidíte, kde jste a co je potřeba zlepšit dříve, než audit začne.",
+                                "tone": "success",
                                 "points": [
                                     "Vizuální přehled zralosti",
                                     "Skóre po jednotlivých sekcích",
@@ -1690,7 +1695,8 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Strukturovaný report",
-                                "content": "Profesionální report pro interní použití i sdílení s jistotou.",
+                                "body": "Profesionální report pro interní použití i sdílení s jistotou.",
+                                "tone": "info",
                                 "points": [
                                     "Executive summary",
                                     "Detailní zjištění",
@@ -1699,7 +1705,8 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Doporučení k dalším krokům",
-                                "content": "Budete vědět, co opravit jako další, v jakém pořadí a na co se zaměřit.",
+                                "body": "Budete vědět, co opravit jako další, v jakém pořadí a na co se zaměřit.",
+                                "tone": "warning",
                                 "points": [
                                     "Prioritizováno dle rizika a dopadu",
                                     "Praktické další kroky",
@@ -1708,7 +1715,8 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Lepší auditní připravenost",
-                                "content": "Jděte do auditu s větší jistotou, lepšími důkazy a menší nejistotou.",
+                                "body": "Jděte do auditu s větší jistotou, lepšími důkazy a menší nejistotou.",
+                                "tone": "primary",
                                 "points": [
                                     "Odhalte mezery včas",
                                     "Zlepšujte s důkazy",
