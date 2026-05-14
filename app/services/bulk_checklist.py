@@ -355,7 +355,7 @@ def create_checklist_from_file(
             # Position should be 1..4 (top-to-bottom in UI). Scores remain 4..1.
             scores = [4, 3, 2, 1]
             for idx, (score, col_key) in enumerate(zip(scores, col_keys)):
-                desc = row.get(col_key) if col_key else None
+                desc = get_column_value(row, col_key, headers) if col_key else None
                 label = fixed_labels.get(score, f"Score {score}")
                 answer_options.append({
                     "position": idx + 1,
