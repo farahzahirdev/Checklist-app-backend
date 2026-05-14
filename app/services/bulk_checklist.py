@@ -343,18 +343,22 @@ def create_checklist_from_file(
             answer_options = []
             # Fixed labels as requested: Yes=4pts, Maybe=3pts, Sure=2pts, No=1pts
             fixed_labels = {4: "Yes", 3: "Maybe", 2: "Sure", 1: "No"}
-            
-            for score, col_key in zip([4, 3, 2, 1], [
+
+            # Column keys in score-descending order (score 4 -> score 1)
+            col_keys = [
                 column_mapping.guidance_score_4_col,
                 column_mapping.guidance_score_3_col,
                 column_mapping.guidance_score_2_col,
                 column_mapping.guidance_score_1_col,
-            ]):
+            ]
+
+            # Position should be 1..4 (top-to-bottom in UI). Scores remain 4..1.
+            scores = [4, 3, 2, 1]
+            for idx, (score, col_key) in enumerate(zip(scores, col_keys)):
                 desc = row.get(col_key) if col_key else None
-                # Use fixed label, CSV content as description
                 label = fixed_labels.get(score, f"Score {score}")
                 answer_options.append({
-                    "position": score,
+                    "position": idx + 1,
                     "label": label,
                     "score": score,
                     "description": desc,
