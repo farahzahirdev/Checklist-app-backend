@@ -1373,7 +1373,32 @@ PAGES_DATA = {
                                 "body": "Start, assess, and finish in just a few days",
                                 "icon": "lightning"
                             }
-                        ]
+                        ],
+                        "mockup": {
+                            "brand": "AuditReady",
+                            "nav": {
+                                "dashboard": "Dashboard",
+                                "checklists": "Checklists",
+                                "reports": "Reports",
+                                "settings": "Settings"
+                            },
+                            "sectionTitle": "1.1 Information Security Policies",
+                            "question": "Does your organization have documented information security policies?",
+                            "questionHelp": "Policies should cover information classification, access control, incident management, and audit practice requirements.",
+                            "progress": "Progress",
+                            "answers": {
+                                "yes": "Yes",
+                                "partly": "Partly",
+                                "no": "No",
+                                "notSure": "Not sure"
+                            },
+                            "evidence": "Evidence",
+                            "maturity": "Maturity Overview",
+                            "legend": {
+                                "current": "Current",
+                                "target": "Target"
+                            }
+                        }
                     }
                 },
                 {
@@ -1484,7 +1509,7 @@ PAGES_DATA = {
                             {
                                 "title": "Clear Gap Analysis",
                                 "body": "See where you stand and what needs improvement before the audit begins.",
-                                "tone": "success",
+                                "tone": "green",
                                 "points": [
                                     "Visual maturity overview",
                                     "Section-by-section scoring",
@@ -1494,7 +1519,7 @@ PAGES_DATA = {
                             {
                                 "title": "Structured Report",
                                 "body": "A professional report you can review internally and share with confidence.",
-                                "tone": "info",
+                                "tone": "blue",
                                 "points": [
                                     "Executive summary",
                                     "Detailed findings",
@@ -1504,7 +1529,7 @@ PAGES_DATA = {
                             {
                                 "title": "Actionable Recommendations",
                                 "body": "Know what to fix next, in what order, and where to focus first.",
-                                "tone": "warning",
+                                "tone": "amber",
                                 "points": [
                                     "Prioritized by risk and impact",
                                     "Practical next steps",
@@ -1514,7 +1539,7 @@ PAGES_DATA = {
                             {
                                 "title": "Stronger Audit Readiness",
                                 "body": "Move into your audit with more confidence, clearer evidence, and less uncertainty.",
-                                "tone": "primary",
+                                "tone": "purple",
                                 "points": [
                                     "Identify gaps early",
                                     "Improve with evidence",
@@ -1575,7 +1600,32 @@ PAGES_DATA = {
                                 "body": "Začněte, vyhodnoťte a dokončete během pár dní",
                                 "icon": "lightning"
                             }
-                        ]
+                        ],
+                        "mockup": {
+                            "brand": "AuditReady",
+                            "nav": {
+                                "dashboard": "Dashboard",
+                                "checklists": "Checklists",
+                                "reports": "Reports",
+                                "settings": "Settings"
+                            },
+                            "sectionTitle": "1.1 Information Security Policies",
+                            "question": "Má vaše organizace zdokumentované zásady bezpečnosti informací?",
+                            "questionHelp": "Zásady by měly pokrývat klasifikaci informací, kontrolu přístupu, řízení incidentů a požadavky na auditorské postupy.",
+                            "progress": "Pokrok",
+                            "answers": {
+                                "yes": "Ano",
+                                "partly": "Částečně",
+                                "no": "Ne",
+                                "notSure": "Nejsem si jistý"
+                            },
+                            "evidence": "Důkazy",
+                            "maturity": "Přehled zralosti",
+                            "legend": {
+                                "current": "Aktuální",
+                                "target": "Cíl"
+                            }
+                        }
                     }
                 },
                 {
@@ -1686,7 +1736,7 @@ PAGES_DATA = {
                             {
                                 "title": "Jasná gap analýza",
                                 "body": "Uvidíte, kde jste a co je potřeba zlepšit dříve, než audit začne.",
-                                "tone": "success",
+                                "tone": "green",
                                 "points": [
                                     "Vizuální přehled zralosti",
                                     "Skóre po jednotlivých sekcích",
@@ -1696,7 +1746,7 @@ PAGES_DATA = {
                             {
                                 "title": "Strukturovaný report",
                                 "body": "Profesionální report pro interní použití i sdílení s jistotou.",
-                                "tone": "info",
+                                "tone": "blue",
                                 "points": [
                                     "Executive summary",
                                     "Detailní zjištění",
@@ -1706,7 +1756,7 @@ PAGES_DATA = {
                             {
                                 "title": "Doporučení k dalším krokům",
                                 "body": "Budete vědět, co opravit jako další, v jakém pořadí a na co se zaměřit.",
-                                "tone": "warning",
+                                "tone": "amber",
                                 "points": [
                                     "Prioritizováno dle rizika a dopadu",
                                     "Praktické další kroky",
@@ -1716,7 +1766,7 @@ PAGES_DATA = {
                             {
                                 "title": "Lepší auditní připravenost",
                                 "body": "Jděte do auditu s větší jistotou, lepšími důkazy a menší nejistotou.",
-                                "tone": "primary",
+                                "tone": "purple",
                                 "points": [
                                     "Odhalte mezery včas",
                                     "Zlepšujte s důkazy",
