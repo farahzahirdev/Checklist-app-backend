@@ -684,26 +684,6 @@ PAGES_DATA = {
                             }
                         ]
                     }
-                },
-                {
-                    "section_type": "cta",
-                    "order": 3,
-                    "data": {
-                        "title": "Start your assessment today",
-                        "subtitle": "Sign up now and simplify your cybersecurity audit process.",
-                        "buttons": [
-                            {
-                                "text": "Get Access",
-                                "url": "/register",
-                                "primary": True
-                            },
-                            {
-                                "text": "View Products",
-                                "url": "/products/audit-readiness-checklist",
-                                "primary": False
-                            }
-                        ]
-                    }
                 }
             ]
         },
@@ -742,26 +722,6 @@ PAGES_DATA = {
                     "data": {
                         "title": "Začněte s hodnocením ještě dnes",
                         "subtitle": "Získejte přístup k našim nástrojům a zjednodušte audit kybernetické bezpečnosti.",
-                        "buttons": [
-                            {
-                                "text": "Získat přístup",
-                                "url": "/register",
-                                "primary": True
-                            },
-                            {
-                                "text": "Zobrazit produkty",
-                                "url": "/products/audit-readiness-checklist",
-                                "primary": False
-                            }
-                        ]
-                    }
-                },
-                {
-                    "section_type": "cta",
-                    "order": 3,
-                    "data": {
-                        "title": "Začněte s hodnocením ještě dnes",
-                        "subtitle": "Zaregistrujte se a zjednodušte audit kybernetické bezpečnosti.",
                         "buttons": [
                             {
                                 "text": "Získat přístup",
