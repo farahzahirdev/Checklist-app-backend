@@ -1386,55 +1386,59 @@ PAGES_DATA = {
                     }
                 },
                 {
-                    "section_type": "use_cases",
+                    "section_type": "use-cases",
                     "order": 3,
                     "data": {
                         "title": "Use Cases",
                         "items": [
                             {
                                 "title": "Before an Audit",
-                                "description": "Assess your readiness, close gaps, and avoid surprises during the audit."
+                                "body": "Assess your readiness, close gaps, and avoid surprises during the audit.",
+                                "icon": "calendar"
                             },
                             {
                                 "title": "Internal Review",
-                                "description": "Validate your current security and compliance posture and ensure controls are in place and effective."
+                                "body": "Validate your current security and compliance posture and ensure controls are in place and effective.",
+                                "icon": "search"
                             },
                             {
                                 "title": "Gap Analysis",
-                                "description": "Compare your environment with regulatory requirements, identify weak areas, and prioritize what to fix first."
+                                "body": "Compare your environment with regulatory requirements, identify weak areas, and prioritize what to fix first.",
+                                "icon": "target"
                             },
                             {
                                 "title": "Documentation Readiness",
-                                "description": "Understand what needs to be documented and prepare policies, procedures, and evidence with confidence."
+                                "body": "Understand what needs to be documented and prepare policies, procedures, and evidence with confidence.",
+                                "icon": "doc-stack"
                             }
                         ]
                     }
                 },
                 {
-                    "section_type": "cards",
+                    "section_type": "who-its-for",
                     "order": 4,
                     "data": {
                         "title": "Who it's for",
                         "subtitle": "Built for teams that need to prove security, close gaps, and stay audit-ready.",
-                        "cards": [
+                        "items": [
                             {
                                 "title": "Compliance & GRC Teams",
-                                "content": "Stay on top of frameworks and regulatory requirements.",
-                                "icon": "check"
+                                "body": "Stay on top of frameworks and regulatory requirements.",
+                                "icon": "shield-check"
                             },
                             {
                                 "title": "IT & Security Teams",
-                                "content": "Identify gaps and prioritize what matters most.",
+                                "body": "Identify gaps and prioritize what matters most.",
                                 "icon": "users"
                             },
                             {
                                 "title": "Management",
-                                "content": "Get clear insights and prove your organization is prepared.",
+                                "body": "Get clear insights and prove your organization is prepared.",
                                 "icon": "target"
                             },
                             {
                                 "title": "Auditors & Consultants",
-                                "content": "Save time with structured, consistent assessments.",
+                                "body": "Save time with structured, consistent assessments.",
                                 "icon": "users"
                             }
                         ]
@@ -1471,7 +1475,7 @@ PAGES_DATA = {
                     }
                 },
                 {
-                    "section_type": "cards",
+                    "section_type": "what-you-get",
                     "order": 6,
                     "data": {
                         "title": "What you get",
@@ -1479,7 +1483,7 @@ PAGES_DATA = {
                         "cards": [
                             {
                                 "title": "Clear Gap Analysis",
-                                "content": "See where you stand and what needs improvement before the audit begins.",
+                                "body": "See where you stand and what needs improvement before the audit begins.",
                                 "points": [
                                     "Visual maturity overview",
                                     "Section-by-section scoring",
@@ -1488,7 +1492,7 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Structured Report",
-                                "content": "A professional report you can review internally and share with confidence.",
+                                "body": "A professional report you can review internally and share with confidence.",
                                 "points": [
                                     "Executive summary",
                                     "Detailed findings",
@@ -1497,7 +1501,7 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Actionable Recommendations",
-                                "content": "Know what to fix next, in what order, and where to focus first.",
+                                "body": "Know what to fix next, in what order, and where to focus first.",
                                 "points": [
                                     "Prioritized by risk and impact",
                                     "Practical next steps",
@@ -1506,7 +1510,7 @@ PAGES_DATA = {
                             },
                             {
                                 "title": "Stronger Audit Readiness",
-                                "content": "Move into your audit with more confidence, clearer evidence, and less uncertainty.",
+                                "body": "Move into your audit with more confidence, clearer evidence, and less uncertainty.",
                                 "points": [
                                     "Identify gaps early",
                                     "Improve with evidence",
@@ -1580,55 +1584,59 @@ PAGES_DATA = {
                     }
                 },
                 {
-                    "section_type": "use_cases",
+                    "section_type": "use-cases",
                     "order": 3,
                     "data": {
                         "title": "Použití",
                         "items": [
                             {
                                 "title": "Před auditem",
-                                "description": "Zhodnoťte připravenost, uzavřete mezery a vyhněte se překvapením během auditu."
+                                "body": "Zhodnoťte připravenost, uzavřete mezery a vyhněte se překvapením během auditu.",
+                                "icon": "calendar"
                             },
                             {
                                 "title": "Interní kontrola",
-                                "description": "Ověřte aktuální bezpečnostní a compliance stav a ujistěte se, že opatření fungují."
+                                "body": "Ověřte aktuální bezpečnostní a compliance stav a ujistěte se, že opatření fungují.",
+                                "icon": "search"
                             },
                             {
                                 "title": "Gap analýza",
-                                "description": "Porovnejte prostředí s požadavky, najděte slabá místa a stanovte priority oprav."
+                                "body": "Porovnejte prostředí s požadavky, najděte slabá místa a stanovte priority oprav.",
+                                "icon": "target"
                             },
                             {
                                 "title": "Připravenost dokumentace",
-                                "description": "Získejte jasno, co je potřeba zdokumentovat, a připravte zásady, postupy a důkazy."
+                                "body": "Získejte jasno, co je potřeba zdokumentovat, a připravte zásady, postupy a důkazy.",
+                                "icon": "doc-stack"
                             }
                         ]
                     }
                 },
                 {
-                    "section_type": "cards",
+                    "section_type": "who-its-for",
                     "order": 4,
                     "data": {
                         "title": "Pro koho je to",
                         "subtitle": "Vytvořeno pro týmy, které potřebují prokázat bezpečnost, uzavřít mezery a být připravené na audit.",
-                        "cards": [
+                        "items": [
                             {
                                 "title": "Compliance & GRC týmy",
-                                "content": "Mějte přehled o rámcích a regulatorních požadavcích.",
-                                "icon": "check"
+                                "body": "Mějte přehled o rámcích a regulatorních požadavcích.",
+                                "icon": "shield-check"
                             },
                             {
                                 "title": "IT & Security týmy",
-                                "content": "Identifikujte mezery a stanovte priority toho nejdůležitějšího.",
+                                "body": "Identifikujte mezery a stanovte priority toho nejdůležitějšího.",
                                 "icon": "users"
                             },
                             {
                                 "title": "Vedení",
-                                "content": "Získejte jasné informace a prokažte připravenost organizace.",
+                                "body": "Získejte jasné informace a prokažte připravenost organizace.",
                                 "icon": "target"
                             },
                             {
                                 "title": "Auditoři & konzultanti",
-                                "content": "Ušetřete čas díky strukturovanému a konzistentnímu hodnocení.",
+                                "body": "Ušetřete čas díky strukturovanému a konzistentnímu hodnocení.",
                                 "icon": "users"
                             }
                         ]
