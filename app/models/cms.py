@@ -29,6 +29,9 @@ class ContentType(StrEnum):
     standard = "standard"
 
 
+    # Frontend added content types may be extended here as needed
+
+
 class SectionType(StrEnum):
     hero = "hero"
     products = "products"
@@ -38,6 +41,14 @@ class SectionType(StrEnum):
     contact_info = "contact_info"
     legal = "legal"
     standard = "standard"
+    # Additional section types introduced by frontend design
+    cards = "cards"
+    cta = "cta"
+    trust = "trust"
+    how_it_works = "how-it-works"
+    documentation_grid = "documentation-grid"
+    bundles = "bundles"
+    why_choose = "why-choose"
 
 
 class Page(Base):

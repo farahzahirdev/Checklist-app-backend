@@ -10,7 +10,13 @@ from pydantic import BaseModel, Field
 # ============================================================================
 
 class PageSectionBase(BaseModel):
-    section_type: str = Field(..., description="Type of section: hero, products, faq, etc.")
+    section_type: str = Field(
+        ...,
+        description=(
+            "Type of section: hero, products, faq, cards, cta, trust, how-it-works, "
+            "documentation-grid, bundles, why-choose, use_cases, steps, contact_info, legal, standard"
+        ),
+    )
     order: int = Field(default=0, description="Order of section on page")
     data: Optional[dict] = Field(default=None, description="Flexible JSON data for section content")
 
