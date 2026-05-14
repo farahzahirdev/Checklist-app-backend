@@ -1345,8 +1345,8 @@ PAGES_DATA = {
     },
     "resources-public": {
         "en": {
-            "title": "Resources",
-            "meta_description": "Access helpful resources and guides for audit preparation",
+            "title": "Audit Readiness Checklist",
+            "meta_description": "Prepare for audits with confidence. Simplify complex compliance requirements into clear, actionable steps.",
             "status": "published",
             "content_type": "standard",
             "sections": [
@@ -1354,17 +1354,163 @@ PAGES_DATA = {
                     "section_type": "hero",
                     "order": 1,
                     "data": {
-                        "title": "Resources",
-                        "subtitle": "Guides and Tools for Success",
-                        "description": "Access our collection of resources to help you prepare for audits.",
-                        "kicker": "Resources"
+                        "title": "Audit Readiness Checklist",
+                        "subtitle": "Prepare for audits with confidence. Simplify complex compliance requirements into clear, actionable steps. Find gaps, upload evidence, and get a reviewed report to prove your readiness.",
+                        "badge": "Audit",
+                        "highlights": [
+                            {
+                                "title": "Secure & Private",
+                                "body": "Your data stays protected",
+                                "icon": "shield"
+                            },
+                            {
+                                "title": "Expert Review",
+                                "body": "Every report is reviewed by our team",
+                                "icon": "clipboard-check"
+                            },
+                            {
+                                "title": "Fast & Focused",
+                                "body": "Start, assess, and finish in just a few days",
+                                "icon": "lightning"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "main-benefit",
+                    "order": 2,
+                    "data": {
+                        "kicker": "Main benefit",
+                        "title": "Know exactly how prepared you are for an audit — before the auditor arrives.",
+                        "body": "Identify gaps, validate controls, and get a clear path to audit readiness. Reduce risk, save time, and approach your next audit with confidence."
+                    }
+                },
+                {
+                    "section_type": "use_cases",
+                    "order": 3,
+                    "data": {
+                        "title": "Use Cases",
+                        "items": [
+                            {
+                                "title": "Before an Audit",
+                                "body": "Assess your readiness, close gaps, and avoid surprises during the audit."
+                            },
+                            {
+                                "title": "Internal Review",
+                                "body": "Validate your current security and compliance posture and ensure controls are in place and effective."
+                            },
+                            {
+                                "title": "Gap Analysis",
+                                "body": "Compare your environment with regulatory requirements, identify weak areas, and prioritize what to fix first."
+                            },
+                            {
+                                "title": "Documentation Readiness",
+                                "body": "Understand what needs to be documented and prepare policies, procedures, and evidence with confidence."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "how-it-works",
+                    "order": 4,
+                    "data": {
+                        "title": "How it works",
+                        "subtitle": "A simple 5-step process to go from uncertainty to audit-ready.",
+                        "steps": [
+                            {
+                                "title": "Choose a checklist",
+                                "body": "Pick the compliance framework or checklist that matches your organization's needs."
+                            },
+                            {
+                                "title": "Answer guided questions",
+                                "body": "We break down requirements into clear, structured questions so you always know what to do."
+                            },
+                            {
+                                "title": "Upload evidence (optional)",
+                                "body": "Attach documents, screenshots, or files that support your answers. We accept PDF, PNG, and JPG."
+                            },
+                            {
+                                "title": "Admin review & final report",
+                                "body": "Our team reviews your assessment, validates the evidence, and publishes your final report."
+                            },
+                            {
+                                "title": "Assessment data lifecycle",
+                                "body": "Your data is securely deleted within 48 hours after completion. You stay in control."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "cards",
+                    "order": 5,
+                    "data": {
+                        "title": "What you get",
+                        "subtitle": "Clear outputs, practical guidance, and audit-ready results you can use right away.",
+                        "items": [
+                            {
+                                "title": "Clear Gap Analysis",
+                                "body": "See where you stand and what needs improvement before the audit begins.",
+                                "points": [
+                                    "Visual maturity overview",
+                                    "Section-by-section scoring",
+                                    "Easy-to-understand findings"
+                                ]
+                            },
+                            {
+                                "title": "Structured Report",
+                                "body": "A professional report you can review internally and share with confidence.",
+                                "points": [
+                                    "Executive summary",
+                                    "Detailed findings",
+                                    "Maturity score and overview"
+                                ]
+                            },
+                            {
+                                "title": "Actionable Recommendations",
+                                "body": "Know what to fix next, in what order, and where to focus first.",
+                                "points": [
+                                    "Prioritized by risk and impact",
+                                    "Practical next steps",
+                                    "Built-in guidance for follow-up"
+                                ]
+                            },
+                            {
+                                "title": "Stronger Audit Readiness",
+                                "body": "Move into your audit with more confidence, clearer evidence, and less uncertainty.",
+                                "points": [
+                                    "Identify gaps early",
+                                    "Improve with evidence",
+                                    "Save time and reduce stress"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "cta",
+                    "order": 6,
+                    "data": {
+                        "title": "Ready to close your gaps and get audit-ready?",
+                        "subtitle": "Start your assessment now and see where you stand.",
+                        "buttons": [
+                            {
+                                "text": "Get Access",
+                                "href": "/products/audit-readiness",
+                                "variant": "primary"
+                            },
+                            {
+                                "text": "View Product",
+                                "href": "/products/audit-readiness",
+                                "variant": "secondary"
+                            }
+                        ]
                     }
                 }
             ]
         },
         "cs": {
-            "title": "Zdroje",
-            "meta_description": "Přístup k užitečným zdrojům a průvodcům přípravou auditu",
+            "title": "Checklist pro auditní připravenost",
+            "meta_description": "Připravte se na audit s jistotou. Zjednodušte složité požadavky do jasných a akčních kroků.",
             "status": "published",
             "content_type": "standard",
             "sections": [
@@ -1372,10 +1518,156 @@ PAGES_DATA = {
                     "section_type": "hero",
                     "order": 1,
                     "data": {
-                        "title": "Zdroje",
-                        "subtitle": "Průvodci a nástroje pro úspěch",
-                        "description": "Přístup k naší kolekci zdrojů, které vám pomůžou připravit se na audity.",
-                        "kicker": "Zdroje"
+                        "title": "Checklist pro auditní připravenost",
+                        "subtitle": "Připravte se na audit s jistotou. Zjednodušte složité požadavky do jasných a akčních kroků. Najděte mezery, nahrajte důkazy a získejte zkontrolovaný report, kterým prokážete připravenost.",
+                        "badge": "Audit",
+                        "highlights": [
+                            {
+                                "title": "Bezpečné & soukromé",
+                                "body": "Vaše data zůstávají chráněná",
+                                "icon": "shield"
+                            },
+                            {
+                                "title": "Odborná kontrola",
+                                "body": "Každý report kontroluje náš tým",
+                                "icon": "clipboard-check"
+                            },
+                            {
+                                "title": "Rychle & k věci",
+                                "body": "Začněte, vyhodnoťte a dokončete během pár dní",
+                                "icon": "lightning"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "main-benefit",
+                    "order": 2,
+                    "data": {
+                        "kicker": "Hlavní přínos",
+                        "title": "Získejte jasnou představu o připravenosti na audit — dříve, než auditor dorazí.",
+                        "body": "Identifikujte mezery, ověřte kontroly a získejte jasnou cestu k auditní připravenosti. Snižte riziko, ušetřete čas a zvládněte další audit s jistotou."
+                    }
+                },
+                {
+                    "section_type": "use_cases",
+                    "order": 3,
+                    "data": {
+                        "title": "Použití",
+                        "items": [
+                            {
+                                "title": "Před auditem",
+                                "body": "Zhodnoťte připravenost, uzavřete mezery a vyhněte se překvapením během auditu."
+                            },
+                            {
+                                "title": "Interní kontrola",
+                                "body": "Ověřte aktuální bezpečnostní a compliance stav a ujistěte se, že opatření fungují."
+                            },
+                            {
+                                "title": "Gap analýza",
+                                "body": "Porovnejte prostředí s požadavky, najděte slabá místa a stanovte priority oprav."
+                            },
+                            {
+                                "title": "Připravenost dokumentace",
+                                "body": "Získejte jasno, co je potřeba zdokumentovat, a připravte zásady, postupy a důkazy."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "how-it-works",
+                    "order": 4,
+                    "data": {
+                        "title": "Jak to funguje",
+                        "subtitle": "Jednoduchý 5krokový proces od nejistoty k auditní připravenosti.",
+                        "steps": [
+                            {
+                                "title": "Vyberte checklist",
+                                "body": "Zvolte rámec nebo checklist, který odpovídá potřebám vaší organizace."
+                            },
+                            {
+                                "title": "Odpovězte na vedené otázky",
+                                "body": "Požadavky rozkládáme na jasné a strukturované otázky, abyste vždy věděli, co dělat."
+                            },
+                            {
+                                "title": "Nahrajte důkazy (volitelně)",
+                                "body": "Přiložte dokumenty, screenshoty nebo soubory k podpoře odpovědí. Podporujeme PDF, PNG a JPG."
+                            },
+                            {
+                                "title": "Kontrola a finální report",
+                                "body": "Náš tým ověří hodnocení, zkontroluje důkazy a publikuje finální report."
+                            },
+                            {
+                                "title": "Životní cyklus dat hodnocení",
+                                "body": "Vaše data jsou bezpečně smazána do 48 hodin po dokončení. Máte kontrolu."
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "cards",
+                    "order": 5,
+                    "data": {
+                        "title": "Co získáte",
+                        "subtitle": "Jasné výstupy, praktické vedení a audit-ready výsledky, které můžete hned použít.",
+                        "items": [
+                            {
+                                "title": "Jasná gap analýza",
+                                "body": "Uvidíte, kde jste a co je potřeba zlepšit dříve, než audit začne.",
+                                "points": [
+                                    "Vizuální přehled zralosti",
+                                    "Skóre po jednotlivých sekcích",
+                                    "Srozumitelná zjištění"
+                                ]
+                            },
+                            {
+                                "title": "Strukturovaný report",
+                                "body": "Profesionální report pro interní použití i sdílení s jistotou.",
+                                "points": [
+                                    "Executive summary",
+                                    "Detailní zjištění",
+                                    "Skóre a přehled zralosti"
+                                ]
+                            },
+                            {
+                                "title": "Doporučení k dalším krokům",
+                                "body": "Budete vědět, co opravit jako další, v jakém pořadí a na co se zaměřit.",
+                                "points": [
+                                    "Prioritizováno dle rizika a dopadu",
+                                    "Praktické další kroky",
+                                    "Vedení pro následné kroky"
+                                ]
+                            },
+                            {
+                                "title": "Lepší auditní připravenost",
+                                "body": "Jděte do auditu s větší jistotou, lepšími důkazy a menší nejistotou.",
+                                "points": [
+                                    "Odhalte mezery včas",
+                                    "Zlepšujte s důkazy",
+                                    "Ušetřete čas a stres"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "section_type": "cta",
+                    "order": 6,
+                    "data": {
+                        "title": "Chcete uzavřít mezery a být audit-ready?",
+                        "subtitle": "Začněte hodnocení a zjistěte, kde jste.",
+                        "buttons": [
+                            {
+                                "text": "Získat přístup",
+                                "href": "/products/audit-readiness",
+                                "variant": "primary"
+                            },
+                            {
+                                "text": "Zobrazit produkt",
+                                "href": "/products/audit-readiness",
+                                "variant": "secondary"
+                            }
+                        ]
                     }
                 }
             ]
