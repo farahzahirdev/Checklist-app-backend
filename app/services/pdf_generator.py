@@ -1,46 +1,58 @@
 import os
-import tempfile
+import asyncio
 from uuid import UUID
 from datetime import datetime
 
 from fastapi import HTTPException, status
-from jinja2 import Environment, FileSystemLoader, Template
+from jinja2 import Environment, FileSystemLoader
 from sqlalchemy.orm import Session
-import weasyprint
+from playwright.async_api import async_playwright
 
 from app.models.report import ReportStatus
 from app.services.report import get_customer_report_data
 
 
+async def _generate_pdf_with_playwright(html_content: str) -> bytes:
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        try:
+            await page.set_content(html_content, wait_until="domcontentloaded", timeout=60000)
+            await page.emulate_media(media="print")
+            await asyncio.sleep(2)
+
+            footer_html = """
+            <div style="width:100%;font-size:10px;padding:0 12px;color:#6b7280;display:flex;justify-content:space-between;font-family:Arial, sans-serif;">
+                <span>Compliance Assessment Report</span>
+                <span style="font-variant-numeric: tabular-nums;"><span class="pageNumber"></span>/<span class="totalPages"></span></span>
+            </div>
+            """
+
+            pdf_bytes = await page.pdf(
+                format="A4",
+                print_background=True,
+                display_header_footer=True,
+                header_template="<div></div>",
+                footer_template=footer_html,
+                margin={"top": "20mm", "bottom": "25mm", "left": "10mm", "right": "10mm"},
+            )
+            return pdf_bytes
+        finally:
+            await browser.close()
+
+
 def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None = None, lang_code: str = "en") -> bytes:
-    """Generate PDF report from HTML template"""
-    
-    # Get comprehensive report data
     report_data = get_customer_report_data(db, report_id=report_id, company_id=company_id, lang_code=lang_code)
-    
-    # Verify report is published
     if report_data.report_status != ReportStatus.published:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Report must be published before PDF generation"
-        )
-    
-    # Get template path
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Report must be published before PDF generation")
+
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     if not os.path.exists(template_dir):
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Report template not found"
-        )
-    
-    # Setup Jinja2 environment
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Report template not found")
+
     env = Environment(loader=FileSystemLoader(template_dir))
-    
     try:
-        # Load template
         template = env.get_template('customer_report.html')
-        
-        # Render HTML with data
         html_content = template.render(
             report_id=report_data.report_id,
             report_uuid=report_data.report_uuid,
@@ -74,35 +86,19 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
             approved_at=report_data.approved_at,
             published_at=report_data.published_at,
         )
-        
-        # Generate PDF using WeasyPrint
-        pdf_document = weasyprint.HTML(string=html_content)
-        pdf_bytes = pdf_document.write_pdf()
-        
+
+        pdf_bytes = asyncio.run(_generate_pdf_with_playwright(html_content))
         return pdf_bytes
-        
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate PDF: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate PDF: {str(e)}")
 
 
 def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UUID | None = None, lang_code: str = "en") -> str:
-    """Generate HTML preview of report (for testing/debugging)"""
-    
-    # Get comprehensive report data
-    report_data = get_customer_report_data(db, report_id=report_id, company_id=company_id, lang_code=lang_code)
-    
-    # Get template path
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     env = Environment(loader=FileSystemLoader(template_dir))
-    
     try:
-        # Load template
         template = env.get_template('customer_report.html')
-        
-        # Render HTML with data
+        report_data = get_customer_report_data(db, report_id=report_id, company_id=company_id, lang_code=lang_code)
         html_content = template.render(
             report_id=report_data.report_id,
             report_uuid=report_data.report_uuid,
@@ -136,11 +132,6 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
             approved_at=report_data.approved_at,
             published_at=report_data.published_at,
         )
-        
         return html_content
-        
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate HTML preview: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate HTML preview: {str(e)}")

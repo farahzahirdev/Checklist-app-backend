@@ -62,6 +62,9 @@ from app.schemas.report import (
 	UpsertReportSummaryRequest,
 )
 from app.schemas.user_management import (
+	AdminChangePasswordRequest,
+	AdminProfileResponse,
+	AdminProfileUpdateRequest,
 	UserResponse,
 	UserDetailResponse,
 	UserListResponse,
@@ -218,6 +221,9 @@ def custom_openapi() -> dict:
 		PermissionCheckResponse,
 		MultiPermissionCheckResponse,
 		# User Management Schemas
+		AdminProfileResponse,
+		AdminProfileUpdateRequest,
+		AdminChangePasswordRequest,
 		UserResponse,
 		UserDetailResponse,
 		UserListResponse,

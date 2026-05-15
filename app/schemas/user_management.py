@@ -132,6 +132,41 @@ class UserPasswordResetResponse(BaseModel):
     reset_at: datetime
 
 
+class AdminProfileResponse(BaseModel):
+    """Response model for an admin's own profile."""
+
+    id: UUID
+    email: str
+    full_name: str | None = None
+    username: str | None = None
+    job_title: str | None = None
+    department: str | None = None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AdminProfileUpdateRequest(BaseModel):
+    """Request to update an admin's own profile."""
+
+    email: str | None = Field(None, description="Email address")
+    full_name: str | None = Field(None, max_length=255, description="Full name")
+    username: str | None = Field(None, max_length=100, description="Unique username")
+    job_title: str | None = Field(None, max_length=255, description="Job title")
+    department: str | None = Field(None, max_length=255, description="Department")
+
+
+class AdminChangePasswordRequest(BaseModel):
+    """Request to change an admin's own password."""
+
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
+    confirm_password: str = Field(..., min_length=8)
+
+
 # Customer Management (Fixed Permissions)
 
 class CustomerResponse(BaseModel):

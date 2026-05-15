@@ -18,259 +18,378 @@
       }
     </script>
     <style>
-            .chart-shell {
-                position: relative;
-                width: 100%;
-                height: 320px;
+        .chart-shell {
+            position: relative;
+            width: 100%;
+            height: 300px;
+        }
+
+        .chart-shell canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .report-page {
+            border-radius: 28px;
+            overflow: hidden;
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 18px 50px -34px rgba(15, 23, 42, 0.45);
+        }
+
+        .page-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .page-kicker {
+            letter-spacing: 0.24em;
+            text-transform: uppercase;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .page-title {
+            font-size: 30px;
+            line-height: 1.05;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+
+        .page-subtitle {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #475569;
+            max-width: 52rem;
+        }
+
+        .section-card {
+            border: 1px solid rgba(219, 231, 251, 0.95);
+            border-radius: 26px;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 10px 30px -24px rgba(15, 23, 42, 0.35);
+        }
+
+        .metric-pill {
+            border-radius: 18px;
+            background: white;
+            border: 1px solid #e5eefc;
+            box-shadow: 0 8px 16px -14px rgba(15, 23, 42, 0.35);
+        }
+
+        /* Dedicated print CSS for PDF output */
+        @media print {
+            @page {
+                size: A4;
+                margin: 14mm 12mm 24mm 12mm;
             }
 
-            .chart-shell canvas {
-                display: block;
-                width: 100% !important;
-                height: 100% !important;
+            html, body {
+                width: 210mm;
+                height: auto;
+                background: white;
+                margin: 0;
+                padding: 0;
+                font-family: Arial, sans-serif;
+                font-size: 12px;
             }
 
-      /* Minimal print tweaks to keep PDF layout stable */
-      @media print {
-        html, body { background: white }
-        .no-print { display: none }
-                .chart-shell {
-                    height: 280px;
-                }
-      }
+            * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+            .no-print { display: none !important; }
+
+            .page-break { page-break-before: always; break-before: page; }
+            .page-break-after { page-break-after: always; break-after: page; }
+            .avoid-break { page-break-inside: avoid; break-inside: avoid; }
+
+            .section { break-inside: auto; page-break-inside: auto; }
+
+            .report-page {
+                min-height: 255mm;
+                padding: 0;
+                background: white;
+                box-shadow: none;
+                page-break-after: always;
+                break-after: page;
+            }
+
+            .report-page.report-page-last {
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
+
+            .report-page:last-child {
+                page-break-after: auto;
+                break-after: auto;
+            }
+
+            .page-shell {
+                min-height: 255mm;
+                justify-content: space-between;
+            }
+
+            /* Chart containers: full width and taller for PDF */
+            .scores-overview {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 18px;
+                justify-items: center;
+            }
+
+            .chart-container { width: 100%; max-width: 150mm; margin-bottom: 0; }
+            .chart-shell { height: 260px; }
+
+            canvas { max-width: 100% !important; height: auto !important; }
+
+            /* Prevent tables from splitting badly */
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+            tr, td, th { page-break-inside: avoid; break-inside: avoid; }
+
+            h1, h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
+            p { orphans: 3; widows: 3; }
+
+            /* Reserve minimal space for Playwright footer (native) - do not use fixed footers in HTML */
+            body { padding-bottom: 8mm; }
+        }
     </style>
 </head>
 <body>
-    <div class="mx-auto flex min-h-screen max-w-6xl flex-col bg-white shadow-xl">
-        <main class="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <!-- Header -->
-        <div class="overflow-hidden rounded-3xl bg-gradient-to-r from-[#050f24] via-[#0f2a5a] to-[#2563eb] px-6 py-10 text-white shadow-[0_18px_50px_-28px_rgba(15,23,42,0.75)] sm:px-8 sm:py-12">
-            <div class="max-w-3xl">
-                <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[#93c5fd]">Compliance Assessment Report</p>
-                <h1 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{{ checklist_title }}</h1>
-                <p class="mt-3 max-w-2xl text-sm leading-6 text-[#dbeafe] sm:text-base">A concise view of overall readiness, section performance, and the most important follow-up actions from this assessment.</p>
-            </div>
-        </div>
-        
-        <!-- Report Information -->
-        <div class="mt-6 grid grid-cols-1 gap-4 rounded-3xl border border-[#dbe7fb] bg-[#f8fbff] p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
-            <div class="rounded-2xl bg-white p-4 text-sm text-gray-600 shadow-sm ring-1 ring-[#edf2fb]">
-                <div class="font-semibold text-xs uppercase tracking-wide text-gray-500">Report Code</div>
-                <div class="mt-1 font-mono text-sm text-gray-800">{{ report_id }}</div>
-            </div>
-            <div class="rounded-2xl bg-white p-4 text-sm text-gray-600 shadow-sm ring-1 ring-[#edf2fb]">
-                {% if company_name or company_website %}
-                <div class="font-semibold text-xs uppercase tracking-wide text-gray-500">Company</div>
-                <div class="mt-1 text-sm text-gray-800">{{ company_name or customer_name }}</div>
-                {% if company_website %}
-                <div class="text-xs text-gray-500">{{ company_website }}</div>
-                {% elif customer_email %}
-                <div class="text-xs text-gray-500">{{ customer_email }}</div>
-                {% endif %}
-                {% else %}
-                <div class="font-semibold text-xs uppercase tracking-wide text-gray-500">Customer</div>
-                <div class="mt-1 text-sm text-gray-800">{{ customer_name }}</div>
-                <div class="text-xs text-gray-500">{{ customer_email }}</div>
-                {% endif %}
-            </div>
-            <div class="rounded-2xl bg-white p-4 text-sm text-gray-600 shadow-sm ring-1 ring-[#edf2fb]">
-                <div class="font-semibold text-xs uppercase tracking-wide text-gray-500">Assessment Date</div>
-                <div class="mt-1 text-sm text-gray-800">{{ assessment_date.strftime('%B %d, %Y') }}</div>
-            </div>
-            <div class="rounded-2xl bg-white p-4 text-sm text-gray-600 shadow-sm ring-1 ring-[#edf2fb]">
-                <div class="font-semibold text-xs uppercase tracking-wide text-gray-500">Scores</div>
-                <div class="mt-1 text-sm text-gray-800">{{ "%.1f"|format(overall_score) }}/{{ max_possible_score }} · {{ "%.1f"|format(completion_percentage) }}% complete</div>
-            </div>
-        </div>
-        
-        <!-- Scores Overview -->
-        <div class="section">
-            <h2 class="section-title">Assessment Results Overview</h2>
-            <div class="scores-overview">
-                <div class="chart-container">
-                    <div class="chart-title">Section Performance Radar</div>
-                    <div class="chart-shell">
-                        <canvas id="radarChart"></canvas>
-                    </div>
-                </div>
-                <div class="chart-container">
-                    <div class="chart-title">Overall Score Distribution</div>
-                    <div class="chart-shell">
-                        <canvas id="scoreChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Chapter Overview -->
-        <div class="mt-8 rounded-3xl border border-[#dbe7fb] bg-[#f8fbff] p-5 shadow-sm sm:p-6">
-            <div class="flex flex-col gap-3 border-b border-[#e3ebf7] pb-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[#0066ff]">Chapter breakdown</p>
-                    <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Results by Chapter</h2>
-                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">This view shows how each chapter performed, how many findings were recorded, and where the weakest areas are concentrated.</p>
-                </div>
-                <div class="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#dbe7fb]">
-                    <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Chapters</div>
-                    <div class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ chapter_data|length }}</div>
-                </div>
-            </div>
-            <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {% for chapter in chapter_data %}
-                <article class="rounded-2xl border border-[#e3ebf7] bg-white p-4 shadow-sm sm:p-5">
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#0066ff]">{{ chapter.chapter_code }}</p>
-                            <h3 class="mt-1 text-lg font-semibold text-slate-900">{{ chapter.title }}</h3>
-                        </div>
-                        <div class="rounded-2xl bg-[#eef5ff] px-3 py-2 text-right">
-                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0066ff]">Score</div>
-                            <div class="text-2xl font-semibold tabular-nums text-slate-900">{{ "%.1f"|format(chapter.percentage) }}%</div>
+    <div class="mx-auto max-w-6xl bg-white">
+        <main class="px-4 py-6 sm:px-6 lg:px-8 page-shell">
+            <section class="report-page page-break-after">
+                <div class="page-shell">
+                    <div class="overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_top_left,_#3b82f6_0%,_#0f2a5a_36%,_#050f24_100%)] px-6 py-10 text-white shadow-[0_18px_50px_-28px_rgba(15,23,42,0.85)] sm:px-8 sm:py-12">
+                        <div class="max-w-3xl">
+                            <p class="page-kicker text-[#93c5fd]">Compliance Assessment Report</p>
+                            <h1 class="mt-3 text-3xl font-semibold tracking-tight sm:text-5xl">{{ checklist_title }}</h1>
+                            <p class="mt-4 max-w-2xl text-sm leading-6 text-[#dbeafe] sm:text-base">A concise view of overall readiness, section performance, and the most important follow-up actions from this assessment.</p>
                         </div>
                     </div>
-                    <div class="mt-4 space-y-2 text-sm text-slate-600">
-                        <div class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-                            <span>Score</span>
-                            <span class="font-semibold text-slate-900">{{ chapter.score }}/{{ chapter.max_score }}</span>
-                        </div>
-                        <div class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-                            <span>Findings</span>
-                            <span class="font-semibold text-slate-900">{{ chapter.findings_count }}</span>
-                        </div>
-                    </div>
-                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div class="h-full rounded-full bg-gradient-to-r from-[#0066ff] to-[#60a5fa]" style="width: {{ chapter.percentage }}%"></div>
-                    </div>
-                </article>
-                {% endfor %}
-            </div>
-        </div>
-        
-        <!-- Findings (Nonconformities/Weak Points) -->
-        <div class="mt-8 rounded-3xl border border-[#f2dede] bg-[#fff8f8] p-5 shadow-sm sm:p-6">
-            <div class="flex flex-col gap-3 border-b border-[#f4d6d6] pb-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[#dc2626]">Areas for improvement</p>
-                    <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Identified Areas for Improvement</h2>
-                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">These findings are grouped as practical follow-ups. The recommendation is surfaced directly under each issue to keep the action clear.</p>
-                </div>
-                <div class="grid grid-cols-3 gap-2 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-[#f3d9d9]">
-                    <div class="text-center">
-                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-500">High</div>
-                        <div class="mt-1 text-xl font-semibold tabular-nums text-slate-900">{{ findings|selectattr('priority', 'equalto', 'high')|list|length }}</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-500">Medium</div>
-                        <div class="mt-1 text-xl font-semibold tabular-nums text-slate-900">{{ findings|selectattr('priority', 'equalto', 'medium')|list|length }}</div>
-                    </div>
-                    <div class="text-center">
-                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-500">Low</div>
-                        <div class="mt-1 text-xl font-semibold tabular-nums text-slate-900">{{ findings|selectattr('priority', 'equalto', 'low')|list|length }}</div>
-                    </div>
-                </div>
-            </div>
-            <div class="mt-5 grid gap-4">
-                {% for finding in findings %}
-                <article class="rounded-2xl border border-[#f4d6d6] bg-white p-4 shadow-sm sm:p-5">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div class="flex-1">
-                            <div class="inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] {% if finding.priority == 'high' %}bg-red-100 text-red-700{% elif finding.priority == 'medium' %}bg-orange-100 text-orange-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
-                                {{ finding.priority.title() }}
-                            </div>
-                            <p class="mt-3 text-base font-semibold leading-6 text-slate-900">{{ finding.question_text }}</p>
-                        </div>
-                    </div>
-                    <div class="mt-4 rounded-2xl bg-slate-50 p-4">
-                        <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Recommendation</div>
-                        <p class="mt-2 text-sm leading-6 text-slate-700">{{ finding.recommendation }}</p>
-                    </div>
-                </article>
-                {% endfor %}
-            </div>
-        </div>
-        
-        <!-- Section Summaries -->
-        {% if section_summaries %}
-        <div class="mt-8 rounded-3xl border border-[#dbe7fb] bg-[#f8fbff] p-5 shadow-sm sm:p-6">
-            <div class="flex flex-col gap-3 border-b border-[#e3ebf7] pb-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[#0066ff]">Executive Summary</p>
-                    <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Section insights at a glance</h2>
-                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">These summaries condense the key findings for each chapter into a format that is easier to scan than the detailed findings list below.</p>
-                </div>
-                <div class="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#dbe7fb]">
-                    <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Sections summarized</div>
-                    <div class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ section_summaries|length }}</div>
-                </div>
-            </div>
-            <div class="mt-5 grid gap-4">
-                {% for summary in section_summaries %}
-                <article class="rounded-2xl border border-[#e3ebf7] bg-white p-4 shadow-sm sm:p-5">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#0066ff]">{{ summary.chapter_code }}</p>
-                            <h3 class="mt-1 text-lg font-semibold text-slate-900">Section summary</h3>
-                        </div>
-                        <span class="inline-flex self-start rounded-full bg-[#eef5ff] px-3 py-1 text-xs font-semibold text-[#0066ff]">Concise overview</span>
-                    </div>
-                    <p class="mt-3 text-sm leading-6 text-slate-600">{{ summary.summary_text }}</p>
-                </article>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-        
-        <!-- Public Suggestions -->
-        {% if public_suggestions %}
-        <div class="mt-8 rounded-3xl border border-[#cfe8ff] bg-[#f4faff] p-5 shadow-sm sm:p-6">
-            <div class="flex flex-col gap-3 border-b border-[#dbeefd] pb-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[#0066ff]">Recommendations</p>
-                    <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Additional Recommendations</h2>
-                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Suggested next steps for closing the most important gaps and making the checklist results easier to act on.</p>
-                </div>
-                <div class="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#dbe7fb]">
-                    <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Suggestions</div>
-                    <div class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ public_suggestions|length }}</div>
-                </div>
-            </div>
-            <div class="mt-5 grid gap-4">
-                {% for suggestion in public_suggestions %}
-                <article class="rounded-2xl border border-[#dbeefd] bg-white p-4 shadow-sm sm:p-5">
-                    <div class="flex items-start gap-3">
-                        <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#eef5ff] text-sm font-semibold text-[#0066ff]">{{ loop.index }}</div>
-                        <div class="min-w-0 flex-1">
-                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0066ff]">Recommendation</div>
-                            <p class="mt-2 text-sm leading-6 text-slate-700">{{ suggestion.suggestion_text }}</p>
-                        </div>
-                    </div>
-                </article>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-        
-        </main>
 
-        <!-- Footer -->
-        <footer class="mt-auto border-t border-[#dbe7fb] bg-[#050a14] px-4 py-8 text-white sm:px-6 lg:px-8">
-            <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-                <div class="max-w-2xl">
-                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-[#93c5fd]">Report footer</p>
-                    <p class="mt-3 text-sm leading-6 text-[#cbd5e1]">This report is generated from the current assessment data and should be treated as a confidential summary of the checklist results.</p>
+                    <div class="grid grid-cols-1 gap-4 rounded-[28px] border border-[#dbe7fb] bg-[#f8fbff] p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+                        <div class="metric-pill p-4 text-sm text-gray-600">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Report Code</div>
+                            <div class="mt-1 font-mono text-sm text-gray-800">{{ report_id }}</div>
+                        </div>
+                        <div class="metric-pill p-4 text-sm text-gray-600">
+                            {% if company_name or company_website %}
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Company</div>
+                            <div class="mt-1 text-sm text-gray-800">{{ company_name or customer_name }}</div>
+                            {% if company_website %}
+                            <div class="text-xs text-gray-500">{{ company_website }}</div>
+                            {% elif customer_email %}
+                            <div class="text-xs text-gray-500">{{ customer_email }}</div>
+                            {% endif %}
+                            {% else %}
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Customer</div>
+                            <div class="mt-1 text-sm text-gray-800">{{ customer_name }}</div>
+                            <div class="text-xs text-gray-500">{{ customer_email }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="metric-pill p-4 text-sm text-gray-600">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Assessment Date</div>
+                            <div class="mt-1 text-sm text-gray-800">{{ assessment_date.strftime('%B %d, %Y') }}</div>
+                        </div>
+                        <div class="metric-pill p-4 text-sm text-gray-600">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Scores</div>
+                            <div class="mt-1 text-sm text-gray-800">{{ "%.1f"|format(overall_score) }}/{{ max_possible_score }} · {{ "%.1f"|format(completion_percentage) }}% complete</div>
+                        </div>
+                    </div>
+
+                    <div class="section-card p-5 sm:p-6">
+                        <div class="flex flex-col gap-3 border-b border-[#e3ebf7] pb-5 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <p class="page-kicker text-[#0f2a5a]">Assessment overview</p>
+                                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">The two score views that frame the report</h2>
+                                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">The radar view shows section balance while the doughnut chart shows overall score distribution. Both are sized to feel like part of the page instead of a compressed widget.</p>
+                            </div>
+                            <div class="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#dbe7fb]">
+                                <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Sections</div>
+                                <div class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ section_scores|length }}</div>
+                            </div>
+                        </div>
+                        <div class="mt-5 scores-overview grid gap-4 lg:grid-cols-2">
+                            <div class="chart-container rounded-[24px] border border-[#e3ebf7] bg-white p-4 shadow-sm">
+                                <div class="page-kicker text-[#0066ff]">Section performance radar</div>
+                                <div class="mt-2 text-lg font-semibold text-slate-900">Balance across the compliance sections</div>
+                                <div class="chart-shell mt-4">
+                                    <canvas id="radarChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="chart-container rounded-[24px] border border-[#e3ebf7] bg-white p-4 shadow-sm">
+                                <div class="page-kicker text-[#0f2a5a]">Overall score distribution</div>
+                                <div class="mt-2 text-lg font-semibold text-slate-900">How the sections cluster by maturity</div>
+                                <div class="chart-shell mt-4">
+                                    <canvas id="scoreChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="space-y-1 text-sm text-[#cbd5e1] lg:text-right">
-                    <p>Generated on {{ generated_at.strftime('%B %d, %Y at %I:%M %p') }}</p>
-                    {% if approved_at %}
-                    <p>Approved by administrator on {{ approved_at.strftime('%B %d, %Y') }}</p>
-                    {% endif %}
-                    {% if published_at %}
-                    <p>Published on {{ published_at.strftime('%B %d, %Y') }}</p>
-                    {% endif %}
-                    <p class="pt-2 font-semibold text-white">© 2026 Compliance Assessment Platform. All rights reserved.</p>
+            </section>
+
+            <section class="report-page page-break-after">
+                <div class="page-shell">
+                    <div class="section-card p-5 sm:p-6">
+                        <div class="flex flex-col gap-3 border-b border-[#e3ebf7] pb-5 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <p class="page-kicker text-[#0066ff]">Chapter breakdown</p>
+                                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Results by Chapter</h2>
+                                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Each chapter is presented as part of the page grid so it reads like a designed report page, not a stack of disconnected cards.</p>
+                            </div>
+                            <div class="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#dbe7fb]">
+                                <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Chapters</div>
+                                <div class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ chapter_data|length }}</div>
+                            </div>
+                        </div>
+                        <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+                            {% for chapter in chapter_data %}
+                            <article class="rounded-[24px] border border-[#e3ebf7] bg-white p-4 shadow-sm sm:p-5">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#0066ff]">{{ chapter.chapter_code }}</p>
+                                        <h3 class="mt-1 text-lg font-semibold text-slate-900">{{ chapter.title }}</h3>
+                                    </div>
+                                    <div class="rounded-2xl bg-[#eef5ff] px-3 py-2 text-right">
+                                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0066ff]">Score</div>
+                                        <div class="text-2xl font-semibold tabular-nums text-slate-900">{{ "%.1f"|format(chapter.percentage) }}%</div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 grid gap-2 text-sm text-slate-600">
+                                    <div class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                                        <span>Score</span>
+                                        <span class="font-semibold text-slate-900">{{ chapter.score }}/{{ chapter.max_score }}</span>
+                                    </div>
+                                    <div class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                                        <span>Findings</span>
+                                        <span class="font-semibold text-slate-900">{{ chapter.findings_count }}</span>
+                                    </div>
+                                </div>
+                                <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+                                    <div class="h-full rounded-full bg-gradient-to-r from-[#0066ff] to-[#60a5fa]" style="width: {{ chapter.percentage }}%"></div>
+                                </div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </footer>
+            </section>
+
+            <section class="report-page page-break-after page-break">
+                <div class="page-shell">
+                    <div class="section-card p-5 sm:p-6">
+                        <div class="flex flex-col gap-3 border-b border-[#f4d6d6] pb-5 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <p class="page-kicker text-[#dc2626]">Areas for improvement</p>
+                                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Identified Areas for Improvement</h2>
+                                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">This page is intentionally reserved for the issues that matter most. The layout is broader and calmer so each finding feels like part of one designed page.</p>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-[#f3d9d9]">
+                                <div class="text-center">
+                                    <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-red-500">High</div>
+                                    <div class="mt-1 text-xl font-semibold tabular-nums text-slate-900">{{ findings|selectattr('priority', 'equalto', 'high')|list|length }}</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-orange-500">Medium</div>
+                                    <div class="mt-1 text-xl font-semibold tabular-nums text-slate-900">{{ findings|selectattr('priority', 'equalto', 'medium')|list|length }}</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-500">Low</div>
+                                    <div class="mt-1 text-xl font-semibold tabular-nums text-slate-900">{{ findings|selectattr('priority', 'equalto', 'low')|list|length }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-5 grid gap-4">
+                            {% for finding in findings %}
+                            <article class="rounded-[24px] border border-[#f4d6d6] bg-white p-4 shadow-sm sm:p-5">
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div class="flex-1">
+                                        <div class="inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] {% if finding.priority == 'high' %}bg-red-100 text-red-700{% elif finding.priority == 'medium' %}bg-orange-100 text-orange-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                                            {{ finding.priority.title() }}
+                                        </div>
+                                        <p class="mt-3 text-base font-semibold leading-6 text-slate-900">{{ finding.question_text }}</p>
+                                    </div>
+                                </div>
+                                <div class="mt-4 rounded-2xl bg-slate-50 p-4">
+                                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Recommendation</div>
+                                    <p class="mt-2 text-sm leading-6 text-slate-700">{{ finding.recommendation }}</p>
+                                </div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {% if section_summaries %}
+            <section class="report-page page-break-after">
+                <div class="page-shell">
+                    <div class="section-card p-5 sm:p-6">
+                        <div class="flex flex-col gap-3 border-b border-[#e3ebf7] pb-5 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <p class="page-kicker text-[#0066ff]">Executive Summary</p>
+                                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Section insights at a glance</h2>
+                                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">These summary cards give each chapter a concise, high-level explanation that reads as part of the page design.</p>
+                            </div>
+                            <div class="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#dbe7fb]">
+                                <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Sections summarized</div>
+                                <div class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ section_summaries|length }}</div>
+                            </div>
+                        </div>
+                        <div class="mt-5 grid gap-4">
+                            {% for summary in section_summaries %}
+                            <article class="rounded-[24px] border border-[#e3ebf7] bg-white p-4 shadow-sm sm:p-5">
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#0066ff]">{{ summary.chapter_code }}</p>
+                                        <h3 class="mt-1 text-lg font-semibold text-slate-900">Section summary</h3>
+                                    </div>
+                                    <span class="inline-flex self-start rounded-full bg-[#eef5ff] px-3 py-1 text-xs font-semibold text-[#0066ff]">Concise overview</span>
+                                </div>
+                                <p class="mt-3 text-sm leading-6 text-slate-600">{{ summary.summary_text }}</p>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {% endif %}
+
+            {% if public_suggestions %}
+            <section class="report-page report-page-last">
+                <div class="page-shell">
+                    <div class="section-card p-5 sm:p-6">
+                        <div class="flex flex-col gap-3 border-b border-[#dbeefd] pb-5 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <p class="page-kicker text-[#0066ff]">Recommendations</p>
+                                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Additional Recommendations</h2>
+                                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Suggested next steps for closing the most important gaps and making the checklist results easier to act on.</p>
+                            </div>
+                            <div class="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#dbe7fb]">
+                                <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Suggestions</div>
+                                <div class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ public_suggestions|length }}</div>
+                            </div>
+                        </div>
+                        <div class="mt-5 grid gap-4">
+                            {% for suggestion in public_suggestions %}
+                            <article class="rounded-[24px] border border-[#dbeefd] bg-white p-4 shadow-sm sm:p-5">
+                                <div class="flex items-start gap-3">
+                                    <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#eef5ff] text-sm font-semibold text-[#0066ff]">{{ loop.index }}</div>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0066ff]">Recommendation</div>
+                                        <p class="mt-2 text-sm leading-6 text-slate-700">{{ suggestion.suggestion_text }}</p>
+                                    </div>
+                                </div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </section>
+            {% endif %}
+        </main>
     </div>
     
     <script>

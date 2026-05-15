@@ -16,7 +16,7 @@ from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user, get_db
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.models.audit_log import AuditAction, AuditLog
 from app.utils.i18n import get_language_code
 from app.utils.i18n_messages import translate
@@ -26,6 +26,9 @@ from app.schemas.user_management import (
     CreateAdminResponse,
     CreateAuditorRequest,
     CreateAuditorResponse,
+    AdminChangePasswordRequest,
+    AdminProfileResponse,
+    AdminProfileUpdateRequest,
     CustomerActivateRequest,
     CustomerBanRequest,
     CustomerDetailResponse,
@@ -60,6 +63,166 @@ from app.services.customer_assessments import (
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def _serialize_admin_profile(user: User) -> dict:
+    return {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "username": user.username,
+        "job_title": user.job_title,
+        "department": user.department,
+        "is_active": user.is_active,
+        "created_at": user.created_at,
+        "updated_at": user.updated_at,
+    }
+
+
+def _require_admin_user(current_user: User, lang_code: str) -> None:
+    if current_user.role != UserRole.admin.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=translate("insufficient_permissions", lang_code),
+        )
+
+
+@router.get("/profile", response_model=AdminProfileResponse, summary="Get Admin Profile")
+def get_admin_profile(
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
+) -> dict:
+    """Get the authenticated admin's own profile without customer company fields."""
+    lang_code = get_language_code(request, db)
+    _require_admin_user(current_user, lang_code)
+    return _serialize_admin_profile(current_user)
+
+
+@router.patch("/profile", response_model=AdminProfileResponse, summary="Update Admin Profile")
+def update_admin_profile(
+    request: Request,
+    payload: AdminProfileUpdateRequest,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
+) -> dict:
+    """Update the authenticated admin's own profile fields."""
+    lang_code = get_language_code(request, db)
+    _require_admin_user(current_user, lang_code)
+
+    before_json = {
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "username": current_user.username,
+        "job_title": current_user.job_title,
+        "department": current_user.department,
+    }
+
+    if payload.email is not None:
+        new_email = payload.email.strip().lower()
+        if new_email != current_user.email.lower():
+            existing = db.query(User).filter(User.email == new_email, User.id != current_user.id).first()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=translate("email_already_exists", lang_code),
+                )
+        current_user.email = new_email
+
+    if payload.full_name is not None:
+        current_user.full_name = payload.full_name.strip()
+
+    if payload.username is not None:
+        new_username = payload.username.strip().lower()
+        if new_username != (current_user.username or "").lower():
+            existing = db.query(User).filter(User.username == new_username, User.id != current_user.id).first()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=translate("username_already_taken", lang_code),
+                )
+        current_user.username = new_username
+
+    if payload.job_title is not None:
+        current_user.job_title = payload.job_title.strip()
+
+    if payload.department is not None:
+        current_user.department = payload.department.strip()
+
+    db.add(
+        AuditLog(
+            actor_user_id=current_user.id,
+            actor_role=str(current_user.role),
+            action=AuditAction.auth_profile_update,
+            target_entity="user",
+            target_id=current_user.id,
+            target_user_id=current_user.id,
+            before_json=before_json,
+            after_json={
+                "email": current_user.email,
+                "full_name": current_user.full_name,
+                "username": current_user.username,
+                "job_title": current_user.job_title,
+                "department": current_user.department,
+            },
+            changes_summary="Admin updated own profile",
+        )
+    )
+    db.commit()
+    db.refresh(current_user)
+    return _serialize_admin_profile(current_user)
+
+
+@router.patch("/profile/password", summary="Change Admin Password")
+def change_admin_password(
+    request: Request,
+    payload: AdminChangePasswordRequest,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
+) -> dict:
+    """Change the authenticated admin's own password."""
+    lang_code = get_language_code(request, db)
+    _require_admin_user(current_user, lang_code)
+
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=translate("invalid_current_password", lang_code),
+        )
+
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate("password_mismatch", lang_code),
+        )
+
+    validation_error = get_password_validation_error(payload.new_password)
+    if validation_error is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate(validation_error, lang_code),
+        )
+
+    if verify_password(payload.new_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate("new_password_same_as_current", lang_code),
+        )
+
+    current_user.password_hash = hash_password(payload.new_password)
+    db.add(
+        AuditLog(
+            actor_user_id=current_user.id,
+            actor_role=str(current_user.role),
+            action=AuditAction.auth_password_change,
+            target_entity="user",
+            target_id=current_user.id,
+            target_user_id=current_user.id,
+            changes_summary="Admin changed own password",
+        )
+    )
+    db.commit()
+    return {"message": "Password changed successfully."}
 
 
 # ============================================================================
