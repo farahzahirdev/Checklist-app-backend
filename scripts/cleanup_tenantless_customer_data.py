@@ -3,6 +3,7 @@
 """Remove legacy customer data that is not linked to a company.
 
 This deletes only rows where company_id IS NULL from the tenant-scoped tables.
+Payment history is retained so customer billing records remain visible after access expires.
 Dependent rows are removed by database cascades where configured.
 """
 
@@ -40,9 +41,6 @@ def main() -> int:
             deleted_reports = session.execute(text("DELETE FROM reports WHERE company_id IS NULL RETURNING id"))
             deleted_reports_count = len(deleted_reports.fetchall())
 
-            deleted_payments = session.execute(text("DELETE FROM payments WHERE company_id IS NULL RETURNING id"))
-            deleted_payments_count = len(deleted_payments.fetchall())
-
             deleted_assessments = session.execute(text("DELETE FROM assessments WHERE company_id IS NULL RETURNING id"))
             deleted_assessments_count = len(deleted_assessments.fetchall())
 
@@ -56,7 +54,7 @@ def main() -> int:
 
         print("Deleted rows:")
         print(f"- reports: {deleted_reports_count}")
-        print(f"- payments: {deleted_payments_count}")
+        print("- payments: retained")
         print(f"- assessments: {deleted_assessments_count}")
         print(f"- access_windows: {deleted_access_windows_count}")
 
