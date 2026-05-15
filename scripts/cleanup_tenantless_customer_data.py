@@ -10,8 +10,12 @@ Dependent rows are removed by database cascades where configured.
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
+import sys
 
 from sqlalchemy import text
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.db.session import SessionLocal
 
