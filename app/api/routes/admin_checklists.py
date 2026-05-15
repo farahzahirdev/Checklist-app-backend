@@ -177,6 +177,45 @@ def admin_update_checklist(
     return checklist
 
 
+@router.get(
+    "/{checklist_id}/translations/{language_code}",
+    response_model=ChecklistTranslationResponse,
+    summary="Get Checklist Translation",
+    description="Get translation for checklist title/description in a specific language.",
+)
+def admin_get_checklist_translation(
+    checklist_id: UUID,
+    language_code: str,
+    http_request: Request,
+    _admin=Depends(require_admin_or_auditor_for_read()),
+    db: Session = Depends(get_db),
+) -> ChecklistTranslationResponse:
+    lang_code = get_language_code(http_request, db)
+    checklist = db.get(Checklist, checklist_id)
+    if checklist is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
+
+    language = db.scalar(select(Language).where(Language.code == language_code))
+    if language is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Language {language_code} not found")
+
+    translation = db.scalar(
+        select(ChecklistTranslation).where(
+            ChecklistTranslation.checklist_id == checklist_id,
+            ChecklistTranslation.language_id == language.id,
+        )
+    )
+    if translation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Translation for language {language_code} not found")
+
+    return ChecklistTranslationResponse(
+        checklist_id=checklist_id,
+        language_code=language_code,
+        title=translation.title,
+        description=translation.description,
+    )
+
+
 @router.post(
     "/{checklist_id}/translations",
     response_model=ChecklistTranslationResponse,
@@ -349,6 +388,46 @@ def admin_create_section(
     return create_section(
         db, checklist_id=checklist_id, payload=request, lang_code=lang_code
     )
+
+
+@router.get(
+    "/{checklist_id}/sections/{section_id}/translations/{language_code}",
+    response_model=SectionTranslationResponse,
+    summary="Get Section Translation",
+    description="Get a section translation for a given language.",
+)
+def admin_get_section_translation(
+    checklist_id: UUID,
+    section_id: UUID,
+    language_code: str,
+    http_request: Request,
+    _admin=Depends(require_admin_or_auditor_for_read()),
+    db: Session = Depends(get_db),
+) -> SectionTranslationResponse:
+    lang_code = get_language_code(http_request, db)
+    section = db.scalar(
+        select(ChecklistSection).where(
+            ChecklistSection.id == section_id,
+            ChecklistSection.checklist_id == checklist_id,
+        )
+    )
+    if section is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("section_not_found", lang_code))
+
+    language = db.scalar(select(Language).where(Language.code == language_code))
+    if language is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Language {language_code} not found")
+
+    translation = db.scalar(
+        select(ChecklistSectionTranslation).where(
+            ChecklistSectionTranslation.section_id == section_id,
+            ChecklistSectionTranslation.language_id == language.id,
+        )
+    )
+    if translation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Translation for language {language_code} not found")
+
+    return SectionTranslationResponse(section_id=section_id, language_code=language_code, title=translation.title)
 
 
 @router.post(
@@ -644,6 +723,62 @@ def admin_create_question(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate(str(exc), lang_code)) from exc
+
+
+@router.get(
+    "/{checklist_id}/sections/{section_id}/questions/{question_id}/translations/{language_code}",
+    response_model=QuestionTranslationResponse,
+    summary="Get Question Translation",
+    description="Get a question translation for a given language.",
+)
+def admin_get_question_translation(
+    checklist_id: UUID,
+    section_id: UUID,
+    question_id: UUID,
+    language_code: str,
+    http_request: Request,
+    _admin=Depends(require_admin_or_auditor_for_read()),
+    db: Session = Depends(get_db),
+) -> QuestionTranslationResponse:
+    lang_code = get_language_code(http_request, db)
+    question = db.scalar(
+        select(ChecklistQuestion).where(
+            ChecklistQuestion.id == question_id,
+            ChecklistQuestion.section_id == section_id,
+            ChecklistQuestion.checklist_id == checklist_id,
+        )
+    )
+    if question is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("question_not_found", lang_code))
+
+    language = db.scalar(select(Language).where(Language.code == language_code))
+    if language is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Language {language_code} not found")
+
+    translation = db.scalar(
+        select(ChecklistQuestionTranslation).where(
+            ChecklistQuestionTranslation.question_id == question_id,
+            ChecklistQuestionTranslation.language_id == language.id,
+        )
+    )
+    if translation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Translation for language {language_code} not found")
+
+    return QuestionTranslationResponse(
+        question_id=question_id,
+        language_code=language_code,
+        question_text=translation.question_text,
+        explanation=translation.explanation,
+        expected_implementation=translation.expected_implementation,
+        how_it_works=translation.how_it_works,
+        legal_requirement_title=translation.legal_requirement_title,
+        legal_requirement_description=translation.legal_requirement_description,
+        guidance_score_4=translation.guidance_score_4,
+        guidance_score_3=translation.guidance_score_3,
+        guidance_score_2=translation.guidance_score_2,
+        guidance_score_1=translation.guidance_score_1,
+        recommendation_template=translation.recommendation_template,
+    )
 
 
 @router.post(
