@@ -22,7 +22,9 @@ from app.models.checklist import (
     SeverityLevel,
 )
 from app.models.payment import Payment, PaymentStatus
+from app.models.reference import Language
 from app.models.user import User, UserRole
+from app.utils.i18n import DEFAULT_LANGUAGE_CODE
 from app.utils.audit_logger import AuditLogger
 from app.schemas.assessment import (
     AssessmentAnswerResponse,
@@ -328,6 +330,18 @@ def _recompute_completion(db: Session, *, assessment: Assessment) -> float:
     return completion
 
 
+def _default_language(db: Session) -> Language | None:
+    return db.scalar(
+        select(Language).where(Language.is_default.is_(True), Language.is_active.is_(True)).limit(1)
+    ) or db.scalar(select(Language).where(Language.code == DEFAULT_LANGUAGE_CODE, Language.is_active.is_(True)).limit(1))
+
+
+def _language_by_code(db: Session, lang_code: str | None) -> Language | None:
+    if not lang_code:
+        return None
+    return db.scalar(select(Language).where(Language.code == lang_code, Language.is_active.is_(True)))
+
+
 def _latest_checklist_translation(db: Session, checklist_id: UUID) -> ChecklistTranslation | None:
     return db.scalar(
         select(ChecklistTranslation)
@@ -355,14 +369,86 @@ def _latest_question_translation(db: Session, question_id: UUID) -> ChecklistQue
     )
 
 
+def _translation_for_language(
+    db: Session,
+    *,
+    requested_lang_code: str | None,
+    fetch_for_language_id,
+    fetch_latest,
+):
+    """Resolve translation: requested language, then default language, then latest row."""
+    requested = _language_by_code(db, requested_lang_code)
+    if requested is not None:
+        translation = fetch_for_language_id(requested.id)
+        if translation is not None:
+            return translation
+
+    default_language = _default_language(db)
+    if default_language is not None and (requested is None or default_language.id != requested.id):
+        translation = fetch_for_language_id(default_language.id)
+        if translation is not None:
+            return translation
+
+    return fetch_latest()
+
+
+def _checklist_translation_for_language(
+    db: Session, checklist_id: UUID, lang_code: str | None
+) -> ChecklistTranslation | None:
+    return _translation_for_language(
+        db,
+        requested_lang_code=lang_code,
+        fetch_for_language_id=lambda language_id: db.scalar(
+            select(ChecklistTranslation).where(
+                ChecklistTranslation.checklist_id == checklist_id,
+                ChecklistTranslation.language_id == language_id,
+            )
+        ),
+        fetch_latest=lambda: _latest_checklist_translation(db, checklist_id),
+    )
+
+
+def _section_translation_for_language(
+    db: Session, section_id: UUID, lang_code: str | None
+) -> ChecklistSectionTranslation | None:
+    return _translation_for_language(
+        db,
+        requested_lang_code=lang_code,
+        fetch_for_language_id=lambda language_id: db.scalar(
+            select(ChecklistSectionTranslation).where(
+                ChecklistSectionTranslation.section_id == section_id,
+                ChecklistSectionTranslation.language_id == language_id,
+            )
+        ),
+        fetch_latest=lambda: _latest_section_translation(db, section_id),
+    )
+
+
+def _question_translation_for_language(
+    db: Session, question_id: UUID, lang_code: str | None
+) -> ChecklistQuestionTranslation | None:
+    return _translation_for_language(
+        db,
+        requested_lang_code=lang_code,
+        fetch_for_language_id=lambda language_id: db.scalar(
+            select(ChecklistQuestionTranslation).where(
+                ChecklistQuestionTranslation.question_id == question_id,
+                ChecklistQuestionTranslation.language_id == language_id,
+            )
+        ),
+        fetch_latest=lambda: _latest_question_translation(db, question_id),
+    )
+
+
 def _to_assessment_question_response(
     question: ChecklistQuestion,
     answer_map: dict[UUID, AssessmentAnswer],
     children_map: dict[UUID, list[ChecklistQuestion]],
     db: Session,
     assessment: Assessment,
+    lang_code: str | None = None,
 ) -> 'AssessmentQuestionResponse':
-    translation = _latest_question_translation(db, question.id)
+    translation = _question_translation_for_language(db, question.id, lang_code)
     customer_answer = None
     customer_answer_status = "not_started"
     answer = answer_map.get(question.id)
@@ -371,7 +457,7 @@ def _to_assessment_question_response(
         customer_answer_status = "answered"
 
     sub_questions = [
-        _to_assessment_question_response(subq, answer_map, children_map, db, assessment)
+        _to_assessment_question_response(subq, answer_map, children_map, db, assessment, lang_code)
         for subq in sorted(children_map.get(question.id, []), key=lambda q: q.display_order)
     ]
 
@@ -459,12 +545,15 @@ def _to_assessment_question_response(
     )
 
 
-def _serialize_assessment_detail(db: Session, assessment: Assessment) -> AssessmentDetailResponse:
+def _serialize_assessment_detail(
+    db: Session, assessment: Assessment, lang_code: str | None = None
+) -> AssessmentDetailResponse:
     checklist = db.get(Checklist, assessment.checklist_id)
     if checklist is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="checklist_not_found")
 
-    checklist_translation = _latest_checklist_translation(db, checklist.id)
+    resolved_lang = lang_code or DEFAULT_LANGUAGE_CODE
+    checklist_translation = _checklist_translation_for_language(db, checklist.id, resolved_lang)
     checklist_title = checklist_translation.title if checklist_translation else f"Checklist v{checklist.version}"
 
     sections = db.scalars(
@@ -494,15 +583,17 @@ def _serialize_assessment_detail(db: Session, assessment: Assessment) -> Assessm
 
     section_responses: list[AssessmentSectionResponse] = []
     for section in sections:
-        title = _latest_section_translation(db, section.id)
+        section_translation = _section_translation_for_language(db, section.id, resolved_lang)
         section_responses.append(
             AssessmentSectionResponse(
                 id=section.id,
                 checklist_id=section.checklist_id,
-                title=title.title if title else section.section_code,
+                title=section_translation.title if section_translation else section.section_code,
                 order=section.display_order,
                 questions=[
-                    _to_assessment_question_response(question, answer_map, children_map, db, assessment)
+                    _to_assessment_question_response(
+                        question, answer_map, children_map, db, assessment, resolved_lang
+                    )
                     for question in sorted(questions, key=lambda q: q.display_order)
                     if question.section_id == section.id and question.parent_question_id is None
                 ],
@@ -528,7 +619,7 @@ def _serialize_assessment_detail(db: Session, assessment: Assessment) -> Assessm
 def get_current_assessment_detail(db: Session, *, user: User, checklist_id: UUID | None = None, company_id: UUID | None = None, lang_code: str | None = None) -> AssessmentDetailResponse:
     assessment = _get_active_assessment(db, user=user, checklist_id=checklist_id, company_id=company_id)
     db.refresh(assessment)  # Ensure we have latest completion_percent
-    return _serialize_assessment_detail(db, assessment)
+    return _serialize_assessment_detail(db, assessment, lang_code=lang_code)
 
 
 def upsert_assessment_answer(
