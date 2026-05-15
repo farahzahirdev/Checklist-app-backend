@@ -43,6 +43,13 @@ def _has_visible_text(raw_html: str) -> bool:
     return bool(re.search(r"\w", text))
 
 
+def _format_fallback_html(title: str, description: str) -> str:
+    return (
+        f"<h1>{html_module.escape(title)}</h1>"
+        f"<p>{html_module.escape(description)}</p>"
+    )
+
+
 def _load_legal_html(filename: str, fallback: str) -> str:
     """Load legal page HTML from project root; use fallback when unavailable."""
     candidate_paths = [
@@ -63,23 +70,35 @@ def _load_legal_html(filename: str, fallback: str) -> str:
 
 PRIVACY_POLICY_HTML_CS = _load_legal_html(
     "AuditReady_Privacy_Policy.html",
-    "Vaše soukromí je pro nás důležité. Tyto zásady ochrany osobních údajů vysvětlují, jak shromažďujeme a používáme vaše informace.",
+    _format_fallback_html(
+        "Zásady ochrany osobních údajů",
+        "Vaše soukromí je pro nás důležité. Tyto zásady ochrany osobních údajů vysvětlují, jak shromažďujeme a používáme vaše informace.",
+    ),
 )
 
 COOKIE_POLICY_HTML_CS = _load_legal_html(
     "AuditReady_Cookie_Policy.html",
-    "Používáme cookies ke zlepšení vaší zkušenosti. Zjistěte více o tom, jak je používáme.",
+    _format_fallback_html(
+        "Zásady cookies",
+        "Používáme cookies ke zlepšení vaší zkušenosti. Zjistěte více o tom, jak je používáme.",
+    ),
 )
 
 # Optional English legal documents (if provided by client as translated HTML files)
 PRIVACY_POLICY_HTML_EN = _load_legal_html(
     "AuditReady_Privacy_Policy_en.html",
-    "Your privacy is important to us. This privacy policy explains how we collect and use your information. We are committed to protecting your personal data and ensuring transparency in our data practices.",
+    _format_fallback_html(
+        "Privacy Policy",
+        "Your privacy is important to us. This privacy policy explains how we collect and use your information. We are committed to protecting your personal data and ensuring transparency in our data practices.",
+    ),
 )
 
 COOKIE_POLICY_HTML_EN = _load_legal_html(
     "AuditReady_Cookie_Policy_en.html",
-    "We use cookies to enhance your experience. Learn more about how we use them. Cookies help us analyze traffic, personalize content, and improve our services to better meet your needs.",
+    _format_fallback_html(
+        "Cookie Policy",
+        "We use cookies to enhance your experience. Learn more about how we use them. Cookies help us analyze traffic, personalize content, and improve our services to better meet your needs.",
+    ),
 )
 
 # Page content data structure - comprehensive content from all frontend pages
