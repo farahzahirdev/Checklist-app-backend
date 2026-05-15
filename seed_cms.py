@@ -5,6 +5,7 @@ Usage: python seed_cms.py
 """
 
 import os
+import html as html_module
 import re
 import sys
 from uuid import uuid4
@@ -27,13 +28,19 @@ def _extract_html_fragment(raw_html: str) -> str:
     """Keep the meaningful HTML fragment from Word-exported documents."""
     fragment_match = re.search(r"<!--StartFragment-->(.*?)<!--EndFragment-->", raw_html, flags=re.IGNORECASE | re.DOTALL)
     if fragment_match:
-        return fragment_match.group(1).strip()
+        return html_module.unescape(fragment_match.group(1).strip())
 
     body_match = re.search(r"<body[^>]*>(.*?)</body>", raw_html, flags=re.IGNORECASE | re.DOTALL)
     if body_match:
-        return body_match.group(1).strip()
+        return html_module.unescape(body_match.group(1).strip())
 
-    return raw_html.strip()
+    return html_module.unescape(raw_html.strip())
+
+
+def _has_visible_text(raw_html: str) -> bool:
+    text = re.sub(r"<[^>]+>", " ", raw_html)
+    text = html_module.unescape(text)
+    return bool(re.search(r"\w", text))
 
 
 def _load_legal_html(filename: str, fallback: str) -> str:
@@ -46,7 +53,9 @@ def _load_legal_html(filename: str, fallback: str) -> str:
     for file_path in candidate_paths:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
-                return _extract_html_fragment(f.read())
+                fragment = _extract_html_fragment(f.read())
+                if _has_visible_text(fragment):
+                    return fragment
         except OSError:
             continue
     return fallback
