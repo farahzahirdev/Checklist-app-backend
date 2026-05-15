@@ -83,6 +83,8 @@ def serialize_user(user: User, db: Session | None = None) -> AuthUserResponse:
     return AuthUserResponse(
         id=user.id,
         email=user.email,
+        full_name=user.full_name,
+        username=user.username,
         role=_role_to_code(user.role),
         is_active=bool(user.is_active),
         primary_company_id=user.primary_company_id,
