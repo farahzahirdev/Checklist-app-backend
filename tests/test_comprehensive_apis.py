@@ -120,6 +120,52 @@ class TestUserManagementAPI:
         data = response.json()
         assert data["email"] == "admin@test.com"
 
+    def test_impersonate_auditor_user(self, admin_token, db):
+        """Test impersonating an auditor user"""
+        auditor_user = User(
+            email="auditor@test.com",
+            password_hash=hash_password("Auditor123!"),
+            role=UserRole.auditor,
+            is_active=True,
+        )
+        db.add(auditor_user)
+        db.commit()
+        db.refresh(auditor_user)
+
+        response = client.post(
+            f"/api/api/v1/admin/users/{auditor_user.id}/impersonate",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"reason": "Impersonation session for auditor review.", "duration_minutes": 15},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["user_role"] == "auditor"
+        assert data["target_email"] == "auditor@test.com"
+        assert isinstance(data.get("temporary_token"), str)
+
+    def test_impersonate_customer_user(self, admin_token, db):
+        """Test impersonating a customer user"""
+        customer_user = User(
+            email="customer@test.com",
+            password_hash=hash_password("Customer123!"),
+            role=UserRole.customer,
+            is_active=True,
+        )
+        db.add(customer_user)
+        db.commit()
+        db.refresh(customer_user)
+
+        response = client.post(
+            f"/api/api/v1/admin/customers/{customer_user.id}/impersonate",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"reason": "Impersonation session for customer support.", "duration_minutes": 15},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["user_role"] == "customer"
+        assert data["target_email"] == "customer@test.com"
+        assert isinstance(data.get("temporary_token"), str)
+
 class TestChecklistManagementAPI:
     """Test checklist management endpoints"""
     

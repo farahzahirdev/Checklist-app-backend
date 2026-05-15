@@ -37,6 +37,8 @@ from app.schemas.user_management import (
     AdminRoleSwitchRequest,
     AdminRoleSwitchResponse,
     AdminRoleSwitchEndRequest,
+    UserImpersonationRequest,
+    UserImpersonationResponse,
     CustomerDashboardAccessRequest,
     DashboardDataResponse,
     UserAssignPermissionsRequest,
@@ -1004,7 +1006,7 @@ def end_admin_role_switch(
         from app.core.security import verify_signed_token
 
         try:
-                        switch_session_claims = verify_signed_token(credentials.credentials.strip())
+            switch_session_claims = verify_signed_token(credentials.credentials.strip())
         except Exception:
             switch_session_claims = None
 
@@ -1015,6 +1017,9 @@ def end_admin_role_switch(
         )
 
     if switch_session_claims:
+        if switch_session_claims.get("impersonation"):
+            return {"status": "success", "message": translate("returned_to_admin_role", lang_code)}
+
         from app.models.rbac import UserRoleAssignment
         from app.services.rbac import RBACService
 
@@ -1042,6 +1047,90 @@ def end_admin_role_switch(
         print(f"[ROLE-RESTORE] After refresh: current_user.role={current_user.role}")
     
     return {"status": "success", "message": translate("returned_to_admin_role", lang_code)}
+
+
+def _create_impersonation_response(
+    current_user: User,
+    target_user: User,
+    reason: str,
+    duration_minutes: int,
+) -> dict:
+    from datetime import datetime, timedelta
+    from app.core.security import create_signed_token
+
+    expires_at = datetime.utcnow() + timedelta(minutes=duration_minutes)
+    temp_token = create_signed_token(
+        {
+            "sub": str(target_user.id),
+            "role": target_user.role,
+            "role_switch_active": True,
+            "impersonation": True,
+            "original_user_id": str(current_user.id),
+            "original_role": current_user.role,
+            "reason": reason,
+        },
+        ttl_minutes=duration_minutes,
+        token_type="access",
+    )
+
+    return {
+        "user_id": target_user.id,
+        "user_role": target_user.role,
+        "target_email": target_user.email,
+        "temporary_token": temp_token,
+        "expires_at": expires_at,
+        "original_role": current_user.role,
+    }
+
+
+@router.post("/users/{user_id}/impersonate", response_model=UserImpersonationResponse)
+def impersonate_admin_user(
+    user_id: UUID,
+    request: Request,
+    payload: UserImpersonationRequest,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
+) -> dict:
+    """Allow admin to impersonate an auditor support user."""
+    lang_code = get_language_code(request, db)
+    _require_admin_user(current_user, lang_code)
+
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("user_not_found", lang_code))
+
+    if target_user.role != UserRole.auditor.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate("target_user_not_auditor", lang_code),
+        )
+
+    return _create_impersonation_response(current_user, target_user, payload.reason, payload.duration_minutes)
+
+
+@router.post("/customers/{customer_id}/impersonate", response_model=UserImpersonationResponse)
+def impersonate_customer(
+    customer_id: UUID,
+    request: Request,
+    payload: UserImpersonationRequest,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
+) -> dict:
+    """Allow admin to impersonate a customer account."""
+    lang_code = get_language_code(request, db)
+    _require_admin_user(current_user, lang_code)
+
+    customer = db.query(User).filter(User.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("customer_not_found", lang_code))
+
+    if customer.role != UserRole.customer.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate("user_is_not_a_customer", lang_code),
+        )
+
+    return _create_impersonation_response(current_user, customer, payload.reason, payload.duration_minutes)
 
 
 # ============================================================================

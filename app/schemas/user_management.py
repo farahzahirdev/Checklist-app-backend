@@ -248,6 +248,34 @@ class AdminRoleSwitchResponse(BaseModel):
     original_role: str = "admin"
 
 
+class UserImpersonationRequest(BaseModel):
+    """Request for admin to impersonate another support user or customer."""
+
+    reason: str = Field(
+        ..., 
+        min_length=10,
+        max_length=500,
+        description="Reason for impersonation (must be logged)",
+    )
+    duration_minutes: int = Field(
+        default=30,
+        ge=5,
+        le=480,
+        description="How long the impersonation session lasts",
+    )
+
+
+class UserImpersonationResponse(BaseModel):
+    """Response for impersonation request."""
+
+    user_id: UUID
+    user_role: str
+    target_email: str
+    temporary_token: str
+    expires_at: datetime
+    original_role: str
+
+
 class AdminRoleSwitchEndRequest(BaseModel):
     """Request to end role switch and return to admin."""
     
