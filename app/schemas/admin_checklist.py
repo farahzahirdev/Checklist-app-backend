@@ -247,6 +247,12 @@ class SectionTranslationResponse(BaseModel):
     title: str
 
 
+class QuestionAnswerOptionTranslationItem(BaseModel):
+    position: int = Field(ge=1, le=4)
+    label: str | None = None
+    description: str | None = None
+
+
 class QuestionTranslationCreateRequest(BaseModel):
     language_code: str = Field(min_length=2, max_length=8)
     question_text: str | None = None
@@ -260,6 +266,7 @@ class QuestionTranslationCreateRequest(BaseModel):
     guidance_score_2: str | None = None
     guidance_score_1: str | None = None
     recommendation_template: str | None = None
+    answer_options: list[QuestionAnswerOptionTranslationItem] | None = None
 
 
 class QuestionTranslationUpdateRequest(BaseModel):
@@ -274,6 +281,7 @@ class QuestionTranslationUpdateRequest(BaseModel):
     guidance_score_2: str | None = None
     guidance_score_1: str | None = None
     recommendation_template: str | None = None
+    answer_options: list[QuestionAnswerOptionTranslationItem] | None = None
 
 
 class QuestionTranslationResponse(BaseModel):
@@ -290,3 +298,4 @@ class QuestionTranslationResponse(BaseModel):
     guidance_score_2: str | None = None
     guidance_score_1: str | None = None
     recommendation_template: str | None = None
+    answer_options: list[QuestionAnswerOptionTranslationItem] | None = None

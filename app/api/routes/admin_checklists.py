@@ -35,6 +35,7 @@ from app.schemas.admin_checklist import (
     SectionTranslationCreateRequest,
     SectionTranslationUpdateRequest,
     SectionTranslationResponse,
+    QuestionAnswerOptionTranslationItem,
     QuestionTranslationCreateRequest,
     QuestionTranslationUpdateRequest,
     QuestionTranslationResponse,
@@ -88,6 +89,45 @@ from app.tasks.bulk_import import create_checklist_task
 from app.celery_app import celery_app
 
 router = APIRouter(prefix="/admin/checklists", tags=["admin-checklists"])
+
+
+def _dump_answer_option_translations(
+    options: list[QuestionAnswerOptionTranslationItem] | None,
+) -> list[dict] | None:
+    if options is None:
+        return None
+    return [item.model_dump() for item in options]
+
+
+def _load_answer_option_translations(
+    stored: list[dict] | None,
+) -> list[QuestionAnswerOptionTranslationItem] | None:
+    if not stored:
+        return None
+    return [QuestionAnswerOptionTranslationItem.model_validate(item) for item in stored]
+
+
+def _question_translation_response(
+    question_id: UUID,
+    language_code: str,
+    translation: ChecklistQuestionTranslation,
+) -> QuestionTranslationResponse:
+    return QuestionTranslationResponse(
+        question_id=question_id,
+        language_code=language_code,
+        question_text=translation.question_text,
+        explanation=translation.explanation,
+        expected_implementation=translation.expected_implementation,
+        how_it_works=translation.how_it_works,
+        legal_requirement_title=translation.legal_requirement_title,
+        legal_requirement_description=translation.legal_requirement_description,
+        guidance_score_4=translation.guidance_score_4,
+        guidance_score_3=translation.guidance_score_3,
+        guidance_score_2=translation.guidance_score_2,
+        guidance_score_1=translation.guidance_score_1,
+        recommendation_template=translation.recommendation_template,
+        answer_options=_load_answer_option_translations(translation.answer_options),
+    )
 
 
 @router.get(
@@ -764,21 +804,7 @@ def admin_get_question_translation(
     if translation is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Translation for language {language_code} not found")
 
-    return QuestionTranslationResponse(
-        question_id=question_id,
-        language_code=language_code,
-        question_text=translation.question_text,
-        explanation=translation.explanation,
-        expected_implementation=translation.expected_implementation,
-        how_it_works=translation.how_it_works,
-        legal_requirement_title=translation.legal_requirement_title,
-        legal_requirement_description=translation.legal_requirement_description,
-        guidance_score_4=translation.guidance_score_4,
-        guidance_score_3=translation.guidance_score_3,
-        guidance_score_2=translation.guidance_score_2,
-        guidance_score_1=translation.guidance_score_1,
-        recommendation_template=translation.recommendation_template,
-    )
+    return _question_translation_response(question_id, language_code, translation)
 
 
 @router.post(
@@ -824,25 +850,12 @@ def admin_create_question_translation(
         guidance_score_2=request.guidance_score_2,
         guidance_score_1=request.guidance_score_1,
         recommendation_template=request.recommendation_template,
+        answer_options=_dump_answer_option_translations(request.answer_options),
     )
     db.add(translation)
     db.commit()
     db.refresh(translation)
-    return QuestionTranslationResponse(
-        question_id=question_id,
-        language_code=request.language_code,
-        question_text=translation.question_text,
-        explanation=translation.explanation,
-        expected_implementation=translation.expected_implementation,
-        how_it_works=translation.how_it_works,
-        legal_requirement_title=translation.legal_requirement_title,
-        legal_requirement_description=translation.legal_requirement_description,
-        guidance_score_4=translation.guidance_score_4,
-        guidance_score_3=translation.guidance_score_3,
-        guidance_score_2=translation.guidance_score_2,
-        guidance_score_1=translation.guidance_score_1,
-        recommendation_template=translation.recommendation_template,
-    )
+    return _question_translation_response(question_id, request.language_code, translation)
 
 
 @router.patch(
@@ -891,23 +904,12 @@ def admin_update_question_translation(
         if hasattr(request, field) and getattr(request, field) is not None:
             setattr(translation, field, getattr(request, field))
 
+    if request.answer_options is not None:
+        translation.answer_options = _dump_answer_option_translations(request.answer_options)
+
     db.commit()
     db.refresh(translation)
-    return QuestionTranslationResponse(
-        question_id=question_id,
-        language_code=language_code,
-        question_text=translation.question_text,
-        explanation=translation.explanation,
-        expected_implementation=translation.expected_implementation,
-        how_it_works=translation.how_it_works,
-        legal_requirement_title=translation.legal_requirement_title,
-        legal_requirement_description=translation.legal_requirement_description,
-        guidance_score_4=translation.guidance_score_4,
-        guidance_score_3=translation.guidance_score_3,
-        guidance_score_2=translation.guidance_score_2,
-        guidance_score_1=translation.guidance_score_1,
-        recommendation_template=translation.recommendation_template,
-    )
+    return _question_translation_response(question_id, language_code, translation)
 
 
 @router.patch(

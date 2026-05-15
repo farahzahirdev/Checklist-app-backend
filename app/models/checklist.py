@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import uuid
 
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, SmallInteger, String, Text, UniqueConstraint, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.media import Media
 from app.db.base import Base
@@ -323,6 +323,7 @@ class ChecklistQuestionTranslation(Base):
     guidance_score_2: Mapped[str | None] = mapped_column(Text, nullable=True)
     guidance_score_1: Mapped[str | None] = mapped_column(Text, nullable=True)
     recommendation_template: Mapped[str | None] = mapped_column(Text, nullable=True)
+    answer_options: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     # Relationships
