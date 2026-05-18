@@ -30,11 +30,30 @@
             height: 100% !important;
         }
 
+        .chart-container {
+            max-width: 420px;
+            margin: 0 auto;
+        }
+
         .report-page {
             border-radius: 28px;
             overflow: hidden;
             background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
             box-shadow: 0 18px 50px -34px rgba(15, 23, 42, 0.45);
+        }
+
+        .report-page,
+        .section-card,
+        .chart-container,
+        .section-card article,
+        .section-card table {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        .report-page {
+            page-break-after: always;
+            break-after: page;
         }
 
         .page-shell {
@@ -137,7 +156,7 @@
                 justify-items: center;
             }
 
-            .chart-container { width: 100%; max-width: 150mm; margin-bottom: 0; }
+            .chart-container { width: 100%; max-width: 120mm; margin: 0 auto 0; }
             .chart-shell { height: 260px; }
 
             canvas { max-width: 100% !important; height: auto !important; }
@@ -202,25 +221,41 @@
                         <div class="flex flex-col gap-3 border-b border-[#e3ebf7] pb-5 sm:flex-row sm:items-end sm:justify-between">
                             <div>
                                 <p class="page-kicker text-[#0f2a5a]">Assessment overview</p>
-                                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">The two score views that frame the report</h2>
-                                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">The radar view shows section balance while the doughnut chart shows overall score distribution. Both are sized to feel like part of the page instead of a compressed widget.</p>
+                                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Section performance radar</h2>
+                                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">The radar view shows section balance across the compliance categories and makes it easy to compare performance visually.</p>
                             </div>
                             <div class="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#dbe7fb]">
                                 <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Sections</div>
                                 <div class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ section_scores|length }}</div>
                             </div>
                         </div>
-                        <div class="mt-5 scores-overview grid gap-4 lg:grid-cols-2">
+                        <div class="mt-5">
                             <div class="chart-container rounded-[24px] border border-[#e3ebf7] bg-white p-4 shadow-sm">
-                                <div class="page-kicker text-[#0066ff]">Section performance radar</div>
-                                <div class="mt-2 text-lg font-semibold text-slate-900">Balance across the compliance sections</div>
                                 <div class="chart-shell mt-4">
                                     <canvas id="radarChart"></canvas>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="report-page page-break-after">
+                <div class="page-shell">
+                    <div class="section-card p-5 sm:p-6">
+                        <div class="flex flex-col gap-3 border-b border-[#e3ebf7] pb-5 sm:flex-row sm:items-end sm:justify-between">
+                            <div>
+                                <p class="page-kicker text-[#0f2a5a]">Assessment overview</p>
+                                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Overall score distribution</h2>
+                                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">This chart shows how the assessment scores are distributed across sections and highlights whether performance is concentrated or varied.</p>
+                            </div>
+                            <div class="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#dbe7fb]">
+                                <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Total score</div>
+                                <div class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ "%.1f"|format(overall_score) }}%</div>
+                            </div>
+                        </div>
+                        <div class="mt-5">
                             <div class="chart-container rounded-[24px] border border-[#e3ebf7] bg-white p-4 shadow-sm">
-                                <div class="page-kicker text-[#0f2a5a]">Overall score distribution</div>
-                                <div class="mt-2 text-lg font-semibold text-slate-900">How the sections cluster by maturity</div>
                                 <div class="chart-shell mt-4">
                                     <canvas id="scoreChart"></canvas>
                                 </div>
