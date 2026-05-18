@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.core.security import hash_password, verify_password
-from app.models.user import User
+from app.models.user import User, UserRole
 import app.api.routes.user_management as admin_routes
 
 
@@ -70,5 +70,50 @@ def test_admin_profile_password_change(client, db, admin_user):
         refreshed = db.get(User, admin_user.id)
         assert refreshed is not None
         assert verify_password("NewPass123", refreshed.password_hash)
+    finally:
+        client.app.dependency_overrides.pop(admin_routes.get_current_user, None)
+
+
+def test_auditor_profile_get_and_update(client, db):
+    auditor = db.query(User).filter_by(email="auditor-profile@example.com").first()
+    if auditor:
+        auditor.password_hash = hash_password("OldPass123")
+        auditor.is_active = True
+        auditor.role = UserRole.auditor
+        auditor.full_name = "Auditor Name"
+    else:
+        auditor = User(
+            email="auditor-profile@example.com",
+            password_hash=hash_password("OldPass123"),
+            is_active=True,
+            role=UserRole.auditor,
+            full_name="Auditor Name",
+        )
+        db.add(auditor)
+    db.commit()
+    db.refresh(auditor)
+
+    client.app.dependency_overrides[admin_routes.get_current_user] = lambda: auditor
+    try:
+        response = client.get("/api/api/v1/admin/profile")
+        assert response.status_code == 200
+        assert response.json()["email"] == auditor.email
+        assert response.json()["full_name"] == "Auditor Name"
+
+        update_response = client.patch(
+            "/api/api/v1/admin/profile",
+            json={"full_name": "Updated Auditor"},
+        )
+        assert update_response.status_code == 200
+        assert update_response.json()["full_name"] == "Updated Auditor"
+    finally:
+        client.app.dependency_overrides.pop(admin_routes.get_current_user, None)
+
+
+def test_customer_cannot_access_staff_profile(client, db, customer_user):
+    client.app.dependency_overrides[admin_routes.get_current_user] = lambda: customer_user
+    try:
+        response = client.get("/api/api/v1/admin/profile")
+        assert response.status_code == 403
     finally:
         client.app.dependency_overrides.pop(admin_routes.get_current_user, None)

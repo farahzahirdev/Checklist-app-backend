@@ -89,15 +89,24 @@ def _require_admin_user(current_user: User, lang_code: str) -> None:
         )
 
 
+def _require_staff_user(current_user: User, lang_code: str) -> None:
+    """Admin or auditor may access own-profile endpoints only (enforced via current_user)."""
+    if current_user.role not in (UserRole.admin.value, UserRole.auditor.value):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=translate("insufficient_permissions", lang_code),
+        )
+
+
 @router.get("/profile", response_model=AdminProfileResponse, summary="Get Admin Profile")
 def get_admin_profile(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> dict:
-    """Get the authenticated admin's own profile without customer company fields."""
+    """Get the authenticated admin or auditor's own profile without customer company fields."""
     lang_code = get_language_code(request, db)
-    _require_admin_user(current_user, lang_code)
+    _require_staff_user(current_user, lang_code)
     return _serialize_admin_profile(current_user)
 
 
@@ -108,9 +117,9 @@ def update_admin_profile(
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> dict:
-    """Update the authenticated admin's own profile fields."""
+    """Update the authenticated admin or auditor's own profile fields."""
     lang_code = get_language_code(request, db)
-    _require_admin_user(current_user, lang_code)
+    _require_staff_user(current_user, lang_code)
 
     before_json = {
         "email": current_user.email,
@@ -167,7 +176,7 @@ def update_admin_profile(
                 "job_title": current_user.job_title,
                 "department": current_user.department,
             },
-            changes_summary="Admin updated own profile",
+            changes_summary=f"{current_user.role} updated own profile",
         )
     )
     db.commit()
@@ -182,9 +191,9 @@ def change_admin_password(
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> dict:
-    """Change the authenticated admin's own password."""
+    """Change the authenticated admin or auditor's own password."""
     lang_code = get_language_code(request, db)
-    _require_admin_user(current_user, lang_code)
+    _require_staff_user(current_user, lang_code)
 
     if not verify_password(payload.current_password, current_user.password_hash):
         raise HTTPException(
@@ -220,7 +229,7 @@ def change_admin_password(
             target_entity="user",
             target_id=current_user.id,
             target_user_id=current_user.id,
-            changes_summary="Admin changed own password",
+            changes_summary=f"{current_user.role} changed own password",
         )
     )
     db.commit()
