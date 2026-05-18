@@ -312,6 +312,52 @@
                                 </div>
                             </dl>
                         </div>
+
+                        {% set high_risk_sections = section_scores|selectattr('percentage', 'lt', 60)|list %}
+                        {% set medium_risk_sections = section_scores|selectattr('percentage', 'ge', 60)|selectattr('percentage', 'lt', 80)|list %}
+                        {% set critical_findings = findings|selectattr('priority', 'equalto', 'high')|list %}
+
+                        <div class="mt-4 grid gap-3 rounded-[24px] border border-[#e3ebf7] bg-white p-4 shadow-sm md:grid-cols-3">
+                            <article class="rounded-lg border border-[#fee2e2] bg-[#fef2f2] p-3">
+                                <p class="text-xs font-semibold uppercase text-[#7f1d1d]">High risk areas</p>
+                                <p class="mt-2 text-2xl font-bold text-[#dc2626]">{{ high_risk_sections|length }}</p>
+                                <p class="mt-1 text-xs text-[#991b1b]">
+                                    {% if high_risk_sections %}
+                                        {% for section in high_risk_sections %}
+                                            {{ section.section_title or section.section_name or section.section_code or 'Section' }}{% if not loop.last %}, {% endif %}
+                                        {% endfor %}
+                                    {% else %}
+                                        None
+                                    {% endif %}
+                                </p>
+                            </article>
+
+                            <article class="rounded-lg border border-[#fef3c7] bg-[#fffbeb] p-3">
+                                <p class="text-xs font-semibold uppercase text-[#78350f]">Medium risk areas</p>
+                                <p class="mt-2 text-2xl font-bold text-[#d97706]">{{ medium_risk_sections|length }}</p>
+                                <p class="mt-1 text-xs text-[#92400e]">
+                                    {% if medium_risk_sections %}
+                                        {% for section in medium_risk_sections %}
+                                            {{ section.section_title or section.section_name or section.section_code or 'Section' }}{% if not loop.last %}, {% endif %}
+                                        {% endfor %}
+                                    {% else %}
+                                        None
+                                    {% endif %}
+                                </p>
+                            </article>
+
+                            <article class="rounded-lg border border-[#fecaca] bg-[#fee2e2] p-3">
+                                <p class="text-xs font-semibold uppercase text-[#7f1d1d]">Critical findings</p>
+                                <p class="mt-2 text-2xl font-bold text-[#dc2626]">{{ critical_findings|length }}</p>
+                                <p class="mt-1 text-xs text-[#991b1b]">
+                                    {% if critical_findings|length > 0 %}
+                                        Require immediate attention
+                                    {% else %}
+                                        No immediate attention required
+                                    {% endif %}
+                                </p>
+                            </article>
+                        </div>
                     </div>
                 </div>
             </section>
