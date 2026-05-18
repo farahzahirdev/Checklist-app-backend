@@ -46,6 +46,7 @@ class FixedPermissionSet:
         ("dashboard", "read"),
         ("report", "read"),
         ("user_management", "read"),
+        ("permission_management", "read"),
         ("payment_management", "read"),
         ("audit_log", "read"),
     ]

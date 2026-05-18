@@ -18,6 +18,7 @@ from app.schemas.assessment import (
     StartAssessmentRequest,
 )
 from app.services.assessment import (
+    get_assessment_detail_by_id,
     get_current_assessment,
     get_current_assessment_detail,
     start_assessment,
@@ -90,6 +91,28 @@ def get_current_assessment_detail_route(
 ) -> AssessmentDetailResponse:
     lang_code = get_language_code(http_request, db) if http_request else None
     return get_current_assessment_detail(db, user=current_user, checklist_id=checklist_id, company_id=company_id, lang_code=lang_code)
+
+
+@router.get(
+    "/{assessment_id}/detail",
+    response_model=AssessmentDetailResponse,
+    summary="Get Assessment Detail By Id",
+    description=(
+        "Returns checklist sections, questions, and answers for an owned assessment. "
+        "Works for submitted assessments (read-only viewing from reports)."
+    ),
+)
+def get_assessment_detail_by_id_route(
+    assessment_id: UUID,
+    company_id: UUID | None = None,
+    http_request: Request = None,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AssessmentDetailResponse:
+    lang_code = get_language_code(http_request, db) if http_request else None
+    return get_assessment_detail_by_id(
+        db, user=current_user, assessment_id=assessment_id, company_id=company_id, lang_code=lang_code
+    )
 
 
 @router.get(

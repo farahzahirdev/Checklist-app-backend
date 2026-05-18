@@ -623,6 +623,27 @@ def get_current_assessment_detail(db: Session, *, user: User, checklist_id: UUID
     return _serialize_assessment_detail(db, assessment, lang_code=lang_code)
 
 
+def get_assessment_detail_by_id(
+    db: Session,
+    *,
+    user: User,
+    assessment_id: UUID,
+    company_id: UUID | None = None,
+    lang_code: str | None = None,
+) -> AssessmentDetailResponse:
+    """Return checklist detail for an owned assessment (including submitted, for read-only viewing)."""
+    query = select(Assessment).where(Assessment.id == assessment_id, Assessment.user_id == user.id)
+    if company_id is not None:
+        query = query.where(Assessment.company_id == company_id)
+    assessment = db.scalar(query)
+    if assessment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=translate("assessment_not_found", lang_code or "en"),
+        )
+    return _serialize_assessment_detail(db, assessment, lang_code=lang_code)
+
+
 def upsert_assessment_answer(
     db: Session,
     *,
