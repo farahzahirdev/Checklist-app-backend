@@ -446,8 +446,13 @@
     <script>
         // Radar Chart Data
         const sectionScores = {{ section_scores | tojson }};
-        const radarLabels = sectionScores.map(s => s.section_name);
-        const radarData = sectionScores.map(s => s.percentage);
+        const radarLabels = sectionScores.map((s, index) =>
+            String(s.section_title ?? s.section_name ?? s.section_code ?? `Section ${index + 1}`)
+        );
+        const radarData = sectionScores.map((s) => {
+            const numericValue = Number(s.percentage);
+            return Number.isFinite(numericValue) ? numericValue : 0;
+        });
         
         // Create Radar Chart
         const radarCtx = document.getElementById('radarChart').getContext('2d');
@@ -470,6 +475,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false,
                 scales: {
                     r: {
                         beginAtZero: true,
@@ -518,6 +524,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false,
                 plugins: {
                     legend: {
                         position: 'bottom'
