@@ -515,7 +515,7 @@ def list_report_findings(db: Session, *, report_id: UUID, lang_code: str = "en")
             answer_id=row.answer_id,
             priority=row.priority,
             finding_text=row.finding_text,
-            recommendation_text=row.recommendation_text,
+            recommendation_text=sanitize_html(row.recommendation_text),
             created_at=row.created_at,
         )
         for row in rows
@@ -979,7 +979,7 @@ def _get_customer_findings(db: Session, report_id: UUID) -> list[dict]:
             "question_text": finding.finding_text,
             "answer": "No" if finding.priority == PriorityLevel.high else "Don't Know",
             "priority": finding.priority.value,
-            "recommendation": finding.recommendation_text or "Review and improve this area"
+            "recommendation": sanitize_html(finding.recommendation_text) or "Review and improve this area"
         })
     
     return customer_findings
