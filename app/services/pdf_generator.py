@@ -46,7 +46,7 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
     if report_data.report_status != ReportStatus.published:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Report must be published before PDF generation")
 
-    section_scores = [score.model_dump() for score in report_data.section_scores]
+    section_scores = [score.model_dump(mode='json') for score in report_data.section_scores]
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     if not os.path.exists(template_dir):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Report template not found")
@@ -100,7 +100,7 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
     try:
         template = env.get_template('customer_report.html')
         report_data = get_customer_report_data(db, report_id=report_id, company_id=company_id, lang_code=lang_code)
-        section_scores = [score.model_dump() for score in report_data.section_scores]
+        section_scores = [score.model_dump(mode='json') for score in report_data.section_scores]
         html_content = template.render(
             report_id=report_data.report_id,
             report_uuid=report_data.report_uuid,
