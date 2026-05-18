@@ -122,7 +122,14 @@ def publish_report_route(
     db: Session = Depends(get_db),
 ) -> ReportResponse:
     lang_code = get_language_code(request, db)
-    return publish_report(db, report_id=report_id, actor=admin, final_pdf_storage_key=payload.final_pdf_storage_key, lang_code=lang_code)
+    return publish_report(
+        db,
+        report_id=report_id,
+        actor=admin,
+        final_pdf_storage_key=payload.final_pdf_storage_key,
+        pdf_password=payload.pdf_password,
+        lang_code=lang_code,
+    )
 
 
 # Auditor and Admin Review Endpoints
@@ -249,4 +256,11 @@ def publish_report_route(
     db: Session = Depends(get_db),
 ) -> ReportResponse:
     lang_code = get_language_code(request, db)
-    return publish_report(db, report_id=report_id, actor=admin, final_pdf_storage_key=payload.final_pdf_storage_key, lang_code=lang_code)
+    return publish_report(
+        db,
+        report_id=report_id,
+        actor=admin,
+        final_pdf_storage_key=payload.final_pdf_storage_key,
+        pdf_password=payload.pdf_password,
+        lang_code=lang_code,
+    )

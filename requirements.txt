@@ -46,6 +46,7 @@ pycparser==3.0
 pydantic==2.12.5
 pydantic-settings==2.13.1
 pydantic_core==2.41.5
+pypdf==5.9.0
 Pygments==2.20.0
 pytest==9.0.3
 python-dateutil==2.9.0.post0
@@ -78,3 +79,5 @@ websockets==16.0
 xlsxwriter==3.2.9
 python-jose==3.3.0
 bleach==6.0.0
+playwright
+jinja2

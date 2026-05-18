@@ -55,6 +55,7 @@ class ReportResponse(BaseModel):
     approved_by: UUID | None = None
     approved_at: datetime | None = None
     final_pdf_storage_key: str | None = None
+    has_pdf_password: bool = False
     final_pdf_published_at: datetime | None = None
     findings_count: int
     summaries_count: int
@@ -71,6 +72,12 @@ class ReviewActionRequest(BaseModel):
 
 class PublishReportRequest(BaseModel):
     final_pdf_storage_key: str = Field(min_length=1, max_length=512)
+    pdf_password: str | None = Field(default=None, min_length=4, max_length=128)
+
+
+class ReportPdfPasswordResponse(BaseModel):
+    has_pdf_password: bool
+    pdf_password: str | None = None
 
 
 class UpsertReportSummaryRequest(BaseModel):

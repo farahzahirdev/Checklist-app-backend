@@ -9,8 +9,8 @@ from app.db.session import get_db
 from app.models.assessment import Assessment
 from app.models.report import Report, ReportStatus
 from app.models.user import User, UserRole
-from app.schemas.report import ReportResponse, CustomerReportDataResponse
-from app.services.report import get_report_by_assessment, get_customer_report_data
+from app.schemas.report import ReportResponse, CustomerReportDataResponse, ReportPdfPasswordResponse
+from app.services.report import get_report_by_assessment, get_customer_report_data, get_report_pdf_password
 from app.services.company_context import resolve_company_id, user_has_company_access
 from app.utils.i18n import get_language_code
 
@@ -251,6 +251,39 @@ def get_customer_report_data_endpoint(
         )
     
     return get_customer_report_data(db, report_id=report_id, company_id=resolved_company_id, lang_code=lang_code)
+
+
+@router.get(
+    "/{report_id}/pdf-password",
+    response_model=ReportPdfPasswordResponse,
+    summary="Get Report PDF Password",
+    description="Returns the PDF password for the report owner when password protection is enabled.",
+)
+def get_customer_report_pdf_password(
+    report_id: UUID,
+    request: Request,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ReportPdfPasswordResponse:
+    if current_user.role != UserRole.customer:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only customers can access their reports",
+        )
+
+    lang_code = get_language_code(request, db)
+    resolved_company_id = resolve_company_id(current_user, None)
+
+    from app.services.report import get_report
+
+    report = get_report(db, report_id=report_id, lang_code=lang_code)
+    assessment = db.get(Assessment, report.assessment_id)
+    if assessment is None or assessment.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+
+    return get_report_pdf_password(db, report_id=report_id, requesting_user=current_user, lang_code=lang_code)
 
 
 @router.get(

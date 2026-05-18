@@ -1,15 +1,27 @@
 import os
 import asyncio
+import importlib
+from io import BytesIO
 from uuid import UUID
 from datetime import datetime
+from typing import Any
 
 from fastapi import HTTPException, status
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy.orm import Session
 from playwright.async_api import async_playwright
 
-from app.models.report import ReportStatus
+from app.core.security import decrypt_secret
+from app.models.report import Report, ReportStatus
 from app.services.report import get_customer_report_data
+
+
+def _load_pypdf() -> tuple[Any, Any]:
+    try:
+        module = importlib.import_module("pypdf")
+        return module.PdfReader, module.PdfWriter
+    except ImportError as exc:  # pragma: no cover
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="pypdf_package_not_installed") from exc
 
 
 async def _generate_pdf_with_playwright(html_content: str) -> bytes:
@@ -89,6 +101,21 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
         )
 
         pdf_bytes = asyncio.run(_generate_pdf_with_playwright(html_content))
+        report = db.get(Report, report_id)
+        if report and report.final_pdf_password_encrypted:
+            PdfReader, PdfWriter = _load_pypdf()
+
+            user_password = decrypt_secret(report.final_pdf_password_encrypted)
+            reader = PdfReader(BytesIO(pdf_bytes))
+            writer = PdfWriter()
+            for page in reader.pages:
+                writer.add_page(page)
+            writer.encrypt(user_password)
+
+            encrypted_stream = BytesIO()
+            writer.write(encrypted_stream)
+            return encrypted_stream.getvalue()
+
         return pdf_bytes
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate PDF: {str(e)}")

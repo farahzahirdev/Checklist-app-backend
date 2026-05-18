@@ -28,9 +28,11 @@ from app.models.report import (
 )
 from app.models.company import Company
 from app.models.user import User
+from app.core.security import decrypt_secret, encrypt_secret
 from app.services.audit_log import create_audit_log
 from app.schemas.report import (
     ReportFindingItem,
+    ReportPdfPasswordResponse,
     ReportResponse,
     ReportSummaryItem,
     ReviewActionRequest,
@@ -137,6 +139,7 @@ def _serialize_report(db: Session, report: Report) -> ReportResponse:
         approved_by=report.approved_by,
         approved_at=report.approved_at,
         final_pdf_storage_key=report.final_pdf_storage_key,
+        has_pdf_password=bool(report.final_pdf_password_encrypted),
         final_pdf_published_at=report.final_pdf_published_at,
         findings_count=findings_count,
         summaries_count=summaries_count,
@@ -417,13 +420,27 @@ def list_reports(db: Session, *, status: str | None = None, skip: int = 0, limit
     }
 
 
-def publish_report(db: Session, *, report_id: UUID, actor: User, final_pdf_storage_key: str, lang_code: str = "en") -> ReportResponse:
+def publish_report(
+    db: Session,
+    *,
+    report_id: UUID,
+    actor: User,
+    final_pdf_storage_key: str,
+    pdf_password: str | None = None,
+    lang_code: str = "en",
+) -> ReportResponse:
     report = _get_report(db, report_id, lang_code)
     if report.status != ReportStatus.approved:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("report_not_approved", lang_code))
 
+    encrypted_password = None
+    if pdf_password is not None:
+        cleaned_password = pdf_password.strip()
+        encrypted_password = encrypt_secret(cleaned_password) if cleaned_password else None
+
     report.status = ReportStatus.published
     report.final_pdf_storage_key = final_pdf_storage_key
+    report.final_pdf_password_encrypted = encrypted_password
     report.final_pdf_published_at = _now()
     _create_review_event(
         db,
@@ -441,10 +458,41 @@ def publish_report(db: Session, *, report_id: UUID, actor: User, final_pdf_stora
         report=report,
         actor_user_id=actor.id,
         changes_summary=f"Published report {report_id}",
-        after_data={"status": str(report.status), "final_pdf_storage_key": final_pdf_storage_key},
+        after_data={
+            "status": str(report.status),
+            "final_pdf_storage_key": final_pdf_storage_key,
+            "has_pdf_password": bool(encrypted_password),
+        },
     )
 
     return _serialize_report(db, report)
+
+
+def get_report_pdf_password(
+    db: Session,
+    *,
+    report_id: UUID,
+    requesting_user: User,
+    lang_code: str = "en",
+) -> ReportPdfPasswordResponse:
+    report = _get_report(db, report_id, lang_code)
+    assessment = db.get(Assessment, report.assessment_id)
+    if assessment is None or assessment.user_id != requesting_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("report_not_found", lang_code))
+
+    if report.status != ReportStatus.published:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Report is not yet available for download",
+        )
+
+    if not report.final_pdf_password_encrypted:
+        return ReportPdfPasswordResponse(has_pdf_password=False, pdf_password=None)
+
+    return ReportPdfPasswordResponse(
+        has_pdf_password=True,
+        pdf_password=decrypt_secret(report.final_pdf_password_encrypted),
+    )
 
 
 def upsert_report_summary(
