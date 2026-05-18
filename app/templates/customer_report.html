@@ -24,6 +24,13 @@
             height: 300px;
         }
 
+        .chart-shell-radar {
+            width: min(100%, 360px);
+            height: min(360px, 80vw);
+            margin-left: auto;
+            margin-right: auto;
+        }
+
         .chart-shell canvas {
             display: block;
             width: 100% !important;
@@ -158,8 +165,17 @@
 
             .chart-container { width: 100%; max-width: 120mm; margin: 0 auto 0; }
             .chart-shell { height: 260px; }
+            .chart-shell-radar {
+                width: 108mm;
+                height: 108mm;
+                max-width: 108mm;
+            }
 
-            canvas { max-width: 100% !important; height: auto !important; }
+            .chart-shell canvas {
+                width: 100% !important;
+                height: 100% !important;
+                max-width: 100% !important;
+            }
 
             /* Prevent tables from splitting badly */
             thead { display: table-header-group; }
@@ -231,7 +247,7 @@
                         </div>
                         <div class="mt-5">
                             <div class="chart-container rounded-[24px] border border-[#e3ebf7] bg-white p-4 shadow-sm">
-                                <div class="chart-shell mt-4">
+                                <div class="chart-shell chart-shell-radar mt-4">
                                     <canvas id="radarChart"></canvas>
                                 </div>
                             </div>
