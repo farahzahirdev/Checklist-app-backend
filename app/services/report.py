@@ -12,7 +12,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import selectinload
 from app.utils.i18n_messages import translate
-from app.utils.html_sanitizer import sanitize_html
+from app.utils.html_sanitizer import sanitize_html, sanitize_text
 from sqlalchemy.orm import Session
 
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentStatus, PriorityLevel
@@ -768,7 +768,7 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
         
         # Get section translation
         translation = _latest_section_translation(db, section.id)
-        section_title = translation.title if translation else section.section_code
+        section_title = sanitize_text(translation.title) if translation else section.section_code
         section_domain = next((q.report_domain for q in questions if q.report_domain), None)
         
         percentage = (total_score / max_score * 100) if max_score > 0 else 0

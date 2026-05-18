@@ -32,7 +32,7 @@ from app.services.file_parser import (
     FileParseError,
 )
 from app.utils.audit_logger import AuditLogger
-from app.utils.html_sanitizer import sanitize_html
+from app.utils.html_sanitizer import sanitize_html, sanitize_text
 
 def _generate_unique_checklist_type_code(title: str) -> str:
     """Generate a unique checklist type code from title"""
@@ -470,7 +470,7 @@ def create_checklist_from_file(
                     db.add(ChecklistSectionTranslation(
                         section_id=section.id,
                         language_id=language.id,
-                        title=section_name,
+                        title=sanitize_text(section_name) or section_name,
                     ))
                     sections_map[section_name] = section.id
                     sections_created += 1

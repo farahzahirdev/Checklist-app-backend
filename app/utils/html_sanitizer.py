@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional
+import re
 
 try:
     import bleach
@@ -26,3 +27,16 @@ def sanitize_html(value: Optional[str]) -> Optional[str]:
 
     # Minimal fallback: strip angle brackets
     return raw.replace("<", "&lt;").replace(">", "&gt;")
+
+
+def sanitize_text(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    raw = str(value)
+    if not raw.strip():
+        return None
+
+    if bleach is not None:
+        return bleach.clean(raw, tags=[], strip=True)
+
+    return re.sub(r"<[^>]*>", "", raw)

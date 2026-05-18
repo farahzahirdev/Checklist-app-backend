@@ -87,7 +87,7 @@ from app.services.bulk_checklist import (
 from app.services.bulk_tasks import get_all_bulk_tasks, get_stuck_tasks
 from app.tasks.bulk_import import create_checklist_task
 from app.celery_app import celery_app
-from app.utils.html_sanitizer import sanitize_html
+from app.utils.html_sanitizer import sanitize_html, sanitize_text
 
 router = APIRouter(prefix="/admin/checklists", tags=["admin-checklists"])
 
@@ -499,7 +499,11 @@ def admin_create_section_translation(
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Translation for language {request.language_code} already exists")
 
-    translation = ChecklistSectionTranslation(section_id=section_id, language_id=language.id, title=request.title)
+    translation = ChecklistSectionTranslation(
+        section_id=section_id,
+        language_id=language.id,
+        title=sanitize_text(request.title) or request.title,
+    )
     db.add(translation)
     db.commit()
     db.refresh(translation)
@@ -535,7 +539,7 @@ def admin_update_section_translation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Translation for language {language_code} not found")
 
     if request.title is not None:
-        translation.title = request.title
+        translation.title = sanitize_text(request.title) or request.title
 
     db.commit()
     db.refresh(translation)

@@ -21,7 +21,7 @@ from app.models.reference import Language
 from app.models.user import User
 from app.services.stripe_products import create_stripe_product_for_checklist, get_stripe_price_for_checklist
 from app.utils.audit_logger import AuditLogger
-from app.utils.html_sanitizer import sanitize_html
+from app.utils.html_sanitizer import sanitize_html, sanitize_text
 from app.schemas.admin_checklist import (
     AdminChecklistCreateRequest,
     AdminChecklistResponse,
@@ -432,7 +432,7 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
             ChecklistTranslation(
                 checklist_id=checklist.id,
                 language_id=language.id,
-                title=payload.title,
+                title=sanitize_text(payload.title) or payload.title,
                 description=payload.law_decree,
             )
         )
@@ -493,13 +493,13 @@ def update_checklist(
             translation = ChecklistTranslation(
                 checklist_id=checklist_id,
                 language_id=language.id,
-                title=payload.title or f"Checklist v{checklist.version}",
+                title=sanitize_text(payload.title) or f"Checklist v{checklist.version}",
                 description=payload.law_decree or None,
             )
             db.add(translation)
         else:
             if payload.title is not None:
-                translation.title = payload.title
+                translation.title = sanitize_text(payload.title) or payload.title
             if payload.law_decree is not None:
                 translation.description = payload.law_decree
 
@@ -662,7 +662,7 @@ def create_section(db: Session, *, checklist_id, payload: AdminSectionCreateRequ
             ChecklistSectionTranslation(
                 section_id=section.id,
                 language_id=language.id,
-                title=payload.title,
+                title=sanitize_text(payload.title) or payload.title,
             )
         )
     db.commit()
@@ -701,11 +701,11 @@ def update_section(db: Session, *, checklist_id, section_id, payload: AdminSecti
                 translation = ChecklistSectionTranslation(
                     section_id=section_id,
                     language_id=language.id,
-                    title=payload.title,
+                    title=sanitize_text(payload.title) or payload.title,
                 )
                 db.add(translation)
             else:
-                translation.title = payload.title
+                translation.title = sanitize_text(payload.title) or payload.title
     
     # Check if any fields are actually being updated
     fields_updated = False
