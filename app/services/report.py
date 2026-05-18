@@ -12,6 +12,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import selectinload
 from app.utils.i18n_messages import translate
+from app.utils.html_sanitizer import sanitize_html
 from sqlalchemy.orm import Session
 
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentStatus, PriorityLevel
@@ -110,6 +111,7 @@ def _question_content(db: Session, question_id: UUID) -> tuple[str, str | None]:
     if translation is None:
         return "", None
     recommendation = translation.recommendation_template or translation.expected_implementation
+    recommendation = sanitize_html(recommendation)
     return translation.question_text, recommendation
 
 

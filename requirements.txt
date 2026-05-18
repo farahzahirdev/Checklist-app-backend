@@ -77,3 +77,4 @@ wcwidth==0.6.0
 websockets==16.0
 xlsxwriter==3.2.9
 python-jose==3.3.0
+bleach==6.0.0

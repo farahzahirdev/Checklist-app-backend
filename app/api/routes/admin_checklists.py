@@ -87,6 +87,7 @@ from app.services.bulk_checklist import (
 from app.services.bulk_tasks import get_all_bulk_tasks, get_stuck_tasks
 from app.tasks.bulk_import import create_checklist_task
 from app.celery_app import celery_app
+from app.utils.html_sanitizer import sanitize_html
 
 router = APIRouter(prefix="/admin/checklists", tags=["admin-checklists"])
 
@@ -116,16 +117,16 @@ def _question_translation_response(
         question_id=question_id,
         language_code=language_code,
         question_text=translation.question_text,
-        explanation=translation.explanation,
-        expected_implementation=translation.expected_implementation,
-        how_it_works=translation.how_it_works,
+        explanation=sanitize_html(translation.explanation) if translation and translation.explanation else None,
+        expected_implementation=sanitize_html(translation.expected_implementation) if translation and translation.expected_implementation else None,
+        how_it_works=sanitize_html(translation.how_it_works) if translation and translation.how_it_works else None,
         legal_requirement_title=translation.legal_requirement_title,
         legal_requirement_description=translation.legal_requirement_description,
         guidance_score_4=translation.guidance_score_4,
         guidance_score_3=translation.guidance_score_3,
         guidance_score_2=translation.guidance_score_2,
         guidance_score_1=translation.guidance_score_1,
-        recommendation_template=translation.recommendation_template,
+        recommendation_template=sanitize_html(translation.recommendation_template) if translation and translation.recommendation_template else None,
         answer_options=_load_answer_option_translations(translation.answer_options),
     )
 

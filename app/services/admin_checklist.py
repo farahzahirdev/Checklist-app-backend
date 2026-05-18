@@ -21,6 +21,7 @@ from app.models.reference import Language
 from app.models.user import User
 from app.services.stripe_products import create_stripe_product_for_checklist, get_stripe_price_for_checklist
 from app.utils.audit_logger import AuditLogger
+from app.utils.html_sanitizer import sanitize_html
 from app.schemas.admin_checklist import (
     AdminChecklistCreateRequest,
     AdminChecklistResponse,
@@ -274,7 +275,7 @@ def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
     translation = getattr(question, "_translation", None)
     legal_requirement = translation.question_text if translation else ""
     explanation = translation.explanation if translation and translation.explanation else ""
-    expected_implementation = translation.expected_implementation if translation and translation.expected_implementation else ""
+    expected_implementation = sanitize_html(translation.expected_implementation) if translation and translation.expected_implementation else ""
     how_it_works = translation.how_it_works if translation and translation.how_it_works else ""
     severity = question.severity or SeverityLevel.low
     return AdminQuestionResponse(
@@ -298,7 +299,7 @@ def _to_question_response(question: ChecklistQuestion) -> AdminQuestionResponse:
         guidance_score_3=translation.guidance_score_3 if translation else None,
         guidance_score_2=translation.guidance_score_2 if translation else None,
         guidance_score_1=translation.guidance_score_1 if translation else None,
-        recommendation_template=translation.recommendation_template if translation else None,
+        recommendation_template=sanitize_html(translation.recommendation_template) if translation and translation.recommendation_template else None,
         illustrative_image_id=question.illustrative_image_id,
         note_enabled=question.note_enabled,
         evidence_enabled=question.evidence_enabled,
@@ -360,7 +361,7 @@ def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> Ad
     translation = getattr(question, "_translation", None)
     legal_requirement = translation.question_text if translation else ""
     explanation = translation.explanation if translation and translation.explanation else ""
-    expected_implementation = translation.expected_implementation if translation and translation.expected_implementation else ""
+    expected_implementation = sanitize_html(translation.expected_implementation) if translation and translation.expected_implementation else ""
     how_it_works = translation.how_it_works if translation and translation.how_it_works else ""
     severity = question.severity or SeverityLevel.low
     # Recursively fetch sub-questions
@@ -389,7 +390,7 @@ def _to_question_response_nested(question: ChecklistQuestion, db: Session) -> Ad
         guidance_score_3=translation.guidance_score_3 if translation else None,
         guidance_score_2=translation.guidance_score_2 if translation else None,
         guidance_score_1=translation.guidance_score_1 if translation else None,
-        recommendation_template=translation.recommendation_template if translation else None,
+        recommendation_template=sanitize_html(translation.recommendation_template) if translation and translation.recommendation_template else None,
         illustrative_image_id=question.illustrative_image_id,
         note_enabled=question.note_enabled,
         evidence_enabled=question.evidence_enabled,
@@ -1170,13 +1171,13 @@ def create_question(db: Session, *, checklist_id, section_id, payload: AdminQues
                 legal_requirement_title=payload.legal_requirement_title or "",
                 legal_requirement_description=payload.legal_requirement_description or "",
                 explanation=payload.explanation,
-                expected_implementation=payload.expected_implementation,
+                expected_implementation=sanitize_html(payload.expected_implementation),
                 how_it_works=payload.how_it_works,
                 guidance_score_4=payload.guidance_score_4,
                 guidance_score_3=payload.guidance_score_3,
                 guidance_score_2=payload.guidance_score_2,
                 guidance_score_1=payload.guidance_score_1,
-                recommendation_template=payload.recommendation_template,
+                recommendation_template=sanitize_html(payload.recommendation_template),
             )
         )
 
@@ -1292,13 +1293,13 @@ def update_question(
                 legal_requirement_title=payload.legal_requirement_title or "",
                 legal_requirement_description=payload.legal_requirement_description or "",
                 explanation=payload.explanation,
-                expected_implementation=payload.expected_implementation,
+                expected_implementation=sanitize_html(payload.expected_implementation),
                 how_it_works=payload.how_it_works,
                 guidance_score_4=payload.guidance_score_4,
                 guidance_score_3=payload.guidance_score_3,
                 guidance_score_2=payload.guidance_score_2,
                 guidance_score_1=payload.guidance_score_1,
-                recommendation_template=payload.recommendation_template,
+                recommendation_template=sanitize_html(payload.recommendation_template),
             )
             db.add(translation)
     else:
@@ -1312,7 +1313,7 @@ def update_question(
         if payload.explanation is not None:
             translation.explanation = payload.explanation
         if payload.expected_implementation is not None:
-            translation.expected_implementation = payload.expected_implementation
+            translation.expected_implementation = sanitize_html(payload.expected_implementation)
         if payload.how_it_works is not None:
             translation.how_it_works = payload.how_it_works
         if payload.guidance_score_4 is not None:
@@ -1324,7 +1325,7 @@ def update_question(
         if payload.guidance_score_1 is not None:
             translation.guidance_score_1 = payload.guidance_score_1
         if payload.recommendation_template is not None:
-            translation.recommendation_template = payload.recommendation_template
+            translation.recommendation_template = sanitize_html(payload.recommendation_template)
 
     # Auto-increment checklist version since question was modified
     checklist = db.get(Checklist, checklist_id)

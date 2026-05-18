@@ -35,6 +35,7 @@ from app.schemas.assessment import (
     AssessmentSubmitResponse,
 )
 from app.utils.i18n_messages import translate
+from app.utils.html_sanitizer import sanitize_html
 from app.schemas.admin_checklist import EvidenceRuleResponse
 
 
@@ -511,7 +512,7 @@ def _to_assessment_question_response(
         answer_logic=question.answer_logic,
         legal_requirement=translation.question_text if translation else "",
         explanation=translation.explanation if translation and translation.explanation else "",
-        expected_implementation=translation.expected_implementation if translation and translation.expected_implementation else "",
+        expected_implementation=sanitize_html(translation.expected_implementation) if translation and translation.expected_implementation else "",
         how_it_works=translation.how_it_works if translation and translation.how_it_works else None,
         why_this_matters=translation.how_it_works if translation and translation.how_it_works else None,
         points=_severity_to_points(question.severity or SeverityLevel.low),

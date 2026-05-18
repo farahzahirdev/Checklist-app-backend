@@ -229,8 +229,10 @@ def get_assessment_answers_with_reviews(
         )
         
         question_text = question_translation.question_text if question_translation else answer.question.question_code
-        explanation = question_translation.explanation if question_translation and question_translation.explanation else None
-        expected_implementation = question_translation.expected_implementation if question_translation and question_translation.expected_implementation else None
+        from app.utils.html_sanitizer import sanitize_html
+
+        explanation = sanitize_html(question_translation.explanation) if question_translation and question_translation.explanation else None
+        expected_implementation = sanitize_html(question_translation.expected_implementation) if question_translation and question_translation.expected_implementation else None
         why_this_matters = question_translation.how_it_works if question_translation and question_translation.how_it_works else None
         legal_requirement_title = question_translation.legal_requirement_title if question_translation and question_translation.legal_requirement_title else None
         legal_requirement_description = question_translation.legal_requirement_description if question_translation and question_translation.legal_requirement_description else None

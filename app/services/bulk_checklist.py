@@ -32,6 +32,7 @@ from app.services.file_parser import (
     FileParseError,
 )
 from app.utils.audit_logger import AuditLogger
+from app.utils.html_sanitizer import sanitize_html
 
 def _generate_unique_checklist_type_code(title: str) -> str:
     """Generate a unique checklist type code from title"""
@@ -518,7 +519,7 @@ def create_checklist_from_file(
                         legal_requirement_title="",  # Empty title as requested
                         legal_requirement_description=legal_req,  # Store text in description
                         explanation=explanation,
-                        expected_implementation=expected_impl,
+                        expected_implementation=sanitize_html(expected_impl),
                     ))
                     # Add answer options for parent question
                     for opt in answer_options:
@@ -569,7 +570,7 @@ def create_checklist_from_file(
                             legal_requirement_title="",  # Empty title as requested
                             legal_requirement_description=legal_req,  # Store text in description
                             explanation=explanation,
-                            expected_implementation=expected_impl,
+                            expected_implementation=sanitize_html(expected_impl),
                         ))
                         # Add answer options for child question
                         for opt in answer_options:
@@ -620,7 +621,7 @@ def create_checklist_from_file(
                                 legal_requirement_title="",  # Empty title as requested
                                 legal_requirement_description=legal_req,  # Store text in description
                                 explanation=explanation,
-                                expected_implementation=expected_impl,
+                                expected_implementation=sanitize_html(expected_impl),
                             ))
                             # Add answer options for grandchild question
                             for opt in answer_options:

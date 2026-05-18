@@ -10,6 +10,7 @@ from app.models.user import User, UserRole
 from app.core.security import hash_password
 from app.models.rbac import Role, UserRoleAssignment
 from app.models.checklist import Checklist, ChecklistType
+from app.models.payment import Payment
 from uuid import uuid4
 
 client = TestClient(app)
@@ -31,10 +32,18 @@ def admin_user(db):
     if existing_user:
         from app.models.checklist import Checklist
         from app.models.assessment import Assessment
+        from app.models.payment import Payment
         from app.models.rbac import UserRoleAssignment
-        db.query(UserRoleAssignment).filter(UserRoleAssignment.user_id == existing_user.id).delete()
-        db.query(Assessment).filter(Assessment.user_id == existing_user.id).delete()
-        db.query(Checklist).filter(Checklist.created_by == existing_user.id).delete()
+
+        existing_checklists = db.query(Checklist).filter(Checklist.created_by == existing_user.id).all()
+        checklist_ids = [checklist.id for checklist in existing_checklists]
+        if checklist_ids:
+            db.query(Assessment).filter(Assessment.checklist_id.in_(checklist_ids)).delete(synchronize_session=False)
+            db.query(Payment).filter(Payment.checklist_id.in_(checklist_ids)).delete(synchronize_session=False)
+
+        db.query(Assessment).filter(Assessment.user_id == existing_user.id).delete(synchronize_session=False)
+        db.query(UserRoleAssignment).filter(UserRoleAssignment.user_id == existing_user.id).delete(synchronize_session=False)
+        db.query(Checklist).filter(Checklist.created_by == existing_user.id).delete(synchronize_session=False)
         db.delete(existing_user)
         db.commit()
     
@@ -352,18 +361,18 @@ class TestPublicAPIs:
     """Test public/endpoints that don't require authentication"""
     
     def test_select_checklist_access(self):
-        """Test public checklist access endpoint"""
+        """Test select-checklist endpoint requires authentication"""
         response = client.post("/api/api/v1/access/select-checklist",
             json={"checklist_id": "00000000-0000-0000-0000-000000000000"})
-        # Should work even with invalid checklist ID
-        assert response.status_code in [200, 400, 404]
+        assert response.status_code == 401
     
     def test_public_checklists(self):
         """Test public checklists endpoint"""
         response = client.get("/api/api/v1/checklists/")
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
+        assert isinstance(data, dict)
+        assert isinstance(data.get("checklists"), list)
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
