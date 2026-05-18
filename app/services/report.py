@@ -1015,7 +1015,9 @@ def _get_public_suggestions(db: Session, report_id: UUID) -> list[dict]:
     assessment_review = db.scalar(
         select(AssessmentReview)
         .where(AssessmentReview.assessment_id == report.assessment_id)
-        .options(selectinload(AssessmentReview.answer_reviews))
+        .options(
+            selectinload(AssessmentReview.answer_reviews).selectinload(AnswerReview.answer)
+        )
     )
     
     if not assessment_review:
@@ -1028,7 +1030,8 @@ def _get_public_suggestions(db: Session, report_id: UUID) -> list[dict]:
             customer_suggestions.append({
                 "suggestion_text": answer_review.suggestion_text,
                 "created_at": answer_review.created_at,
-                "question_id": str(answer_review.answer.question_id) if answer_review.answer else None
+                "question_id": str(answer_review.answer.question_id) if answer_review.answer else None,
+                "assessment_question_review_id": str(answer_review.id),
             })
     
     return customer_suggestions

@@ -108,6 +108,13 @@ class ReportScoreDistributionItem(BaseModel):
     percentage: float
 
 
+class CustomerReportSuggestionItem(BaseModel):
+    suggestion_text: str
+    created_at: datetime
+    question_id: UUID | None = None
+    assessment_question_review_id: UUID | None = None
+
+
 
 class CustomerReportDataResponse(BaseModel):
     """Comprehensive report data for customer-facing PDF generation"""
@@ -153,7 +160,9 @@ class CustomerReportDataResponse(BaseModel):
     section_summaries: list[dict] = Field(description="Admin-written section summaries")
     
     # Public suggestions
-    public_suggestions: list[dict] = Field(description="Public admin suggestions for customer")
+    public_suggestions: list[CustomerReportSuggestionItem] = Field(
+        description="Public admin suggestions for customer, including question and answer review identifiers"
+    )
     
     # Metadata
     generated_at: datetime
