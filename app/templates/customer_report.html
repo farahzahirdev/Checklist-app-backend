@@ -250,6 +250,7 @@
                                 <div class="chart-shell chart-shell-radar mt-4">
                                     <canvas id="radarChart"></canvas>
                                 </div>
+                                <p id="radarAreaHint" class="mt-2 text-xs text-slate-500"></p>
                             </div>
                         </div>
                     </div>
@@ -455,14 +456,62 @@
             };
         });
 
-        const radarLabels = normalizedSectionScores.map((s) => s.label);
-        const radarData = normalizedSectionScores.map((s) => s.percentage);
-        const useBarForPerformanceChart = normalizedSectionScores.length < 3;
+        const DEFAULT_TARGET_BAND = 70;
+        const clampPct = (value) => Math.max(0, Math.min(100, Number(value) || 0));
+
+        function buildPerformanceSpiderSeries(rows) {
+            if (!rows.length) {
+                return { labels: [], values: [], targetValues: [], areaHint: null };
+            }
+
+            if (rows.length === 1) {
+                const one = rows[0];
+                return {
+                    labels: [one.label, '', ''],
+                    values: [clampPct(one.percentage), clampPct(one.percentage), clampPct(one.percentage)],
+                    targetValues: [DEFAULT_TARGET_BAND, DEFAULT_TARGET_BAND, DEFAULT_TARGET_BAND],
+                    areaHint: `One section (${one.label}) is shown across 3 axes to keep a closed radar shape.`,
+                };
+            }
+
+            if (rows.length === 2) {
+                const a = rows[0];
+                const b = rows[1];
+                return {
+                    labels: [a.label, b.label, '', ''],
+                    values: [clampPct(a.percentage), clampPct(b.percentage), clampPct(a.percentage), clampPct(b.percentage)],
+                    targetValues: [DEFAULT_TARGET_BAND, DEFAULT_TARGET_BAND, DEFAULT_TARGET_BAND, DEFAULT_TARGET_BAND],
+                    areaHint: `Two sections (${a.label}, ${b.label}) are mirrored to keep a closed radar shape.`,
+                };
+            }
+
+            return {
+                labels: rows.map((row) => row.label),
+                values: rows.map((row) => clampPct(row.percentage)),
+                targetValues: rows.map(() => DEFAULT_TARGET_BAND),
+                areaHint: null,
+            };
+        }
+
+        const maturitySpider = buildPerformanceSpiderSeries(normalizedSectionScores);
+
+        const radarLabels = maturitySpider.labels;
+        const radarData = maturitySpider.values;
+        const radarTargetData = maturitySpider.targetValues;
+
+        const radarAreaHintEl = document.getElementById('radarAreaHint');
+        if (radarAreaHintEl) {
+            if (maturitySpider.areaHint) {
+                radarAreaHintEl.textContent = maturitySpider.areaHint;
+            } else {
+                radarAreaHintEl.textContent = '';
+            }
+        }
         
-        // Create performance chart: bar for 1-2 sections, radar for 3+ sections
+        // Create performance radar chart
         const radarCtx = document.getElementById('radarChart').getContext('2d');
         new Chart(radarCtx, {
-            type: useBarForPerformanceChart ? 'bar' : 'radar',
+            type: 'radar',
             data: {
                 labels: radarLabels,
                 datasets: [{
@@ -475,29 +524,26 @@
                     pointBorderColor: '#fff',
                     pointHoverBackgroundColor: '#fff',
                     pointHoverBorderColor: 'rgba(52, 152, 219, 1)'
+                }, {
+                    label: 'Target (%)',
+                    data: radarTargetData,
+                    borderColor: 'rgba(34, 197, 94, 0.9)',
+                    borderDash: [5, 5],
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: false
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: false,
-                indexAxis: useBarForPerformanceChart ? 'y' : 'x',
                 scales: {
-                    ...(useBarForPerformanceChart
-                        ? {
-                            x: {
-                                beginAtZero: true,
-                                max: 100,
-                                ticks: { stepSize: 20 }
-                            }
-                        }
-                        : {
-                            r: {
-                                beginAtZero: true,
-                                max: 100,
-                                ticks: { stepSize: 20 }
-                            }
-                        })
+                    r: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { stepSize: 20 }
+                    }
                 },
                 plugins: {
                     legend: {
