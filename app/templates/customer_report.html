@@ -267,7 +267,7 @@
                             </div>
                             <div class="rounded-2xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#dbe7fb]">
                                 <div class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Total score</div>
-                                <div class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ "%.1f"|format(overall_score) }}%</div>
+                                <div class="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{{ "%.1f"|format((total_score_percentage or 0)) }}%</div>
                             </div>
                         </div>
                         <div class="mt-5">
@@ -444,20 +444,25 @@
     </div>
     
     <script>
-        // Radar Chart Data
+        // Chart Data
         const sectionScores = {{ section_scores | tojson }};
-        const radarLabels = sectionScores.map((s, index) =>
-            String(s.section_title ?? s.section_name ?? s.section_code ?? `Section ${index + 1}`)
-        );
-        const radarData = sectionScores.map((s) => {
+        const normalizedSectionScores = sectionScores.map((s, index) => {
+            const label = String(s.section_title ?? s.section_name ?? s.section_code ?? `Section ${index + 1}`);
             const numericValue = Number(s.percentage);
-            return Number.isFinite(numericValue) ? numericValue : 0;
+            return {
+                label,
+                percentage: Number.isFinite(numericValue) ? numericValue : 0,
+            };
         });
+
+        const radarLabels = normalizedSectionScores.map((s) => s.label);
+        const radarData = normalizedSectionScores.map((s) => s.percentage);
+        const useBarForPerformanceChart = normalizedSectionScores.length < 3;
         
-        // Create Radar Chart
+        // Create performance chart: bar for 1-2 sections, radar for 3+ sections
         const radarCtx = document.getElementById('radarChart').getContext('2d');
         new Chart(radarCtx, {
-            type: 'radar',
+            type: useBarForPerformanceChart ? 'bar' : 'radar',
             data: {
                 labels: radarLabels,
                 datasets: [{
@@ -476,14 +481,23 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 animation: false,
+                indexAxis: useBarForPerformanceChart ? 'y' : 'x',
                 scales: {
-                    r: {
-                        beginAtZero: true,
-                        max: 100,
-                        ticks: {
-                            stepSize: 20
+                    ...(useBarForPerformanceChart
+                        ? {
+                            x: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: { stepSize: 20 }
+                            }
                         }
-                    }
+                        : {
+                            r: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: { stepSize: 20 }
+                            }
+                        })
                 },
                 plugins: {
                     legend: {
@@ -501,10 +515,10 @@
                 labels: ['Excellent (80-100%)', 'Good (60-79%)', 'Fair (40-59%)', 'Needs Improvement (0-39%)'],
                 datasets: [{
                     data: [
-                        sectionScores.filter(s => s.percentage >= 80).length,
-                        sectionScores.filter(s => s.percentage >= 60 && s.percentage < 80).length,
-                        sectionScores.filter(s => s.percentage >= 40 && s.percentage < 60).length,
-                        sectionScores.filter(s => s.percentage < 40).length
+                        normalizedSectionScores.filter(s => s.percentage >= 80).length,
+                        normalizedSectionScores.filter(s => s.percentage >= 60 && s.percentage < 80).length,
+                        normalizedSectionScores.filter(s => s.percentage >= 40 && s.percentage < 60).length,
+                        normalizedSectionScores.filter(s => s.percentage < 40).length
                     ],
                     backgroundColor: [
                         'rgba(39, 174, 96, 0.8)',
