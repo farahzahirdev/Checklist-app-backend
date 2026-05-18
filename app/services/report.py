@@ -61,6 +61,22 @@ def _report_counts(db: Session, report_id: UUID) -> tuple[int, int]:
     return findings, summaries
 
 
+def _latest_auditor_note(db: Session, report_id: UUID) -> str | None:
+    events = db.scalars(
+        select(ReportReviewEvent)
+        .where(
+            ReportReviewEvent.report_id == report_id,
+            ReportReviewEvent.event_type.in_([ReportEventType.approved, ReportEventType.review_started]),
+        )
+        .order_by(desc(ReportReviewEvent.created_at))
+    ).all()
+    for event in events:
+        note = (event.event_note or "").strip()
+        if note:
+            return note
+    return None
+
+
 def _company_identifier(company: Company | None) -> str:
     if company is None:
         return "UNKNOWN"
@@ -119,6 +135,7 @@ def _question_content(db: Session, question_id: UUID) -> tuple[str, str | None]:
 
 def _serialize_report(db: Session, report: Report) -> ReportResponse:
     findings_count, summaries_count = _report_counts(db, report.id)
+    auditor_note = _latest_auditor_note(db, report.id)
     company = _report_company(report, db)
     return ReportResponse(
         id=report.id,
@@ -140,6 +157,7 @@ def _serialize_report(db: Session, report: Report) -> ReportResponse:
         approved_at=report.approved_at,
         final_pdf_storage_key=report.final_pdf_storage_key,
         has_pdf_password=bool(report.final_pdf_password_encrypted),
+        auditor_note=auditor_note,
         final_pdf_published_at=report.final_pdf_published_at,
         findings_count=findings_count,
         summaries_count=summaries_count,
@@ -705,6 +723,7 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
     findings = _get_customer_findings(db, report_id)
     section_summaries = _get_section_summaries_for_customer(db, report_id)
     public_suggestions = _get_public_suggestions(db, report_id)
+    auditor_note = _latest_auditor_note(db, report_id)
     
     # Calculate overall score
     overall_score = sum(s['score'] for s in section_scores)
@@ -745,6 +764,7 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
         findings=findings,
         section_summaries=section_summaries,
         public_suggestions=public_suggestions,
+        auditor_note=auditor_note,
         generated_at=report.draft_generated_at or report.created_at,
         approved_at=report.approved_at,
         published_at=report.final_pdf_published_at,

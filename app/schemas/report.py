@@ -56,6 +56,7 @@ class ReportResponse(BaseModel):
     approved_at: datetime | None = None
     final_pdf_storage_key: str | None = None
     has_pdf_password: bool = False
+    auditor_note: str | None = None
     final_pdf_published_at: datetime | None = None
     findings_count: int
     summaries_count: int
@@ -170,6 +171,7 @@ class CustomerReportDataResponse(BaseModel):
     public_suggestions: list[CustomerReportSuggestionItem] = Field(
         description="Public admin suggestions for customer, including question and answer review identifiers"
     )
+    auditor_note: str | None = None
     
     # Metadata
     generated_at: datetime
