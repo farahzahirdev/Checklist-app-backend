@@ -7,13 +7,15 @@ from uuid import UUID, uuid4
 import stripe
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.access_window import AccessWindow
+from app.models.assessment import Assessment, AssessmentStatus
 from app.models.checklist import Checklist
 from app.models.payment import Payment, PaymentStatus
+from app.models.report import Report, ReportStatus
 from app.models.user import User
 from app.schemas.payment import PaymentState
 from app.services.stripe_products import get_stripe_price_for_checklist
@@ -74,6 +76,15 @@ def create_checkout_session_for_user(
     resolved_company_id = resolve_company_id(user, company_id)
     if resolved_company_id is None and getattr(user, "role", None) != "admin":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please set up a company before checkout.")
+
+    # Block repurchase: user may not buy the same checklist again until their report is published
+    if checklist_id:
+        eligibility = get_purchase_eligibility(db, user_id=user_id, checklist_id=checklist_id, company_id=resolved_company_id)
+        if not eligibility["can_purchase"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=eligibility["reason"],
+            )
 
     # Ensure Stripe customer exists in DB, create on Stripe if missing
     if not user.stripe_customer_id:
@@ -371,3 +382,65 @@ def admin_set_payment_status(
         access_window_id=access_window.id if access_window else None,
         access_expires_at=access_window.expires_at if access_window else None,
     )
+
+
+def get_purchase_eligibility(
+    db: Session,
+    *,
+    user_id: UUID,
+    checklist_id: UUID,
+    company_id: UUID | None = None,
+) -> dict:
+    """
+    Returns whether a user can purchase the given checklist right now.
+    Rules:
+    - No prior succeeded payment → can purchase.
+    - Succeeded payment with active access window and NO published report → cannot purchase.
+    - Succeeded payment with active access window and published report → can purchase.
+    - Access window expired (forfeited) → can purchase again.
+    """
+    now = datetime.now(timezone.utc)
+
+    latest_payment = db.scalar(
+        select(Payment)
+        .where(
+            Payment.user_id == user_id,
+            Payment.checklist_id == checklist_id,
+            Payment.status == PaymentStatus.succeeded,
+        )
+        .order_by(desc(Payment.paid_at), desc(Payment.created_at))
+    )
+
+    if latest_payment is None:
+        return {"can_purchase": True, "reason": None}
+
+    access_window = db.scalar(
+        select(AccessWindow).where(AccessWindow.payment_id == latest_payment.id)
+    )
+
+    if access_window is None or access_window.expires_at <= now:
+        # Window expired or never created → access forfeited → allow repurchase
+        return {"can_purchase": True, "reason": None}
+
+    # Active window: check for published report on this assessment cycle
+    has_published_report = db.scalar(
+        select(Assessment.id)
+        .join(Report, Report.assessment_id == Assessment.id)
+        .where(
+            Assessment.user_id == user_id,
+            Assessment.checklist_id == checklist_id,
+            Assessment.access_window_id == access_window.id,
+            Report.status == ReportStatus.published,
+        )
+    )
+
+    if has_published_report is not None:
+        return {"can_purchase": True, "reason": None}
+
+    return {
+        "can_purchase": False,
+        "reason": (
+            "You already have an active purchase for this checklist. "
+            "You can buy again once your report has been published."
+        ),
+    }

@@ -85,6 +85,20 @@ from app.schemas.user_management import (
 	DashboardDataResponse,
 )
 
+from app.schemas.product_catalog import (
+	AdminProductListResponse,
+	AdminProductResponse,
+	ProductCategoryCreateRequest,
+	ProductCategoryListResponse,
+	ProductCategoryResponse,
+	ProductCategoryUpdateRequest,
+	ProductCreateRequest,
+	ProductDetailResponse,
+	ProductPricingInfo,
+	ProductUpdateRequest,
+	PublicProductCatalogResponse,
+)
+
 from app.schemas.support_ticket import (
 	SupportTicketCreateRequest,
 	SupportTicketListResponse,
@@ -120,6 +134,8 @@ app = FastAPI(
 		{"name": "reports", "description": "Admin report generation, review, approval, and publish workflow APIs."},
 		{"name": "support", "description": "Customer support ticket submission and admin response APIs."},
 		{"name": "media", "description": "Media file upload and management APIs for checklist questions and answer options."},
+		{"name": "products", "description": "Public product catalogue APIs for checklist, documentation, and future modules."},
+		{"name": "admin-products", "description": "Admin APIs for managing product categories and catalogue items."},
 	],
 	root_path="/api"
 )
@@ -253,6 +269,18 @@ def custom_openapi() -> dict:
 		# Media schemas
 		MediaResponse,
 		MediaUploadResponse,
+		# Product catalogue schemas
+		ProductPricingInfo,
+		ProductCategoryCreateRequest,
+		ProductCategoryUpdateRequest,
+		ProductCategoryResponse,
+		ProductCategoryListResponse,
+		ProductCreateRequest,
+		ProductUpdateRequest,
+		AdminProductResponse,
+		AdminProductListResponse,
+		ProductDetailResponse,
+		PublicProductCatalogResponse,
 	]
 
 	for model in models:

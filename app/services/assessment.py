@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import desc, func, select
+from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -91,27 +91,73 @@ def _latest_succeeded_payment(db: Session, *, user_id: UUID, checklist_id: UUID,
     return db.scalar(query.order_by(desc(Payment.paid_at), desc(Payment.created_at)))
 
 
-def _active_access_window(db: Session, *, user_id: UUID, now: datetime, company_id: UUID | None = None) -> AccessWindow | None:
+def _active_access_window(
+    db: Session,
+    *,
+    user_id: UUID,
+    checklist_id: UUID,
+    now: datetime,
+    company_id: UUID | None = None,
+) -> AccessWindow | None:
     """
     Get the most recent active access window for the user that hasn't been 
     used for a submitted assessment yet.
     """
-    from sqlalchemy import and_, not_
-    
-    # Get active access windows (not expired)
-    access_window_query = select(AccessWindow).where(AccessWindow.user_id == user_id, AccessWindow.expires_at > now)
-    if company_id is not None:
-        access_window_query = access_window_query.where(AccessWindow.company_id == company_id)
-    access_windows = db.execute(access_window_query.order_by(desc(AccessWindow.expires_at))).scalars().all()
+    if hasattr(db, "query"):
+        # Get active access windows (not expired)
+        access_window_query = (
+            db.query(AccessWindow)
+            .outerjoin(Payment, AccessWindow.payment_id == Payment.id)
+            .filter(AccessWindow.user_id == user_id, AccessWindow.expires_at > now)
+            .filter(
+                or_(
+                    AccessWindow.checklist_id == checklist_id,
+                    and_(AccessWindow.checklist_id.is_(None), Payment.checklist_id == checklist_id),
+                    and_(AccessWindow.payment_id.is_(None), AccessWindow.checklist_id.is_(None)),
+                )
+            )
+        )
+        if company_id is not None:
+            access_window_query = access_window_query.filter(AccessWindow.company_id == company_id)
+        access_windows = access_window_query.order_by(desc(AccessWindow.expires_at)).all()
+    else:
+        payments_by_id = {p.id: p for p in getattr(db, "payments", [])}
+        access_windows = []
+        for aw in getattr(db, "access_windows", []):
+            if aw.user_id != user_id or aw.expires_at <= now:
+                continue
+            if company_id is not None and aw.company_id != company_id:
+                continue
+
+            payment = payments_by_id.get(aw.payment_id)
+            checklist_matches = (
+                aw.checklist_id == checklist_id
+                or (aw.checklist_id is None and payment is not None and payment.checklist_id == checklist_id)
+                or (aw.payment_id is None and aw.checklist_id is None)
+            )
+            if checklist_matches:
+                access_windows.append(aw)
+
+        access_windows.sort(key=lambda item: item.expires_at, reverse=True)
     
     # Check each access window to see if it has a submitted assessment
     for aw in access_windows:
-        submitted_assessment = db.scalar(
-            select(Assessment).where(
-                Assessment.access_window_id == aw.id,
-                Assessment.status == AssessmentStatus.submitted,
+        if hasattr(db, "assessments"):
+            submitted_assessment = next(
+                (
+                    item
+                    for item in db.assessments
+                    if item.access_window_id == aw.id and item.status == AssessmentStatus.submitted
+                ),
+                None,
             )
-        )
+        else:
+            submitted_assessment = db.scalar(
+                select(Assessment).where(
+                    Assessment.access_window_id == aw.id,
+                    Assessment.status == AssessmentStatus.submitted,
+                )
+            )
         # Only return if no submitted assessment exists for this access window
         if submitted_assessment is None:
             return aw
@@ -119,15 +165,32 @@ def _active_access_window(db: Session, *, user_id: UUID, now: datetime, company_
     return None
 
 
-def _ensure_access_window(db: Session, *, user: User, payment: Payment | None, now: datetime, company_id: UUID | None = None) -> AccessWindow:
+def _ensure_access_window(
+    db: Session,
+    *,
+    user: User,
+    checklist_id: UUID,
+    payment: Payment | None,
+    now: datetime,
+    company_id: UUID | None = None,
+) -> AccessWindow:
     settings = get_settings()
-    existing = _active_access_window(db, user_id=user.id, now=now, company_id=company_id)
+    existing = _active_access_window(
+        db,
+        user_id=user.id,
+        checklist_id=checklist_id,
+        now=now,
+        company_id=company_id,
+    )
     if existing is not None:
+        if existing.checklist_id is None:
+            existing.checklist_id = checklist_id
         return existing
 
     access_window = AccessWindow(
         user_id=user.id,
         payment_id=payment.id if payment else None,
+        checklist_id=checklist_id,
         company_id=company_id,
         activated_at=now,
         expires_at=now + timedelta(days=settings.access_unlock_days),
@@ -167,12 +230,6 @@ def start_assessment(
 ) -> AssessmentSessionResponse:
     now = _now_utc()
     company_id = resolve_company_id(user, company_id)
-    # Require customers to have a company set up before starting assessments
-    if company_id is None and user.role != UserRole.admin:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please set up a company before starting an assessment.")
-
-    if not user_has_company_access(db, user=user, company_id=company_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("forbidden", lang_code))
 
     checklist = db.get(Checklist, checklist_id)
     if checklist is None:
@@ -204,11 +261,21 @@ def start_assessment(
     )
     
     if user.role == UserRole.admin:
-        access_window = _ensure_access_window(db, user=user, payment=None, now=now)
+        access_window = _ensure_access_window(
+            db,
+            user=user,
+            checklist_id=checklist_id,
+            payment=None,
+            now=now,
+            company_id=company_id,
+        )
     else:
         payment = _latest_succeeded_payment(db, user_id=user.id, checklist_id=checklist_id, company_id=company_id)
         if payment is None:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("payment_required", lang_code))
+
+        if not user_has_company_access(db, user=user, company_id=company_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("forbidden", lang_code))
         
         # For non-admin users, check if their latest payment already has a submitted assessment
         if submitted_for_checklist is not None:
@@ -226,7 +293,14 @@ def start_assessment(
                     detail=translate("assessment_already_submitted_with_this_payment", lang_code)
                 )
         
-        access_window = _ensure_access_window(db, user=user, payment=payment, now=now, company_id=company_id)
+        access_window = _ensure_access_window(
+            db,
+            user=user,
+            checklist_id=checklist_id,
+            payment=payment,
+            now=now,
+            company_id=company_id,
+        )
     
     settings = get_settings()
     assessment = Assessment(

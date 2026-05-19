@@ -568,8 +568,10 @@ def get_customer_dashboard_enhanced(
 
 
 def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> list[AvailableChecklist]:
-    """Get checklists available for the customer to start."""
-    
+    """Get checklists available for the customer to start or continue."""
+
+    now = _now_utc()
+
     # Get purchased checklists with active access windows
     purchased_checklists_query = (
         db.query(Checklist, ChecklistType, ChecklistTranslation, Language)
@@ -581,29 +583,45 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
         .filter(
             Payment.user_id == user_id,
             Payment.status == PaymentStatus.succeeded,
-            AccessWindow.expires_at > _now_utc(),
+            AccessWindow.expires_at > now,
             Checklist.status_code_id == 2,  # published
         )
         .filter(Language.code == lang_code if lang_code != "en" else True)
         .distinct()
         .all()
     )
-    
+
     available = []
     for checklist, checklist_type, translation, language in purchased_checklists_query:
         title = translation.title if translation else f"Checklist v{checklist.version}"
-        
-        # Check if user already has an active assessment for this checklist
+
+        # Skip checklists that already have a published report — cycle complete
+        has_published_report = (
+            db.scalar(
+                select(func.count(Report.id))
+                .join(Assessment, Report.assessment_id == Assessment.id)
+                .where(
+                    Assessment.user_id == user_id,
+                    Assessment.checklist_id == checklist.id,
+                    Report.status == ReportStatus.published,
+                )
+            ) or 0
+        ) > 0
+        if has_published_report:
+            continue
+
+        # Check if user already has an active (non-expired) assessment for this checklist
         has_active_assessment = (
             db.scalar(
                 select(func.count(Assessment.id)).where(
                     Assessment.user_id == user_id,
                     Assessment.checklist_id == checklist.id,
+                    Assessment.expires_at > now,
                     Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
                 )
             ) or 0
         ) > 0
-        
+
         # Get access window
         access_window = (
             db.query(AccessWindow)
@@ -611,11 +629,11 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
             .filter(
                 Payment.user_id == user_id,
                 Payment.checklist_id == checklist.id,
-                AccessWindow.expires_at > _now_utc(),
+                AccessWindow.expires_at > now,
             )
             .first()
         )
-        
+
         available.append(AvailableChecklist(
             checklist_id=checklist.id,
             title=title,
@@ -623,14 +641,14 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
             checklist_type_name=checklist_type.name,
             version=f"v{checklist.version}",
             description=translation.description if translation else None,
-            estimated_duration_minutes=None,  # Could be calculated from question count
+            estimated_duration_minutes=None,
             price_cents=0,  # Already purchased
             currency="USD",
             is_purchased=True,
             can_start=not has_active_assessment,
             access_window_id=access_window.id if access_window else None,
         ))
-    
+
     return available
 
 

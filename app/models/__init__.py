@@ -10,6 +10,7 @@ from app.models.mfa_totp import *
 from app.models.password_reset import *
 from app.models.payment import *
 from app.models.media import *
+from app.models.product_catalog import *
 from app.models.reference import *
 from app.models.report import *
 from app.models.support_ticket import *

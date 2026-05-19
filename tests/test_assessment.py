@@ -128,7 +128,7 @@ def test_start_assessment_requires_payment() -> None:
         start_assessment(db, user=user, checklist_id=checklist.id)
 
     assert exc.value.status_code == 403
-    assert exc.value.detail == "payment_required"
+    assert exc.value.detail == "Payment is required to start this assessment."
 
 
 def test_start_assessment_allows_admin_without_payment() -> None:
@@ -225,7 +225,7 @@ def test_start_assessment_requires_payment_for_same_checklist() -> None:
         start_assessment(db, user=user, checklist_id=checklist_b.id)
 
     assert exc.value.status_code == 403
-    assert exc.value.detail == "payment_required"
+    assert exc.value.detail == "Payment is required to start this assessment."
 
 
 def test_get_current_assessment_returns_active() -> None:

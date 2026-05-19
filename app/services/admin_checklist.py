@@ -20,6 +20,7 @@ from app.models.assessment import Assessment
 from app.models.reference import Language
 from app.models.user import User
 from app.services.stripe_products import create_stripe_product_for_checklist, get_stripe_price_for_checklist
+from app.services.product_catalog import remove_checklist_product, sync_checklist_product
 from app.utils.audit_logger import AuditLogger
 from app.utils.html_sanitizer import sanitize_html, sanitize_text
 from app.schemas.admin_checklist import (
@@ -438,6 +439,12 @@ def create_checklist(db: Session, *, actor: User, payload: AdminChecklistCreateR
         )
     db.commit()
     db.refresh(checklist)
+
+    try:
+        sync_checklist_product(db, checklist=checklist)
+        db.commit()
+    except Exception as e:
+        print(f"Error syncing product catalogue entry for checklist {checklist.id}: {e}")
     
     # Create Stripe product for the checklist
     try:
@@ -523,6 +530,12 @@ def update_checklist(
     db.commit()
     db.refresh(checklist)
 
+    try:
+        sync_checklist_product(db, checklist=checklist)
+        db.commit()
+    except Exception as e:
+        print(f"Error syncing product catalogue entry for checklist {checklist.id}: {e}")
+
     if fields_updated:
         _log_checklist_audit(
             db,
@@ -589,6 +602,11 @@ def delete_checklist(db: Session, *, checklist_id) -> bool:
     except Exception as e:
         print(f"Error deleting Stripe product for checklist {checklist_id}: {e}")
         # Continue with checklist deletion even if Stripe deletion fails
+
+    try:
+        remove_checklist_product(db, checklist_id=checklist_id)
+    except Exception as e:
+        print(f"Error deleting product catalogue entry for checklist {checklist_id}: {e}")
     
     # Delete the checklist (CASCADE will handle sections, questions, and translations)
     db.delete(checklist)

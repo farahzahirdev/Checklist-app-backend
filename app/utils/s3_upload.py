@@ -90,3 +90,29 @@ def upload_file_to_s3(file: UploadFile, unique_filename: str) -> str:
             detail=f"Failed to upload file to S3: {str(e)}"
         )
     return unique_filename
+
+
+def delete_s3_object(s3_key: str) -> bool:
+    """
+    Delete an object from S3 by key. Returns True on success, False on failure.
+    Does NOT raise - failures are logged only, so callers can continue purging other files.
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+    settings = get_settings()
+    if not settings.aws_access_key_id or not settings.s3_bucket_arn:
+        logger.warning("S3 not configured; skipping delete for key %s", s3_key)
+        return False
+    try:
+        s3_client = boto3.client(
+            "s3",
+            aws_access_key_id=settings.aws_access_key_id,
+            aws_secret_access_key=settings.aws_secret_access_key,
+            region_name=settings.aws_default_region,
+        )
+        s3_client.delete_object(Bucket=settings.s3_bucket_arn, Key=s3_key)
+        return True
+    except (BotoCoreError, ClientError) as exc:
+        logger.error("Failed to delete S3 object %s: %s", s3_key, exc)
+        return False

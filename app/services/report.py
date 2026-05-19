@@ -459,7 +459,8 @@ def publish_report(
     report.status = ReportStatus.published
     report.final_pdf_storage_key = final_pdf_storage_key
     report.final_pdf_password_encrypted = encrypted_password
-    report.final_pdf_published_at = _now()
+    published_at = _now()
+    report.final_pdf_published_at = published_at
     _create_review_event(
         db,
         report_id=report.id,
@@ -467,6 +468,14 @@ def publish_report(
         event_type=ReportEventType.published,
         note="Final PDF published",
     )
+
+    # Close the assessment and schedule evidence purge 48 hours after publish
+    assessment = db.get(Assessment, report.assessment_id)
+    if assessment is not None:
+        from datetime import timedelta
+        assessment.status = AssessmentStatus.closed
+        assessment.retention_expires_at = published_at + timedelta(hours=48)
+
     db.commit()
     db.refresh(report)
 

@@ -20,6 +20,8 @@ from app.api.routes.rbac import router as rbac_router
 from app.api.routes.user_management import router as user_management_router
 from app.api.routes.i18n_admin import router as i18n_admin_router
 from app.api.routes.cms import router as cms_router
+from app.api.routes.admin_products import router as admin_products_router
+from app.api.routes.products import router as products_router
 
 from app.api.routes.report import router as report_router
 
@@ -50,3 +52,5 @@ api_router.include_router(support_tickets_router)
 api_router.include_router(media_router)
 api_router.include_router(i18n_admin_router)
 api_router.include_router(cms_router)
+api_router.include_router(admin_products_router)
+api_router.include_router(products_router)

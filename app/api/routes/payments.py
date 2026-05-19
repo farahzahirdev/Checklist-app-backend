@@ -140,6 +140,33 @@ def create_checkout_session(
     )
     return {"checkout_url": url}
 
+
+@router.get(
+    "/purchase-eligibility/{checklist_id}",
+    summary="Check Purchase Eligibility",
+    description=(
+        "Returns whether the current customer is allowed to purchase the given checklist. "
+        "A customer cannot repurchase while an active access window exists and the report "
+        "has not yet been published. Once the report is published (or the 7-day window expires) "
+        "they may buy again."
+    ),
+)
+def check_purchase_eligibility(
+    checklist_id: UUID,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.payments import get_purchase_eligibility
+    from app.services.company_context import resolve_company_id
+    company_id = resolve_company_id(current_user, None)
+    result = get_purchase_eligibility(db, user_id=current_user.id, checklist_id=checklist_id, company_id=company_id)
+    return {
+        "checklist_id": checklist_id,
+        "can_purchase": result["can_purchase"],
+        "reason": result["reason"],
+    }
+
+
 @router.post(
     "/stripe/webhook",
     response_model=StripeWebhookAck,

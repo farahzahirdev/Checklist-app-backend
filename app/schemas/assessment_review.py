@@ -112,6 +112,7 @@ class AnswerWithReview(BaseModel):
     # The UUID for the question is returned as `question_uuid`.
     question_id: str
     question_uuid: UUID
+    parent_question_id: Optional[UUID] = None
     question_text: str
     # New optional fields requested
     explanation: Optional[str] = None

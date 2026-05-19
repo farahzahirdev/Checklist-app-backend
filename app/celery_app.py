@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from celery import Celery
 
@@ -16,11 +17,14 @@ celery_app = Celery(
 celery_app.autodiscover_tasks(["app.tasks"])
 
 # Import tasks to ensure they are registered
-# This avoids circular import by importing after celery_app is fully initialized
 try:
     from app.tasks import bulk_import  # noqa: F401
 except ImportError:
-    # Tasks will be registered when imported elsewhere
+    pass
+
+try:
+    from app.tasks import lifecycle  # noqa: F401
+except ImportError:
     pass
 
 celery_app.conf.update(
@@ -32,7 +36,20 @@ celery_app.conf.update(
     task_track_started=True,
     task_default_queue="celery",
     task_routes={
-        "app.tasks.bulk_import.*": {"queue": "celery"},  # Use celery queue that worker is listening to
+        "app.tasks.bulk_import.*": {"queue": "celery"},
+        "lifecycle.*": {"queue": "celery"},
+    },
+    beat_schedule={
+        # Expire stale assessments every hour (enforces 7-day window)
+        "expire-stale-assessments": {
+            "task": "lifecycle.expire_stale_assessments",
+            "schedule": timedelta(hours=1),
+        },
+        # Purge evidence files every hour (picks up anything past 48h retention)
+        "purge-assessment-evidence": {
+            "task": "lifecycle.purge_assessment_evidence",
+            "schedule": timedelta(hours=1),
+        },
     },
 )
 

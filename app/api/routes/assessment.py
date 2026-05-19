@@ -49,7 +49,14 @@ def start_assessment_route(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentSessionResponse:
+    from app.models.user import UserRole
+    from app.services.company_context import resolve_company_id
     lang_code = get_language_code(http_request, db)
+    # Require customers to have a company set up before starting assessments
+    if current_user.role != UserRole.admin:
+        resolved_company_id = resolve_company_id(current_user, request.company_id)
+        if resolved_company_id is None:
+            raise HTTPException(status_code=400, detail="Please set up a company before starting an assessment.")
     return start_assessment(db, user=current_user, checklist_id=request.checklist_id, company_id=request.company_id, lang_code=lang_code)
 
 

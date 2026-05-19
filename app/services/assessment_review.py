@@ -257,6 +257,7 @@ def get_assessment_answers_with_reviews(
             # public `question_id` should be question code string per request
             question_id=answer.question.question_code,
             question_uuid=answer.question_id,
+            parent_question_id=answer.question.parent_question_id,
             question_text=question_text,
             explanation=explanation,
             audit_type=audit_type,
