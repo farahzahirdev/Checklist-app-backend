@@ -401,40 +401,50 @@ def get_purchase_eligibility(
     """
     now = datetime.now(timezone.utc)
 
-    latest_payment = db.scalar(
-        select(Payment)
-        .where(
-            Payment.user_id == user_id,
-            Payment.checklist_id == checklist_id,
-            Payment.status == PaymentStatus.succeeded,
-        )
-        .order_by(desc(Payment.paid_at), desc(Payment.created_at))
+    active_window_query = select(AccessWindow.id).where(
+        AccessWindow.user_id == user_id,
+        AccessWindow.checklist_id == checklist_id,
+        AccessWindow.expires_at > now,
     )
+    if company_id is not None:
+        active_window_query = active_window_query.where(AccessWindow.company_id == company_id)
 
-    if latest_payment is None:
+    active_window_ids = set(db.scalars(active_window_query).all())
+
+    active_assessment_window_query = select(Assessment.access_window_id).where(
+        Assessment.user_id == user_id,
+        Assessment.checklist_id == checklist_id,
+        Assessment.expires_at > now,
+        Assessment.status.in_(
+            [
+                AssessmentStatus.not_started,
+                AssessmentStatus.in_progress,
+                AssessmentStatus.submitted,
+            ]
+        ),
+    )
+    if company_id is not None:
+        active_assessment_window_query = active_assessment_window_query.where(Assessment.company_id == company_id)
+
+    active_window_ids.update(db.scalars(active_assessment_window_query).all())
+
+    if not active_window_ids:
         return {"can_purchase": True, "reason": None}
 
-    access_window = db.scalar(
-        select(AccessWindow).where(AccessWindow.payment_id == latest_payment.id)
+    published_window_ids = set(
+        db.scalars(
+            select(Assessment.access_window_id)
+            .join(Report, Report.assessment_id == Assessment.id)
+            .where(
+                Assessment.user_id == user_id,
+                Assessment.checklist_id == checklist_id,
+                Assessment.access_window_id.in_(active_window_ids),
+                Report.status == ReportStatus.published,
+            )
+        ).all()
     )
 
-    if access_window is None or access_window.expires_at <= now:
-        # Window expired or never created → access forfeited → allow repurchase
-        return {"can_purchase": True, "reason": None}
-
-    # Active window: check for published report on this assessment cycle
-    has_published_report = db.scalar(
-        select(Assessment.id)
-        .join(Report, Report.assessment_id == Assessment.id)
-        .where(
-            Assessment.user_id == user_id,
-            Assessment.checklist_id == checklist_id,
-            Assessment.access_window_id == access_window.id,
-            Report.status == ReportStatus.published,
-        )
-    )
-
-    if has_published_report is not None:
+    if active_window_ids.issubset(published_window_ids):
         return {"can_purchase": True, "reason": None}
 
     return {

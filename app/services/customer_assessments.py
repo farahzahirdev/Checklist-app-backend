@@ -61,6 +61,19 @@ def _days_until_expiry(expires_at: datetime) -> int:
     return delta.days
 
 
+def _report_lookup_for_assessments(db: Session, assessment_ids: list[UUID]) -> dict[UUID, tuple[UUID, ReportStatus]]:
+    if not assessment_ids:
+        return {}
+
+    rows = db.execute(
+        select(Report.assessment_id, Report.id, Report.status).where(Report.assessment_id.in_(assessment_ids))
+    ).all()
+    return {
+        assessment_id: (report_id, report_status)
+        for assessment_id, report_id, report_status in rows
+    }
+
+
 def get_customer_assessments(
     db: Session, 
     user_id: UUID, 
@@ -126,11 +139,14 @@ def get_customer_assessments(
     # Apply pagination
     results = query.offset(skip).limit(limit).all()
     
+    report_lookup = _report_lookup_for_assessments(db, [assessment.id for assessment, *_ in results])
+
     # Build response
     result_assessments = []
     for assessment, checklist, checklist_type, translation, language in results:
         # Get translation
         title = translation.title if translation else f"Checklist v{checklist.version}"
+        report_details = report_lookup.get(assessment.id)
         
         result_assessments.append(AssessmentSummary(
             id=assessment.id,
@@ -144,8 +160,8 @@ def get_customer_assessments(
             submitted_at=assessment.submitted_at,
             expires_at=assessment.expires_at,
             days_until_expiry=_days_until_expiry(assessment.expires_at),
-            has_report=False,  # TODO: Check if report exists
-            report_status=None,
+            has_report=report_details is not None,
+            report_status=report_details[1] if report_details else None,
             last_activity=assessment.updated_at,
         ))
     
@@ -229,6 +245,8 @@ def get_assessment_detail(
     unanswered_questions = total_questions - answered_questions
     estimated_time_remaining = unanswered_questions * 2 if unanswered_questions > 0 else 0
     
+    report = db.scalar(select(Report).where(Report.assessment_id == assessment.id))
+
     return AssessmentDetail(
         id=assessment.id,
         checklist_id=assessment.checklist_id,
@@ -249,8 +267,8 @@ def get_assessment_detail(
         total_sections=total_sections,
         estimated_time_remaining_minutes=estimated_time_remaining,
         last_activity=assessment.updated_at,
-        report_id=None,  # TODO: Check if report exists
-        report_status=None,
+        report_id=report.id if report else None,
+        report_status=report.status if report else None,
     )
 
 
@@ -435,9 +453,13 @@ def get_customer_dashboard_enhanced(
         .limit(5)
     )
     
+    active_rows = list(active_assessments_query)
+    active_report_lookup = _report_lookup_for_assessments(db, [assessment.id for assessment, *_ in active_rows])
+
     active_assessments = []
-    for assessment, checklist, checklist_type, translation, language in active_assessments_query:
+    for assessment, checklist, checklist_type, translation, language in active_rows:
         title = translation.title if translation else f"Checklist v{checklist.version}"
+        report_details = active_report_lookup.get(assessment.id)
         
         active_assessments.append(AssessmentSummary(
             id=assessment.id,
@@ -451,8 +473,8 @@ def get_customer_dashboard_enhanced(
             submitted_at=assessment.submitted_at,
             expires_at=assessment.expires_at,
             days_until_expiry=_days_until_expiry(assessment.expires_at),
-            has_report=False,
-            report_status=None,
+            has_report=report_details is not None,
+            report_status=report_details[1] if report_details else None,
             last_activity=assessment.updated_at,
         ))
     
@@ -472,9 +494,13 @@ def get_customer_dashboard_enhanced(
         .limit(5)
     )
     
+    submission_rows = list(recent_submissions_query)
+    submission_report_lookup = _report_lookup_for_assessments(db, [assessment.id for assessment, *_ in submission_rows])
+
     recent_submissions = []
-    for assessment, checklist, checklist_type, translation, language in recent_submissions_query:
+    for assessment, checklist, checklist_type, translation, language in submission_rows:
         title = translation.title if translation else f"Checklist v{checklist.version}"
+        report_details = submission_report_lookup.get(assessment.id)
         
         recent_submissions.append(AssessmentSummary(
             id=assessment.id,
@@ -488,8 +514,8 @@ def get_customer_dashboard_enhanced(
             submitted_at=assessment.submitted_at,
             expires_at=assessment.expires_at,
             days_until_expiry=_days_until_expiry(assessment.expires_at),
-            has_report=False,
-            report_status=None,
+            has_report=report_details is not None,
+            report_status=report_details[1] if report_details else None,
             last_activity=assessment.updated_at,
         ))
     
@@ -511,9 +537,13 @@ def get_customer_dashboard_enhanced(
         .limit(5)
     )
     
+    expiring_rows = list(expiring_soon_query)
+    expiring_report_lookup = _report_lookup_for_assessments(db, [assessment.id for assessment, *_ in expiring_rows])
+
     expiring_soon = []
-    for assessment, checklist, checklist_type, translation, language in expiring_soon_query:
+    for assessment, checklist, checklist_type, translation, language in expiring_rows:
         title = translation.title if translation else f"Checklist v{checklist.version}"
+        report_details = expiring_report_lookup.get(assessment.id)
         
         expiring_soon.append(AssessmentSummary(
             id=assessment.id,
@@ -527,8 +557,8 @@ def get_customer_dashboard_enhanced(
             submitted_at=assessment.submitted_at,
             expires_at=assessment.expires_at,
             days_until_expiry=_days_until_expiry(assessment.expires_at),
-            has_report=False,
-            report_status=None,
+            has_report=report_details is not None,
+            report_status=report_details[1] if report_details else None,
             last_activity=assessment.updated_at,
         ))
     

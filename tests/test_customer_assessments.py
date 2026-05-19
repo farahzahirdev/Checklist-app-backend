@@ -39,6 +39,7 @@ class TestCustomerAssessments:
         payment = Payment(
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
+            stripe_payment_intent_id=f"pi_{uuid4().hex}",
             status=PaymentStatus.succeeded,
             amount_cents=1000,
             currency="USD",
@@ -49,8 +50,7 @@ class TestCustomerAssessments:
         access_window = AccessWindow(
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
-            payment_id=payment.id,
-            expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+            payment_id=payment.id,            activated_at=datetime.now(timezone.utc),            expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         )
         db.add(access_window)
         db.flush()
@@ -85,6 +85,7 @@ class TestCustomerAssessments:
         payment = Payment(
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
+            stripe_payment_intent_id=f"pi_{uuid4().hex}",
             status=PaymentStatus.succeeded,
             amount_cents=1000,
             currency="USD",
@@ -96,6 +97,7 @@ class TestCustomerAssessments:
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
             payment_id=payment.id,
+            activated_at=datetime.now(timezone.utc),
             expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         )
         db.add(access_window)
@@ -138,6 +140,7 @@ class TestCustomerAssessments:
         payment = Payment(
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
+            stripe_payment_intent_id=f"pi_{uuid4().hex}",
             status=PaymentStatus.succeeded,
             amount_cents=1000,
             currency="USD",
@@ -149,6 +152,7 @@ class TestCustomerAssessments:
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
             payment_id=payment.id,
+            activated_at=datetime.now(timezone.utc),
             expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         )
         db.add(access_window)
@@ -186,6 +190,7 @@ class TestCustomerAssessments:
         payment = Payment(
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
+            stripe_payment_intent_id=f"pi_{uuid4().hex}",
             status=PaymentStatus.succeeded,
             amount_cents=1000,
             currency="USD",
@@ -197,6 +202,7 @@ class TestCustomerAssessments:
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
             payment_id=payment.id,
+            activated_at=datetime.now(timezone.utc),
             expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         )
         db.add(access_window)
@@ -229,6 +235,7 @@ class TestCustomerAssessments:
         payment = Payment(
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
+            stripe_payment_intent_id=f"pi_{uuid4().hex}",
             status=PaymentStatus.succeeded,
             amount_cents=1000,
             currency="USD",
@@ -240,6 +247,7 @@ class TestCustomerAssessments:
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
             payment_id=payment.id,
+            activated_at=datetime.now(timezone.utc),
             expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         )
         db.add(access_window)
@@ -281,6 +289,7 @@ class TestCustomerAssessments:
         payment = Payment(
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
+            stripe_payment_intent_id=f"pi_{uuid4().hex}",
             status=PaymentStatus.succeeded,
             amount_cents=1000,
             currency="USD",
@@ -292,6 +301,7 @@ class TestCustomerAssessments:
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
             payment_id=payment.id,
+            activated_at=datetime.now(timezone.utc),
             expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         )
         db.add(access_window)
@@ -315,7 +325,7 @@ class TestCustomerAssessments:
 class TestCustomerAssessmentAPI:
     """Test customer assessment API endpoints."""
     
-    def test_list_assessments_endpoint(self, client, customer_token, customer_user, sample_checklist):
+    def test_list_assessments_endpoint(self, client, db, customer_token, customer_user, sample_checklist):
         """Test GET /customer/assessments endpoint."""
         # Setup
         from app.models.payment import Payment, PaymentStatus
@@ -325,6 +335,7 @@ class TestCustomerAssessmentAPI:
         payment = Payment(
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
+            stripe_payment_intent_id=f"pi_{uuid4().hex}",
             status=PaymentStatus.succeeded,
             amount_cents=1000,
             currency="USD",
@@ -336,6 +347,7 @@ class TestCustomerAssessmentAPI:
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
             payment_id=payment.id,
+            activated_at=datetime.now(timezone.utc),
             expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         )
         db.add(access_window)
@@ -363,7 +375,7 @@ class TestCustomerAssessmentAPI:
         assert len(data["assessments"]) == 1
         assert "generated_at" in data
     
-    def test_dashboard_enhanced_endpoint(self, client, customer_token):
+    def test_dashboard_enhanced_endpoint(self, client, customer_token, db):
         """Test GET /dashboard/customer/enhanced endpoint."""
         response = client.get(
             "/api/v1/dashboard/customer/enhanced",
@@ -378,7 +390,7 @@ class TestCustomerAssessmentAPI:
         assert "quick_actions" in data
         assert "generated_at" in data
     
-    def test_assessment_detail_endpoint(self, client, customer_token, customer_user, sample_checklist):
+    def test_assessment_detail_endpoint(self, client, db, customer_token, customer_user, sample_checklist):
         """Test GET /customer/assessments/{assessment_id} endpoint."""
         # Setup
         from app.models.payment import Payment, PaymentStatus
@@ -388,6 +400,7 @@ class TestCustomerAssessmentAPI:
         payment = Payment(
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
+            stripe_payment_intent_id=f"pi_{uuid4().hex}",
             status=PaymentStatus.succeeded,
             amount_cents=1000,
             currency="USD",
@@ -399,6 +412,7 @@ class TestCustomerAssessmentAPI:
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
             payment_id=payment.id,
+            activated_at=datetime.now(timezone.utc),
             expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         )
         db.add(access_window)
@@ -428,7 +442,7 @@ class TestCustomerAssessmentAPI:
         assert "total_questions" in data
         assert "sections_completed" in data
     
-    def test_assessment_action_endpoint(self, client, customer_token, customer_user, sample_checklist):
+    def test_assessment_action_endpoint(self, client, db, customer_token, customer_user, sample_checklist):
         """Test POST /customer/assessments/{assessment_id}/action endpoint."""
         # Setup
         from app.models.payment import Payment, PaymentStatus
@@ -438,6 +452,7 @@ class TestCustomerAssessmentAPI:
         payment = Payment(
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
+            stripe_payment_intent_id=f"pi_{uuid4().hex}",
             status=PaymentStatus.succeeded,
             amount_cents=1000,
             currency="USD",
@@ -449,6 +464,7 @@ class TestCustomerAssessmentAPI:
             user_id=customer_user.id,
             checklist_id=sample_checklist.id,
             payment_id=payment.id,
+            activated_at=datetime.now(timezone.utc),
             expires_at=datetime.now(timezone.utc) + timedelta(days=30),
         )
         db.add(access_window)

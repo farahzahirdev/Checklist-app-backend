@@ -32,8 +32,8 @@ def db():
     Session = sessionmaker(bind=connection)
     session: SQLASession = Session()
     yield session
-    session.close()
     transaction.rollback()
+    session.close()
     connection.close()
 
 # Admin user fixture for tests
@@ -153,3 +153,8 @@ def client(db):
 @pytest.fixture(scope="function")
 def admin_token(admin_user):
     return create_access_token(user_id=str(admin_user.id), role=str(admin_user.role))
+
+# Customer token fixture
+@pytest.fixture(scope="function")
+def customer_token(customer_user):
+    return create_access_token(user_id=str(customer_user.id), role=str(customer_user.role))
