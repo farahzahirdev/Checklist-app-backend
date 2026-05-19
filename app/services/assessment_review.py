@@ -324,6 +324,12 @@ def get_or_create_assessment_review(
         .filter(AssessmentReview.assessment_id == assessment_id)
         .first()
     )
+
+    if review and review.reviewer_id is None:
+        # Backfill legacy orphan rows so reviewer-specific queues work.
+        review.reviewer_id = reviewer_id
+        db.add(review)
+        db.flush()
     
     if not review:
         # Create new review

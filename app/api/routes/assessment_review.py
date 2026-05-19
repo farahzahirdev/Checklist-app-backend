@@ -3,7 +3,7 @@ from uuid import UUID
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.dependencies.auth import get_current_user, require_roles
@@ -341,15 +341,29 @@ def get_my_reviews(
     limit: int = Query(50, ge=1, le=200),
 ) -> List[AssessmentReviewResponse]:
     """Get reviews assigned to current user."""
-    from app.models.assessment_review import AssessmentReview
+    from app.models.assessment_review import AssessmentReview, ReviewHistory
     from app.models.assessment import Assessment
     from app.services.assessment_review import get_or_create_assessment_review
-    from app.models.assessment_review import ReviewStatus
+
+    # Some legacy rows may have reviewer_id = null. Treat reviews with history
+    # entries from the current admin as belonging to that admin.
+    touched_assessment_subquery = (
+        db.query(AssessmentReview.assessment_id)
+        .join(ReviewHistory, ReviewHistory.assessment_review_id == AssessmentReview.id)
+        .filter(ReviewHistory.reviewer_id == admin.id)
+        .distinct()
+        .subquery()
+    )
     
     # Get existing reviews
     existing_reviews = (
         db.query(AssessmentReview)
-        .filter(AssessmentReview.reviewer_id == admin.id)
+        .filter(
+            or_(
+                AssessmentReview.reviewer_id == admin.id,
+                AssessmentReview.assessment_id.in_(select(touched_assessment_subquery.c.assessment_id)),
+            )
+        )
         .order_by(desc(AssessmentReview.updated_at))
         .all()
     )
@@ -368,7 +382,11 @@ def get_my_reviews(
     # Create reviews for assessments that have reached reviewable/closed state
     for assessment in reviewable_assessments:
         try:
-            get_or_create_assessment_review(db, assessment.id, admin.id)
+            review = get_or_create_assessment_review(db, assessment.id, admin.id)
+            # Claim orphan rows so future queries are straightforward.
+            if review.reviewer_id is None:
+                review.reviewer_id = admin.id
+                db.add(review)
         except Exception:
             # Skip if there's an error creating review
             continue
@@ -387,7 +405,12 @@ def get_my_reviews(
             .joinedload(Checklist.translations)
             .joinedload(ChecklistTranslation.language)
         )
-        .filter(AssessmentReview.reviewer_id == admin.id)
+        .filter(
+            or_(
+                AssessmentReview.reviewer_id == admin.id,
+                AssessmentReview.assessment_id.in_(select(touched_assessment_subquery.c.assessment_id)),
+            )
+        )
         .order_by(desc(AssessmentReview.updated_at))
         .offset(skip)
         .limit(limit)
