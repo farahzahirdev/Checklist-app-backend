@@ -229,6 +229,7 @@ def start_assessment(
     db: Session, *, user: User, checklist_id: UUID, company_id: UUID | None = None, lang_code: str = "en"
 ) -> AssessmentSessionResponse:
     now = _now_utc()
+    settings = get_settings()
     company_id = resolve_company_id(user, company_id)
 
     checklist = db.get(Checklist, checklist_id)
@@ -248,6 +249,23 @@ def start_assessment(
         existing_query = existing_query.where(Assessment.company_id == company_id)
     existing = db.scalar(existing_query.order_by(desc(Assessment.created_at)))
     if existing is not None:
+        if existing.status == AssessmentStatus.not_started:
+            # Start is the activation point for the 7-day completion lifecycle.
+            existing.status = AssessmentStatus.in_progress
+            existing.started_at = now
+            existing.expires_at = now + timedelta(days=settings.assessment_completion_days)
+            db.add(existing)
+            db.commit()
+            db.refresh(existing)
+
+            _log_assessment_audit(
+                db,
+                action="assessment_start",
+                assessment=existing,
+                actor_user_id=user.id,
+                changes_summary=f"Started existing not-started assessment for checklist {checklist_id}",
+                after_data={"checklist_id": str(checklist_id), "status": str(existing.status)},
+            )
         return _serialize_assessment(existing, is_new=False)
     
     # Check if user already has a SUBMITTED assessment for this checklist
@@ -302,7 +320,6 @@ def start_assessment(
             company_id=company_id,
         )
     
-    settings = get_settings()
     assessment = Assessment(
         user_id=user.id,
         checklist_id=checklist_id,
@@ -715,6 +732,18 @@ def get_assessment_detail_by_id(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=translate("assessment_not_found", lang_code or "en"),
         )
+
+    # Privacy retention enforcement: once retention window elapses after report
+    # publication (or purge has run), keep the record in history but block viewing.
+    now = _now_utc()
+    if assessment.purged_at is not None or (
+        assessment.retention_expires_at is not None and assessment.retention_expires_at <= now
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Assessment details are no longer viewable due to privacy retention policy.",
+        )
+
     return _serialize_assessment_detail(db, assessment, lang_code=lang_code)
 
 
