@@ -354,17 +354,19 @@ def get_my_reviews(
         .all()
     )
     
-    # Get submitted assessments that don't have reviews yet
-    submitted_assessments = (
+    # Get assessments that are reviewable or just completed review lifecycle
+    # states; published reports close the assessment, so closed items must still
+    # appear in my-reviews for the reviewer who handled them.
+    reviewable_assessments = (
         db.query(Assessment)
-        .filter(Assessment.status == 'submitted')
+        .filter(Assessment.status.in_(['submitted', 'closed']))
         .filter(~Assessment.id.in_([r.assessment_id for r in existing_reviews]))
         .order_by(desc(Assessment.updated_at))
         .all()
     )
     
-    # Create reviews for submitted assessments
-    for assessment in submitted_assessments:
+    # Create reviews for assessments that have reached reviewable/closed state
+    for assessment in reviewable_assessments:
         try:
             get_or_create_assessment_review(db, assessment.id, admin.id)
         except Exception:
