@@ -609,8 +609,10 @@ def get_customer_payment_analytics(db: Session, user_id: UUID) -> PaymentAnalyti
             func.sum(Payment.amount_cents).label('total_amount'),
             func.avg(Payment.amount_cents).label('avg_amount'),
             func.max(Payment.created_at).label('last_payment'),
+            func.count(func.distinct(AccessWindow.id)).label('access_windows_granted'),
         )
         .join(Payment, Checklist.id == Payment.checklist_id)
+        .outerjoin(AccessWindow, Payment.id == AccessWindow.payment_id)
         .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .filter(
             and_(
@@ -637,7 +639,7 @@ def get_customer_payment_analytics(db: Session, user_id: UUID) -> PaymentAnalyti
             total_amount=cb.total_amount or 0,
             average_amount=float(cb.avg_amount or 0),
             last_payment_date=cb.last_payment,
-            access_windows_granted=0,  # TODO: Calculate this
+            access_windows_granted=cb.access_windows_granted or 0,
             is_most_purchased=False,
         )
         

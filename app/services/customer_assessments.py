@@ -100,9 +100,19 @@ def get_customer_assessments(
         .filter(Language.code == lang_code if lang_code != "en" else True)
     )
     
+    now = _now_utc()
+
     # Apply filters
     if status_filter:
+        # Explicit filter provided — use it as-is
         query = query.filter(Assessment.status.in_(status_filter))
+    else:
+        # Default: only show active (non-submitted, non-closed, non-expired) assessments
+        # Also exclude assessments past their expiry date even if DB status hasn't been updated yet
+        query = query.filter(
+            Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
+            Assessment.expires_at > now,
+        )
     
     if checklist_type_filter:
         query = query.filter(ChecklistType.code.in_(checklist_type_filter))
@@ -447,6 +457,7 @@ def get_customer_dashboard_enhanced(
         .filter(
             Assessment.user_id == user_id,
             Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
+            Assessment.expires_at > _now_utc(),
         )
         .filter(Language.code == lang_code if lang_code != "en" else True)
         .order_by(Assessment.updated_at.desc())
@@ -529,6 +540,7 @@ def get_customer_dashboard_enhanced(
         .outerjoin(Language, ChecklistTranslation.language_id == Language.id)
         .filter(
             Assessment.user_id == user_id,
+            Assessment.expires_at > _now_utc(),
             Assessment.expires_at <= seven_days_from_now,
             Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
         )
