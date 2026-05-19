@@ -2,7 +2,7 @@ import os
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
@@ -12,6 +12,8 @@ from app.models.media import Media, MediaType, MalwareScanStatus
 from app.models.user import UserRole
 from app.schemas.media import MediaResponse, MediaUploadResponse
 from app.utils.file_upload import compute_sha256, basic_malware_scan
+from app.utils.i18n import get_language_code
+from app.utils.i18n_messages import translate
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -48,14 +50,18 @@ def get_upload_dir() -> Path:
 )
 def upload_media(
     file: UploadFile,
+    http_request: Request = None,
     admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> MediaUploadResponse:
+    # Get language code for error messages
+    lang_code = get_language_code(http_request, db) if http_request else "en"
+    
     # Validate file type
     if file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File type {file.content_type} not allowed. Allowed types: {', '.join(ALLOWED_MIME_TYPES)}"
+            detail="invalid_file_type"
         )
     
     # Validate file size
@@ -65,8 +71,8 @@ def upload_media(
     
     if file_size > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE_BYTES} bytes"
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="file_too_large"
         )
     
     # Generate unique filename for S3
@@ -79,7 +85,10 @@ def upload_media(
 
     # Perform malware scan
     if not basic_malware_scan(file.file):
-        scan_status = MalwareScanStatus.infected
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="malware_detected"
+        )
     else:
         scan_status = MalwareScanStatus.clean
 
@@ -92,9 +101,13 @@ def upload_media(
     try:
         s3_key = upload_file_to_s3(file, unique_filename)
     except Exception as e:
+        # Log the error but don't expose internal details to client
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"S3 upload failed: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload file to S3: {str(e)}"
+            detail="upload_failed"
         )
     
     # Determine media type

@@ -16,6 +16,7 @@ from app.schemas.cms import (
 )
 from app.services.cms_service import CMSService
 from app.utils.i18n import get_language_code
+from app.utils.i18n_messages import translate
 from app.utils.s3_upload import upload_to_s3, validate_upload_file
 from app.models.cms import CMSImage
 
@@ -359,26 +360,33 @@ def list_images(
 async def upload_image(
     file: UploadFile = File(...),
     alt_text: str = Query("", description="Alt text for accessibility"),
+    http_request: Request = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_only())
 ):
     """Upload a new image for CMS."""
+    # Get language code for error messages
+    lang_code = get_language_code(http_request, db) if http_request else "en"
+    
     # Validate file
     try:
         await validate_upload_file(file, max_file_size_mb=10)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="invalid_file_type"
         )
     
     # Upload to S3 or local storage
     try:
         file_path, file_size = await upload_to_s3(file)
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to upload file: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload file: {str(e)}"
+            detail="upload_failed"
         )
     
     # Create image record

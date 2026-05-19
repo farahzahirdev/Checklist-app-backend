@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from starlette.responses import JSONResponse
@@ -7,6 +8,7 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.middleware.i18n import I18nMiddleware
+from app.middleware.error_handler import ErrorHandlerMiddleware, PayloadTooLargeMiddleware
 from app.services.i18n_service import get_current_language
 from app.utils.i18n_messages import translate
 from app.schemas.access import AccessWindowResponse
@@ -152,6 +154,10 @@ app.add_middleware(
 # Add I18n middleware for automatic language detection and context management
 app.add_middleware(I18nMiddleware)
 
+# Add error handler middleware for global error handling
+app.add_middleware(ErrorHandlerMiddleware)
+app.add_middleware(PayloadTooLargeMiddleware)
+
 # Global exception handler for translating HTTPExceptions
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -168,6 +174,51 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": translated_detail}
+    )
+
+
+# Handler for request validation errors (including 413 Payload Too Large)
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    try:
+        lang_code = get_current_language()
+    except:
+        lang_code = "en"
+    
+    # Check if this is a payload too large error
+    error_details = exc.errors()
+    for error in error_details:
+        if "too large" in str(error).lower() or "413" in str(error).lower():
+            message = translate("request_too_large", lang_code)
+            return JSONResponse(
+                status_code=413,
+                content={"detail": message}
+            )
+    
+    # For other validation errors, provide a generic message
+    message = translate("invalid_request", lang_code)
+    return JSONResponse(
+        status_code=422,
+        content={"detail": message}
+    )
+
+
+# Handler for all other exceptions
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    
+    try:
+        lang_code = get_current_language()
+    except:
+        lang_code = "en"
+    
+    message = translate("internal_server_error", lang_code)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": message}
     )
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)

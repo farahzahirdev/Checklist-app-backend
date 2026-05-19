@@ -108,7 +108,16 @@
     "password_too_short": "Password must be at least 8 characters.",
     "missing_uppercase": "Password must contain at least one uppercase letter.",
     "missing_lowercase": "Password must contain at least one lowercase letter.",
-    "missing_digit": "Password must contain at least one digit."
+    "missing_digit": "Password must contain at least one digit.",
+    "file_too_large": "File size exceeds the maximum allowed limit of 10MB.",
+    "invalid_file_type": "File type is not allowed. Supported types: JPEG, PNG, GIF, WebP, PDF.",
+    "request_too_large": "Request payload is too large. Maximum size is 10MB.",
+    "internal_server_error": "An internal server error occurred. Please try again later.",
+    "service_unavailable": "Service is temporarily unavailable. Please try again later.",
+    "bad_gateway": "Service temporarily unavailable. Please try again later.",
+    "malware_detected": "File upload rejected: potential malware detected.",
+    "upload_failed": "File upload failed. Please try again.",
+    "invalid_request": "Invalid request. Please check your input and try again."
   },
   "cs": {
     "checklist_not_found": "Kontrolní seznam nebyl nalezen.",
@@ -218,6 +227,15 @@
     "password_too_short": "Heslo musí mít alespoň 8 znaků.",
     "missing_uppercase": "Heslo musí obsahovat alespoň jedno velké písmeno.",
     "missing_lowercase": "Heslo musí obsahovat alespoň jedno malé písmeno.",
-    "missing_digit": "Heslo musí obsahovat alespoň jednu číslici."
+    "missing_digit": "Heslo musí obsahovat alespoň jednu číslici.",
+    "file_too_large": "Velikost souboru překročila maximální povolenou hranici 10MB.",
+    "invalid_file_type": "Typ souboru není povolen. Podporované typy: JPEG, PNG, GIF, WebP, PDF.",
+    "request_too_large": "Datová část požadavku je příliš velká. Maximální velikost je 10MB.",
+    "internal_server_error": "Došlo k interní chybě serveru. Prosím, zkuste to později.",
+    "service_unavailable": "Služba je dočasně nedostupná. Prosím, zkuste to později.",
+    "bad_gateway": "Služba je dočasně nedostupná. Prosím, zkuste to později.",
+    "malware_detected": "Nahrávání souboru odmítnuto: zjištěn potenciální malware.",
+    "upload_failed": "Nahrávání souboru se nezdařilo. Prosím, zkuste to znovu.",
+    "invalid_request": "Neplatný požadavek. Prosím, zkontrolujte svůj vstup a zkuste to znovu."
   }
 }

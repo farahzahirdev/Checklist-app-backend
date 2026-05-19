@@ -353,19 +353,23 @@ def upload_evidence_file(
     assessment_id: UUID,
     question_id: UUID,
     file: UploadFile = File(...),
+    http_request: Request = None,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Get language code for error messages
+    lang_code = get_language_code(http_request, db) if http_request else "en"
+    
     # Validate extension
     if not allowed_file(file.filename):
         raise HTTPException(status_code=400, detail="invalid_file_type")
     # Validate file type and size
     contents = file.file
     if not validate_file_type(contents, file.filename):
-        raise HTTPException(status_code=400, detail="invalid_file_content")
+        raise HTTPException(status_code=400, detail="invalid_file_type")
     size = get_file_size(contents)
     if size > 10 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="file_too_large")
+        raise HTTPException(status_code=413, detail="file_too_large")
     
     # Determine media type
     if file.content_type.startswith("image/"):
@@ -375,7 +379,7 @@ def upload_evidence_file(
     
     # Basic malware scan
     if not basic_malware_scan(contents):
-        scan_status = MalwareScanStatus.infected
+        raise HTTPException(status_code=400, detail="malware_detected")
     else:
         scan_status = MalwareScanStatus.clean
     

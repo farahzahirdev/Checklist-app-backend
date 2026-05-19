@@ -1495,11 +1495,23 @@ async def upload_and_verify(
     legal_req_col: str = "F",
     question_text_col: str = "H",
     severity_col: str = "I",
+    http_request: Request = None,
     _admin=Depends(require_admin_only()),
+    db: Session = Depends(get_db),
 ) -> VerifyMappingResponse:
     """Upload file as form-data and verify column mapping."""
     try:
+        # Get language code for error messages
+        lang_code = get_language_code(http_request, db) if http_request else "en"
+        
         file_content = await file.read()
+        
+        # Check file size
+        if len(file_content) > 10 * 1024 * 1024:  # 10MB limit
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="file_too_large"
+            )
         
         mapping = ColumnMapping(
             section_name_col=section_col,
@@ -1519,8 +1531,13 @@ async def upload_and_verify(
         )
         return response
         
+    except HTTPException:
+        raise
     except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Upload verification failed: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Upload verification failed: {str(e)}"
+            detail="invalid_request"
         )
