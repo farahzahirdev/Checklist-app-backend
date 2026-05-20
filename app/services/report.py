@@ -16,7 +16,7 @@ from app.utils.html_sanitizer import sanitize_html, sanitize_text
 from sqlalchemy.orm import Session
 
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentStatus, PriorityLevel
-from app.models.assessment_review import AssessmentReview, AnswerReview, SuggestionType
+from app.models.assessment_review import AssessmentReview, AnswerReview, SuggestionType, ReviewStatus, ReviewHistory
 from app.models.checklist import ChecklistQuestion, ChecklistQuestionTranslation
 from app.models.report import (
     Report,
@@ -301,6 +301,22 @@ def start_review(db: Session, *, report_id: UUID, actor: User, payload: ReviewAc
 def request_changes(db: Session, *, report_id: UUID, actor: User, payload: ReviewActionRequest, lang_code: str = "en") -> ReportResponse:
     report = _get_report(db, report_id, lang_code)
     report.status = ReportStatus.changes_requested
+
+    assessment_review = db.scalar(select(AssessmentReview).where(AssessmentReview.assessment_id == report.assessment_id))
+    if assessment_review is not None:
+        previous_status = assessment_review.status
+        assessment_review.status = ReviewStatus.CHANGES_REQUESTED
+        db.add(
+            ReviewHistory(
+                assessment_review_id=assessment_review.id,
+                reviewer_id=actor.id,
+                action_type="report_changes_requested",
+                description=f"Report {report.id} requested changes; assessment review marked changes_requested",
+                previous_values=str({"status": previous_status}),
+                new_values=str({"status": assessment_review.status, "report_id": str(report.id)}),
+            )
+        )
+
     _create_review_event(
         db,
         report_id=report.id,
