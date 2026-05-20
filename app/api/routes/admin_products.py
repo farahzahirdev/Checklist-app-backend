@@ -26,6 +26,7 @@ from app.services.product_catalog import (
     get_product_by_id,
     list_admin_products,
     list_product_categories,
+    remove_product,
     remove_checklist_product,
     sync_checklist_product,
     to_admin_product_response,
@@ -181,6 +182,18 @@ def admin_delete_checklist_product(
     db: Session = Depends(get_db),
 ) -> None:
     remove_checklist_product(db, checklist_id=checklist_id)
+    db.commit()
+
+
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+def admin_delete_product(
+    product_id: UUID,
+    _admin=Depends(require_admin_only()),
+    db: Session = Depends(get_db),
+) -> None:
+    removed = remove_product(db, product_id=product_id)
+    if not removed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product_not_found")
     db.commit()
 
 

@@ -162,6 +162,14 @@ def remove_checklist_product(db: Session, *, checklist_id: uuid.UUID) -> None:
         db.delete(product)
 
 
+def remove_product(db: Session, *, product_id: uuid.UUID) -> bool:
+    product = db.get(Product, product_id)
+    if product is None:
+        return False
+    db.delete(product)
+    return True
+
+
 def _category_response(category: ProductCategory, product_count: int = 0) -> ProductCategoryResponse:
     return ProductCategoryResponse(
         id=category.id,
@@ -333,7 +341,8 @@ def create_product(db: Session, *, payload) -> Product:
         checklist = db.get(Checklist, payload.checklist_id)
         if checklist is not None:
             checklist_type_id = checklist.checklist_type_id
-    slug = _ensure_unique_slug(db, payload.slug or _slugify(payload.name))
+    slug_source = payload.slug if payload.slug else payload.name
+    slug = _ensure_unique_slug(db, _slugify(slug_source))
     product = Product(
         category_id=category.id,
         parent_product_id=payload.parent_product_id,
@@ -364,7 +373,8 @@ def update_product(db: Session, product: Product, *, payload) -> Product:
             raise ValueError("product_category_not_found")
         product.category_id = category.id
     if payload.slug is not None:
-        product.slug = _ensure_unique_slug(db, payload.slug, exclude_product_id=product.id)
+        slug_source = payload.slug.strip() or payload.name or product.name
+        product.slug = _ensure_unique_slug(db, _slugify(slug_source), exclude_product_id=product.id)
     if payload.checklist_type_id is not None:
         product.checklist_type_id = payload.checklist_type_id
     elif getattr(payload, "checklist_type_code", None) is not None:
