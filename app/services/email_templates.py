@@ -29,6 +29,7 @@ class EmailTemplateRenderer:
         template_name: str,
         context: dict | None = None,
         format: str = "html",
+        db = None,
     ) -> str:
         """
         Render an email template.
@@ -37,6 +38,7 @@ class EmailTemplateRenderer:
             template_name: Name of the template file (e.g., 'assessment_submitted.html')
             context: Dictionary of variables to pass to the template
             format: 'html' or 'txt'
+            db: Optional database session to fetch runtime settings
 
         Returns:
             Rendered template string
@@ -44,13 +46,24 @@ class EmailTemplateRenderer:
         if context is None:
             context = {}
 
+        # Determine production_base_url: from context, runtime settings, or static config
+        production_base_url = context.get("production_base_url")
+        if production_base_url is None and db is not None:
+            try:
+                from app.services.settings_manager import get_runtime_str
+                production_base_url = get_runtime_str(db, "production_base_url", self.settings.production_base_url)
+            except Exception:
+                production_base_url = self.settings.production_base_url
+        if production_base_url is None:
+            production_base_url = self.settings.production_base_url
+
         # Add global branding context
         context.update(
             {
                 "app_name": self.settings.app_name,
                 "from_email": self.settings.email_from_address,
                 "from_name": self.settings.email_from_name,
-                "production_base_url": self.settings.production_base_url,
+                "production_base_url": production_base_url,
                 "support_email": self.settings.email_reply_to or self.settings.email_from_address,
                 "app_year": 2026,  # Update annually or make dynamic
             }

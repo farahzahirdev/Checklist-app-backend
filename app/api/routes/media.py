@@ -15,6 +15,7 @@ from app.schemas.media import MediaResponse, MediaUploadResponse
 from app.utils.file_upload import compute_sha256, basic_malware_scan
 from app.utils.i18n import get_language_code
 from app.utils.i18n_messages import translate
+from app.services.settings_manager import get_runtime_str
 
 router = APIRouter(prefix="/media", tags=["media"])
 
@@ -396,9 +397,10 @@ def preview_media(
             # We'll create a direct URL to the media file
             settings = get_settings()
             
-            # Use production base URL if available, otherwise fall back to local development URL
-            if settings.production_base_url:
-                base_url = settings.production_base_url
+            # Use runtime production base URL if available, otherwise fall back to local development URL
+            production_base_url = get_runtime_str(db, "production_base_url", settings.production_base_url)
+            if production_base_url:
+                base_url = production_base_url
             else:
                 base_url = f"http://{settings.app_host}:{settings.app_port}{settings.api_v1_prefix}"
             

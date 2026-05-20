@@ -21,6 +21,7 @@ from app.schemas.payment import PaymentState
 from app.services.stripe_products import get_stripe_price_for_checklist
 from app.utils.i18n_messages import translate
 from app.services.company_context import resolve_company_id
+from app.services.settings_manager import get_runtime_str, get_runtime_int
 
 def _stripe_required(lang_code: str = "en") -> Any:
     settings = get_settings()
@@ -169,8 +170,9 @@ def create_payment_intent_for_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("user_not_found", lang_code))
 
-    request_amount = amount_cents or settings.stripe_default_amount_cents
-    request_currency = (currency or settings.stripe_currency).upper()
+    # Use runtime settings with fallback to config defaults
+    request_amount = amount_cents or get_runtime_int(db, "stripe_default_amount_cents", settings.stripe_default_amount_cents)
+    request_currency = (currency or get_runtime_str(db, "stripe_currency", settings.stripe_currency)).upper()
 
     intent = stripe_client.PaymentIntent.create(
         amount=request_amount,
@@ -219,7 +221,7 @@ def _ensure_access_window(db: Session, payment: Payment, paid_at: datetime) -> A
         payment_id=payment.id,
         checklist_id=payment.checklist_id,  # Link to checklist if payment is checklist-specific
         activated_at=paid_at,
-        expires_at=paid_at + timedelta(days=settings.access_unlock_days),
+        expires_at=paid_at + timedelta(days=get_runtime_int(db, "access_unlock_days", settings.access_unlock_days)),
         company_id=payment.company_id,
     )
     db.add(access_window)
@@ -352,8 +354,8 @@ def admin_set_payment_status(
             user_id=user_id,
             checklist_id=None,
             stripe_payment_intent_id=f"dev_manual_{uuid4().hex}",
-            amount_cents=amount_cents or settings.stripe_default_amount_cents,
-            currency=(currency or settings.stripe_currency).upper(),
+            amount_cents=amount_cents or get_runtime_int(db, "stripe_default_amount_cents", settings.stripe_default_amount_cents),
+            currency=(currency or get_runtime_str(db, "stripe_currency", settings.stripe_currency)).upper(),
             status=PaymentStatus.pending,
         )
         db.add(payment)

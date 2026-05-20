@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.services.company_context import resolve_company_id, user_has_company_access
+from app.services.settings_manager import get_runtime_int
 from app.models.access_window import AccessWindow
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentEvidenceFile, AssessmentStatus, PriorityLevel
 from app.models.checklist import (
@@ -195,7 +196,7 @@ def _ensure_access_window(
         checklist_id=checklist_id,
         company_id=company_id,
         activated_at=now,
-        expires_at=now + timedelta(days=settings.access_unlock_days),
+        expires_at=now + timedelta(days=get_runtime_int(db, "access_unlock_days", settings.access_unlock_days)),
     )
     db.add(access_window)
     db.flush()

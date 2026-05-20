@@ -50,13 +50,13 @@ class CacheService:
     
     Features:
     - TTL support for automatic expiration
-    - Memory monitoring and warnings
+    - Memory monitoring and warnings (with runtime config)
     - Graceful degradation if Redis unavailable
     - Cache key versioning
     - Bulk operations support
     """
     
-    # Cache configuration
+    # Cache configuration (class-level defaults, overridden by runtime settings when available)
     DEFAULT_TTL = 3600  # 1 hour
     WARN_MEMORY_PERCENT = 80  # Warn when 80% full
     CRITICAL_MEMORY_PERCENT = 90  # Critical at 90%
@@ -66,12 +66,75 @@ class CacheService:
         self.redis = get_redis_client()
         self.prefix = "cache:"
         self._memory_warning_sent = False
+        self._runtime_config_cache = None  # Lazy-load runtime settings
+    
+    def _get_runtime_config(self) -> dict[str, Any]:
+        """
+        Load cache configuration from runtime settings (with fallback to class defaults).
+        Caches the result to avoid repeated DB queries.
+        """
+        if self._runtime_config_cache is not None:
+            return self._runtime_config_cache
+        
+        try:
+            # Import here to avoid circular imports at module load time
+            from sqlalchemy import select
+            from sqlalchemy.orm import Session
+            from app.models.system_setting import SystemSetting
+            from app.db.session import SessionLocal
+            
+            db: Session = SessionLocal()
+            
+            # Load cache settings from DB with defaults
+            ttl = self.DEFAULT_TTL
+            warn_percent = self.WARN_MEMORY_PERCENT
+            critical_percent = self.CRITICAL_MEMORY_PERCENT
+            max_memory_mb = self.MAX_MEMORY_MB
+            
+            for setting in db.query(SystemSetting).filter(
+                SystemSetting.key.in_([
+                    'cache_default_ttl',
+                    'cache_memory_warn_percent',
+                    'cache_memory_critical_percent',
+                    'cache_max_memory_mb',
+                ])
+            ).all():
+                try:
+                    if setting.key == 'cache_default_ttl':
+                        ttl = int(setting.value)
+                    elif setting.key == 'cache_memory_warn_percent':
+                        warn_percent = int(setting.value)
+                    elif setting.key == 'cache_memory_critical_percent':
+                        critical_percent = int(setting.value)
+                    elif setting.key == 'cache_max_memory_mb':
+                        max_memory_mb = int(setting.value)
+                except Exception as e:
+                    logger.warning(f"Failed to parse cache setting {setting.key}: {e}")
+            
+            db.close()
+            
+            self._runtime_config_cache = {
+                'default_ttl': ttl,
+                'warn_percent': warn_percent,
+                'critical_percent': critical_percent,
+                'max_memory_mb': max_memory_mb,
+            }
+            return self._runtime_config_cache
+        except Exception as e:
+            # Gracefully fall back to class defaults if DB unavailable
+            logger.debug(f"Using cache class defaults (could not load runtime config): {e}")
+            return {
+                'default_ttl': self.DEFAULT_TTL,
+                'warn_percent': self.WARN_MEMORY_PERCENT,
+                'critical_percent': self.CRITICAL_MEMORY_PERCENT,
+                'max_memory_mb': self.MAX_MEMORY_MB,
+            }
     
     def set(
         self,
         key: str,
         value: Any,
-        ttl: int = DEFAULT_TTL,
+        ttl: int | None = None,
         namespace: str = "default",
     ) -> bool:
         """
@@ -80,13 +143,18 @@ class CacheService:
         Args:
             key: Cache key
             value: Value to cache (will be JSON serialized)
-            ttl: Time to live in seconds
+            ttl: Time to live in seconds (None = use runtime/default setting)
             namespace: Key namespace for organization
         
         Returns:
             True if set successfully, False otherwise
         """
         try:
+            # Use runtime TTL if not specified
+            if ttl is None:
+                config = self._get_runtime_config()
+                ttl = config['default_ttl']
+            
             full_key = self._make_key(key, namespace)
             serialized = json.dumps(value)
             
@@ -195,39 +263,45 @@ class CacheService:
         """Get Redis memory usage information."""
         try:
             info = self.redis.info("memory")
+            config = self._get_runtime_config()
             return {
                 "used_memory_mb": info.get("used_memory", 0) / (1024 * 1024),
                 "used_memory_rss_mb": info.get("used_memory_rss", 0) / (1024 * 1024),
-                "max_memory_mb": self.MAX_MEMORY_MB,
-                "used_percent": (info.get("used_memory", 0) / (self.MAX_MEMORY_MB * 1024 * 1024)) * 100,
+                "max_memory_mb": config['max_memory_mb'],
+                "used_percent": (info.get("used_memory", 0) / (config['max_memory_mb'] * 1024 * 1024)) * 100,
             }
         except Exception as e:
             logger.error(f"Error getting memory info: {e}")
             return {}
     
     def _check_memory_usage(self) -> None:
-        """Check Redis memory usage and log warnings."""
+        """Check Redis memory usage and log warnings using runtime settings."""
         try:
             info = self.redis.info("memory")
             used_memory = info.get("used_memory", 0)
-            max_memory_bytes = self.MAX_MEMORY_MB * 1024 * 1024
+            
+            # Load runtime config (with fallback to class defaults)
+            config = self._get_runtime_config()
+            max_memory_bytes = config['max_memory_mb'] * 1024 * 1024
+            critical_percent = config['critical_percent']
+            warn_percent = config['warn_percent']
             
             if used_memory == 0:
                 return
             
             usage_percent = (used_memory / max_memory_bytes) * 100
             
-            if usage_percent > self.CRITICAL_MEMORY_PERCENT:
+            if usage_percent > critical_percent:
                 logger.critical(
-                    f"Cache memory CRITICAL: {usage_percent:.1f}% of {self.MAX_MEMORY_MB}MB used"
+                    f"Cache memory CRITICAL: {usage_percent:.1f}% of {config['max_memory_mb']}MB used"
                 )
                 # Trigger eviction task
                 from app.tasks import cache_tasks
                 cache_tasks.evict_stale_cache.delay()
-            elif usage_percent > self.WARN_MEMORY_PERCENT:
+            elif usage_percent > warn_percent:
                 if not self._memory_warning_sent:
                     logger.warning(
-                        f"Cache memory WARNING: {usage_percent:.1f}% of {self.MAX_MEMORY_MB}MB used"
+                        f"Cache memory WARNING: {usage_percent:.1f}% of {config['max_memory_mb']}MB used"
                     )
                     self._memory_warning_sent = True
             else:
@@ -260,7 +334,7 @@ cache = CacheService()
 
 def cached(
     namespace: str = "default",
-    ttl: int = CacheService.DEFAULT_TTL,
+    ttl: int | None = None,
     key_builder: Optional[Callable[[Any, str, tuple, dict], str]] = None,
 ) -> Callable:
     """
@@ -268,7 +342,7 @@ def cached(
     
     Args:
         namespace: Cache namespace
-        ttl: Time to live in seconds
+        ttl: Time to live in seconds (None = use runtime/default setting)
         key_builder: Optional function to build cache key from function arguments
                     Default: f"{function_name}:{args}:{kwargs}"
     
@@ -276,6 +350,11 @@ def cached(
         @cached(namespace="assessments", ttl=1800)
         def get_assessment(assessment_id: int):
             return db.query(Assessment).filter(...).first()
+        
+        # Or use runtime default:
+        @cached(namespace="assessments")
+        def get_list():
+            return db.query(Assessment).all()
     """
     def decorator(func: Callable[..., T]) -> Callable[..., T]:
         @wraps(func)
@@ -298,7 +377,7 @@ def cached(
             # Execute function
             result = func(*args, **kwargs)
             
-            # Cache result
+            # Cache result (ttl=None will use runtime setting)
             cache.set(cache_key, result, ttl, namespace)
             return result
         

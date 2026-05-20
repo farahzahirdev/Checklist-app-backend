@@ -18,6 +18,7 @@ from app.core.security import (
     verify_password,
     verify_totp_code,
 )
+from app.core.config import get_settings
 from app.models.audit_log import AuditAction, AuditLog
 from app.models.mfa_totp import MfaTotp
 from app.models.company import Company
@@ -25,6 +26,7 @@ from app.models.user import User, UserRole
 from app.schemas.auth import AuthResponse, AuthUserResponse, MfaSetupDetailsResponse, UserRoleCode
 from app.services.rbac import RBACService
 from app.services.user_management import UserManagementService
+from app.services.settings_manager import get_runtime_int
 import re
 from app.utils.i18n_messages import translate
 
@@ -239,7 +241,9 @@ def register_user(
     db.commit()
     db.refresh(user)
     
-    token = create_access_token(user_id=str(user.id), role=str(user.role))
+    settings = get_settings()
+    auth_ttl = get_runtime_int(db, "auth_token_ttl_minutes", settings.auth_token_ttl_minutes)
+    token = create_access_token(user_id=str(user.id), role=str(user.role), ttl_minutes=auth_ttl)
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
     db.commit()
     
@@ -262,11 +266,15 @@ def authenticate_user(db: Session, *, email: str, password: str, lang_code: str 
 
     mfa_record = _get_mfa_record(db, user.id)
     mfa_enabled = bool(mfa_record and mfa_record.is_verified)
+    
+    settings = get_settings()
+    auth_ttl = get_runtime_int(db, "auth_token_ttl_minutes", settings.auth_token_ttl_minutes)
+    mfa_ttl = get_runtime_int(db, "mfa_secret_token_ttl_minutes", settings.mfa_secret_token_ttl_minutes)
 
     # For customer users, show both true if MFA is enabled
     if str(user.role) == UserRole.customer.value:
         if mfa_enabled:
-            challenge_token = create_mfa_challenge_token(user_id=str(user.id), role=str(user.role))
+            challenge_token = create_mfa_challenge_token(user_id=str(user.id), role=str(user.role), ttl_minutes=mfa_ttl)
             return AuthResponse(
                 user=serialize_user(user, db),
                 access_token=None,
@@ -275,13 +283,13 @@ def authenticate_user(db: Session, *, email: str, password: str, lang_code: str 
                 mfa_enabled=True,
             )
         else:
-            token = create_access_token(user_id=str(user.id), role=str(user.role))
+            token = create_access_token(user_id=str(user.id), role=str(user.role), ttl_minutes=auth_ttl)
             _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
             db.commit()
             return AuthResponse(user=serialize_user(user, db), access_token=token, mfa_required=False, mfa_enabled=False)
     # For other users, keep existing logic
     if mfa_enabled:
-        challenge_token = create_mfa_challenge_token(user_id=str(user.id), role=str(user.role))
+        challenge_token = create_mfa_challenge_token(user_id=str(user.id), role=str(user.role), ttl_minutes=mfa_ttl)
         return AuthResponse(
             user=serialize_user(user, db),
             access_token=None,
@@ -289,7 +297,7 @@ def authenticate_user(db: Session, *, email: str, password: str, lang_code: str 
             mfa_required=True,
             mfa_enabled=True,
         )
-    token = create_access_token(user_id=str(user.id), role=str(user.role))
+    token = create_access_token(user_id=str(user.id), role=str(user.role), ttl_minutes=auth_ttl)
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
     db.commit()
     return AuthResponse(user=serialize_user(user, db), access_token=token, mfa_required=False, mfa_enabled=False)
@@ -318,7 +326,9 @@ def verify_mfa_challenge(db: Session, *, challenge_token: str, code: str, lang_c
     if not verify_totp_code(secret, code):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=translate("invalid_mfa_code", lang_code))
 
-    token = create_access_token(user_id=str(user.id), role=str(user.role))
+    settings = get_settings()
+    auth_ttl = get_runtime_int(db, "auth_token_ttl_minutes", settings.auth_token_ttl_minutes)
+    token = create_access_token(user_id=str(user.id), role=str(user.role), ttl_minutes=auth_ttl)
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
     db.commit()
 
@@ -378,7 +388,9 @@ def confirm_mfa_enrollment(db: Session, *, user: User, code: str, lang_code: str
     record.is_verified = True
     db.commit()
 
-    token = create_access_token(user_id=str(user.id), role=str(user.role))
+    settings = get_settings()
+    auth_ttl = get_runtime_int(db, "auth_token_ttl_minutes", settings.auth_token_ttl_minutes)
+    token = create_access_token(user_id=str(user.id), role=str(user.role), ttl_minutes=auth_ttl)
     _audit(db, actor_user=user, action=AuditAction.auth_mfa_verify, target_entity="user", target_id=user.id)
     db.commit()
 

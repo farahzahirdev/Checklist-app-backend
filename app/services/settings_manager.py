@@ -170,6 +170,82 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "category": "lifecycle",
         "description": _localized_text("Počet hodin uchování důkazů po zveřejnění zprávy", "Hours to retain evidence after report publish"),
     },
+    # Payment and billing settings
+    "stripe_currency": {
+        "value": "USD",
+        "value_type": "string",
+        "category": "payment",
+        "description": _localized_text("Měna pro platby (ISO 4217 kód)", "Currency for payments (ISO 4217 code, e.g. USD, EUR, CZK)"),
+    },
+    "stripe_default_amount_cents": {
+        "value": "4900",
+        "value_type": "int",
+        "category": "payment",
+        "description": _localized_text("Výchozí výběr částky v centech", "Default payment amount in cents (e.g. 4900 = $49.00)"),
+    },
+    # Security and token settings
+    "auth_token_ttl_minutes": {
+        "value": "720",
+        "value_type": "int",
+        "category": "security",
+        "description": _localized_text("Doba vypršení ověřovacího tokenu v minutách", "Auth token expiration time in minutes (720 = 12 hours)"),
+    },
+    "mfa_secret_token_ttl_minutes": {
+        "value": "15",
+        "value_type": "int",
+        "category": "security",
+        "description": _localized_text("Doba vypršení MFA tajného kódu v minutách", "MFA secret code expiration time in minutes"),
+    },
+    "access_unlock_days": {
+        "value": "30",
+        "value_type": "int",
+        "category": "security",
+        "description": _localized_text("Dny do odemknutí přístupu po vypršení", "Days to unlock access after expiration (e.g. 30 for 30-day grace period)"),
+    },
+    "production_base_url": {
+        "value": "",
+        "value_type": "string",
+        "category": "routing",
+        "description": _localized_text("Základní URL pro veřejné výstupy", "Base URL for public outputs (e.g. https://example.com); used in email templates and links"),
+    },
+    # Storage settings (non-secret metadata)
+    "aws_default_region": {
+        "value": "eu-north-1",
+        "value_type": "string",
+        "category": "storage",
+        "description": _localized_text("Výchozí region AWS", "Default AWS region for S3 storage (e.g. eu-west-1, eu-north-1)"),
+    },
+    "s3_bucket_arn": {
+        "value": "",
+        "value_type": "string",
+        "category": "storage",
+        "description": _localized_text("S3 Bucket ARN", "S3 bucket ARN for reference (e.g. arn:aws:s3:::my-bucket); metadata only"),
+    },
+    # Cache tuning settings
+    "cache_default_ttl": {
+        "value": "3600",
+        "value_type": "int",
+        "category": "cache",
+        "description": _localized_text("Výchozí doba do vypršení mezipaměti v sekundách", "Default cache TTL in seconds (3600 = 1 hour)"),
+    },
+    "cache_max_memory_mb": {
+        "value": "150",
+        "value_type": "int",
+        "category": "cache",
+        "description": _localized_text("Maximální paměť mezipaměti v MB", "Maximum cache memory in MB (t2.micro safe: 150 MB)"),
+    },
+    "cache_memory_warn_percent": {
+        "value": "80",
+        "value_type": "int",
+        "category": "cache",
+        "description": _localized_text("Prahová hodnota varování paměti mezipaměti", "Cache memory usage warning threshold (percent, e.g. 80 = 80% full)"),
+    },
+    "cache_memory_critical_percent": {
+        "value": "90",
+        "value_type": "int",
+        "category": "cache",
+        "description": _localized_text("Kritická prahová hodnota paměti mezipaměti", "Cache memory critical threshold (percent, e.g. 90 = cache will evict items)"),
+    },
 }
 
 
