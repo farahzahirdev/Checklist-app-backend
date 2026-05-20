@@ -5,11 +5,13 @@ from datetime import datetime, timezone
 from typing import Optional, List
 from uuid import UUID
 
+from fastapi import HTTPException, status
 from sqlalchemy import func, select, and_, or_, desc, case
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
 from app.models.assessment import Assessment, AssessmentAnswer, AssessmentEvidenceFile, AssessmentStatus
+from app.models.report import Report, ReportStatus
 from app.models.checklist import ChecklistTranslation
 from app.models.assessment_review import (
     AssessmentReview, 
@@ -47,6 +49,16 @@ from app.schemas.assessment_review import (
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _assert_assessment_review_unlocked(db: Session, assessment_id: UUID) -> None:
+    """Prevent mutations after final report has been published."""
+    report_status = db.scalar(select(Report.status).where(Report.assessment_id == assessment_id))
+    if report_status == ReportStatus.published:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Assessment review is locked because the report has already been published.",
+        )
 
 
 def _log_assessment_review_audit(
@@ -371,6 +383,7 @@ def create_answer_review(
     review_data: AnswerReviewCreate
 ) -> AnswerReviewResponse:
     """Create review for a specific answer."""
+    _assert_assessment_review_unlocked(db, assessment_id)
     
     # Verify answer belongs to assessment
     answer = (
@@ -456,6 +469,14 @@ def update_answer_review(
     
     if not review:
         raise ValueError("Review not found")
+
+    assessment_review = (
+        db.query(AssessmentReview)
+        .filter(AssessmentReview.id == review.assessment_review_id)
+        .first()
+    )
+    if assessment_review is not None:
+        _assert_assessment_review_unlocked(db, assessment_review.assessment_id)
     
     # Store previous values for history
     previous_values = {
@@ -512,6 +533,14 @@ def delete_answer_review(
     
     if not review:
         raise ValueError("Review not found")
+
+    assessment_review = (
+        db.query(AssessmentReview)
+        .filter(AssessmentReview.id == review.assessment_review_id)
+        .first()
+    )
+    if assessment_review is not None:
+        _assert_assessment_review_unlocked(db, assessment_review.assessment_id)
     
     assessment_review_id = review.assessment_review_id
     answer_id = review.answer_id
@@ -548,6 +577,7 @@ def update_assessment_review(
     review_data: AssessmentReviewUpdate
 ) -> AssessmentReviewResponse:
     """Update overall assessment review."""
+    _assert_assessment_review_unlocked(db, assessment_id)
     
     review = get_or_create_assessment_review(db, assessment_id, reviewer_id)
     
@@ -630,6 +660,7 @@ def create_bulk_answer_reviews(
     bulk_data: BulkAnswerReviewCreate
 ) -> BulkAnswerReviewResponse:
     """Create multiple answer reviews at once."""
+    _assert_assessment_review_unlocked(db, assessment_id)
     
     results = []
     success_count = 0

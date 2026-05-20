@@ -112,6 +112,8 @@ def create_or_update_assessment_review(
     """Create or update assessment review."""
     try:
         return update_assessment_review(db, assessment_id, admin.id, review_data)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -141,6 +143,8 @@ def create_answer_review_endpoint(
             raise HTTPException(status_code=404, detail="Answer not found")
         
         return create_answer_review(db, answer.assessment_id, answer_id, admin.id, review_data)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -163,6 +167,8 @@ def update_answer_review_endpoint(
     """Update answer review."""
     try:
         return update_answer_review(db, review_id, admin.id, review_data)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -184,6 +190,8 @@ def delete_answer_review_endpoint(
     try:
         success = delete_answer_review(db, review_id, admin.id)
         return {"success": success, "message": "Review deleted successfully"}
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -206,6 +214,8 @@ def create_bulk_answer_reviews_endpoint(
     """Create bulk answer reviews."""
     try:
         return create_bulk_answer_reviews(db, assessment_id, admin.id, bulk_data)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -293,6 +303,8 @@ def quick_approve_assessment(
     
     try:
         return update_assessment_review(db, assessment_id, admin.id, review_data)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -321,6 +333,8 @@ def request_assessment_changes(
     
     try:
         return update_assessment_review(db, assessment_id, admin.id, review_data)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
