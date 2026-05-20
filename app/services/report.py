@@ -40,6 +40,7 @@ from app.schemas.report import (
     CustomerReportDataResponse,
 )
 from app.services.notifications import NotificationService, NotificationEventType, NotificationEvent
+from app.services.settings_manager import get_runtime_int
 
 
 def _now() -> datetime:
@@ -524,8 +525,9 @@ def publish_report(
     assessment = db.get(Assessment, report.assessment_id)
     if assessment is not None:
         from datetime import timedelta
+        retention_hours = get_runtime_int(db, "evidence_retention_hours", 48)
         assessment.status = AssessmentStatus.closed
-        assessment.retention_expires_at = published_at + timedelta(hours=48)
+        assessment.retention_expires_at = published_at + timedelta(hours=retention_hours)
 
     db.commit()
     db.refresh(report)

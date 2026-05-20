@@ -18,6 +18,7 @@ from app.api.routes.media import router as media_router
 from app.api.routes.payments import router as payments_router
 from app.api.routes.rbac import router as rbac_router
 from app.api.routes.user_management import router as user_management_router
+from app.api.routes.admin_settings import router as admin_settings_router
 from app.api.routes.i18n_admin import router as i18n_admin_router
 from app.api.routes.cms import router as cms_router
 from app.api.routes.admin_products import router as admin_products_router
@@ -42,6 +43,7 @@ api_router.include_router(dashboard_router)
 api_router.include_router(admin_checklists_router)
 api_router.include_router(rbac_router)
 api_router.include_router(user_management_router)
+api_router.include_router(admin_settings_router)
 api_router.include_router(company_router)
 api_router.include_router(customer_companies_router)
 api_router.include_router(report_router)

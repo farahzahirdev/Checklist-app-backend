@@ -7,8 +7,10 @@ from starlette.responses import JSONResponse
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.db.session import SessionLocal
 from app.middleware.i18n import I18nMiddleware
 from app.middleware.error_handler import ErrorHandlerMiddleware, PayloadTooLargeMiddleware
+from app.services.settings_manager import seed_default_settings
 from app.services.i18n_service import get_current_language
 from app.utils.i18n_messages import translate
 from app.schemas.access import AccessWindowResponse
@@ -222,6 +224,20 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+
+@app.on_event("startup")
+def preload_system_settings() -> None:
+	"""Prebuild dynamic settings on app startup (idempotent)."""
+	db = SessionLocal()
+	try:
+		seeded = seed_default_settings(db)
+		import logging
+		logger = logging.getLogger(__name__)
+		if seeded:
+			logger.info("Seeded %s system settings at startup", seeded)
+	finally:
+		db.close()
 
 
 def custom_openapi() -> dict:

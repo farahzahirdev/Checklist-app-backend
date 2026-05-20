@@ -38,6 +38,7 @@ from app.utils.i18n_messages import translate
 from app.utils.html_sanitizer import sanitize_html
 from app.schemas.admin_checklist import EvidenceRuleResponse
 from app.services.notifications import NotificationService, NotificationEventType, NotificationEvent
+from app.services.settings_manager import get_runtime_int
 
 
 def _now_utc() -> datetime:
@@ -231,6 +232,7 @@ def start_assessment(
 ) -> AssessmentSessionResponse:
     now = _now_utc()
     settings = get_settings()
+    completion_days = get_runtime_int(db, "assessment_completion_days", settings.assessment_completion_days)
     company_id = resolve_company_id(user, company_id)
 
     checklist = db.get(Checklist, checklist_id)
@@ -254,7 +256,7 @@ def start_assessment(
             # Start is the activation point for the 7-day completion lifecycle.
             existing.status = AssessmentStatus.in_progress
             existing.started_at = now
-            existing.expires_at = now + timedelta(days=settings.assessment_completion_days)
+            existing.expires_at = now + timedelta(days=completion_days)
             db.add(existing)
             db.commit()
             db.refresh(existing)
@@ -267,23 +269,32 @@ def start_assessment(
                 changes_summary=f"Started existing not-started assessment for checklist {checklist_id}",
                 after_data={"checklist_id": str(checklist_id), "status": str(existing.status)},
             )
-    
-    # Send notification
-    try:
-        event = NotificationEvent(
-            event_type=NotificationEventType.ASSESSMENT_STARTED,
-            user_id=user.id,
-            assessment_id=existing.id,
+
+            # Send notification only on activation transition.
+            try:
+                event = NotificationEvent(
+                    event_type=NotificationEventType.ASSESSMENT_STARTED,
+                    user_id=user.id,
+                    assessment_id=existing.id,
+                )
+                notification_service = NotificationService(db)
+                notification_service.notify(event)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send assessment_started notification: {e}", exc_info=True)
+
+        return _serialize_assessment(existing, is_new=False)
+
+    # Check if user already has a submitted assessment for this checklist.
+    submitted_for_checklist = db.scalar(
+        select(Assessment).where(
+            Assessment.user_id == user.id,
+            Assessment.checklist_id == checklist_id,
+            Assessment.status == AssessmentStatus.submitted,
         )
-        notification_service = NotificationService(db)
-        notification_service.notify(event)
-    except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Failed to send assessment_started notification: {e}", exc_info=True)
-    
-    return _serialize_assessment(existing, is_new=False)
-    
+    )
+
     if user.role == UserRole.admin:
         access_window = _ensure_access_window(
             db,
@@ -333,7 +344,7 @@ def start_assessment(
         access_window_id=access_window.id,
         started_at=now,
         status=AssessmentStatus.in_progress,
-        expires_at=now + timedelta(days=settings.assessment_completion_days),
+        expires_at=now + timedelta(days=completion_days),
         completion_percent=0,
     )
     db.add(assessment)

@@ -5,6 +5,8 @@ import logging
 from celery import shared_task
 from app.core.config import get_settings
 from app.services.email_provider import EmailMessage, get_email_provider
+from app.db.session import SessionLocal
+from app.services.settings_manager import get_runtime_bool, get_runtime_int, get_runtime_str
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,24 @@ def send_email_task(
         dict with status and details
     """
     settings = get_settings()
+    db = SessionLocal()
+    try:
+        # Runtime overrides from DB (with env fallback).
+        settings.email_enabled = get_runtime_bool(db, "email_enabled", settings.email_enabled)
+        settings.smtp_host = get_runtime_str(db, "smtp_host", settings.smtp_host)
+        settings.smtp_port = get_runtime_int(db, "smtp_port", settings.smtp_port)
+        settings.smtp_use_tls = get_runtime_bool(db, "smtp_use_tls", settings.smtp_use_tls)
+        settings.email_from_address = get_runtime_str(db, "email_from_address", settings.email_from_address)
+        settings.email_from_name = get_runtime_str(db, "email_from_name", settings.email_from_name)
+        settings.email_reply_to = get_runtime_str(db, "email_reply_to", settings.email_reply_to or "")
+        settings.email_retry_delay_seconds = get_runtime_int(
+            db,
+            "email_retry_delay_seconds",
+            settings.email_retry_delay_seconds,
+        )
+    finally:
+        db.close()
+
     provider = get_email_provider(settings)
 
     if provider is None:

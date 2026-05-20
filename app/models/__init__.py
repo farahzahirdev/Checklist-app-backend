@@ -13,6 +13,7 @@ from app.models.media import *
 from app.models.product_catalog import *
 from app.models.reference import *
 from app.models.report import *
+from app.models.system_setting import *
 from app.models.support_ticket import *
 from app.models.user import *
 from app.models.rbac import *

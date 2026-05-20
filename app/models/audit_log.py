@@ -81,6 +81,7 @@ class AuditAction(StrEnum):
     system_restore = "system_restore"
     system_maintenance = "system_maintenance"
     system_config_update = "system_config_update"
+    settings_change = "settings_change"
     
     # RBAC actions
     role_create = "role_create"
