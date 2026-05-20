@@ -221,7 +221,7 @@ def _ensure_access_window(db: Session, payment: Payment, paid_at: datetime) -> A
         payment_id=payment.id,
         checklist_id=payment.checklist_id,  # Link to checklist if payment is checklist-specific
         activated_at=paid_at,
-        expires_at=paid_at + timedelta(days=get_runtime_int(db, "access_unlock_days", settings.access_unlock_days)),
+        expires_at=paid_at + timedelta(days=get_runtime_int(db, "assessment_completion_days", settings.assessment_completion_days)),
         company_id=payment.company_id,
     )
     db.add(access_window)

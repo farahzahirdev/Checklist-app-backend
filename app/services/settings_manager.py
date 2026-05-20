@@ -196,12 +196,6 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "category": "security",
         "description": _localized_text("Doba vypršení MFA tajného kódu v minutách", "MFA secret code expiration time in minutes"),
     },
-    "access_unlock_days": {
-        "value": "30",
-        "value_type": "int",
-        "category": "security",
-        "description": _localized_text("Dny do odemknutí přístupu po vypršení", "Days to unlock access after expiration (e.g. 30 for 30-day grace period)"),
-    },
     "production_base_url": {
         "value": "",
         "value_type": "string",

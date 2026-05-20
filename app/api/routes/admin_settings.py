@@ -13,7 +13,7 @@ from app.schemas.system_setting import (
     SystemSettingResponse,
     SystemSettingUpdateRequest,
 )
-from app.services.settings_manager import localize_setting_description
+from app.services.settings_manager import DEFAULT_SETTINGS, localize_setting_description
 from app.utils.i18n_messages import translate
 
 
@@ -43,7 +43,8 @@ def list_settings(
     lang_code = _request_language(request)
     _assert_admin(current_user, lang_code)
 
-    query = db.query(SystemSetting).filter(SystemSetting.is_secret.is_(False))
+    allowed_keys = set(DEFAULT_SETTINGS.keys())
+    query = db.query(SystemSetting).filter(SystemSetting.is_secret.is_(False), SystemSetting.key.in_(allowed_keys))
     if category:
         query = query.filter(SystemSetting.category == category)
     settings = query.order_by(SystemSetting.category.asc(), SystemSetting.key.asc()).all()
@@ -72,7 +73,9 @@ def update_setting(
     lang_code = _request_language(request)
     _assert_admin(current_user, lang_code)
 
-    setting = db.scalar(select(SystemSetting).where(SystemSetting.key == setting_key))
+    setting = db.scalar(
+        select(SystemSetting).where(SystemSetting.key == setting_key, SystemSetting.key.in_(set(DEFAULT_SETTINGS.keys())))
+    )
     if setting is None or setting.is_secret:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("setting_not_found", lang_code))
     if setting.is_locked:

@@ -196,7 +196,7 @@ def _ensure_access_window(
         checklist_id=checklist_id,
         company_id=company_id,
         activated_at=now,
-        expires_at=now + timedelta(days=get_runtime_int(db, "access_unlock_days", settings.access_unlock_days)),
+        expires_at=now + timedelta(days=get_runtime_int(db, "assessment_completion_days", settings.assessment_completion_days)),
     )
     db.add(access_window)
     db.flush()
