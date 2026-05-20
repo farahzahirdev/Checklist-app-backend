@@ -3,6 +3,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
@@ -230,6 +231,73 @@ def download_media(
             filename=media.original_filename,
             media_type=media.mime_type,
         )
+
+
+@router.get(
+    "/{media_id}/direct",
+    summary="Get Direct Media URL",
+    description="Resolve media into a direct image response (redirects to S3 presigned URL or serves local file).",
+)
+def direct_media(
+    media_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    """Public endpoint suitable for image tags stored as product hero URLs."""
+    media = db.get(Media, media_id)
+    if media is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found")
+
+    if not media.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media is not active")
+
+    if media.media_type != MediaType.image:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Media is not an image")
+
+    if media.scan_status != MalwareScanStatus.clean:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Media cannot be served due to scan status")
+
+    settings = get_settings()
+    s3_key = media.file_path
+
+    # S3-backed media: redirect to a short-lived presigned URL.
+    if s3_key and not s3_key.startswith('/'):
+        try:
+            import boto3
+            from botocore.exceptions import BotoCoreError, ClientError
+
+            s3_client = boto3.client(
+                "s3",
+                aws_access_key_id=settings.aws_access_key_id,
+                aws_secret_access_key=settings.aws_secret_access_key,
+                region_name=settings.aws_default_region,
+            )
+
+            presigned_url = s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": settings.s3_bucket_arn, "Key": s3_key},
+                ExpiresIn=3600,
+            )
+            return RedirectResponse(url=presigned_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+        except Exception:
+            # Fall through to local-file branch.
+            pass
+
+    # Local-file media fallback.
+    file_path = Path(media.file_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media file not found")
+
+    from fastapi.responses import FileResponse
+
+    return FileResponse(
+        path=file_path,
+        filename=media.original_filename,
+        media_type=media.mime_type,
+        headers={
+            "Cache-Control": "public, max-age=300",
+            "Content-Disposition": "inline",
+        },
+    )
 
 
 @router.get(
