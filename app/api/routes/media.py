@@ -236,22 +236,19 @@ def download_media(
 @router.get(
     "/{media_id}/direct",
     summary="Get Direct Media URL",
-    description="Resolve media into a direct image response (redirects to S3 presigned URL or serves local file).",
+    description="Resolve media into a direct file response (redirects to S3 presigned URL or serves local file).",
 )
 def direct_media(
     media_id: uuid.UUID,
     db: Session = Depends(get_db),
 ):
-    """Public endpoint suitable for image tags stored as product hero URLs."""
+    """Public endpoint suitable for product asset URLs (hero images and brochure PDFs)."""
     media = db.get(Media, media_id)
     if media is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found")
 
     if not media.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media is not active")
-
-    if media.media_type != MediaType.image:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Media is not an image")
 
     if media.scan_status != MalwareScanStatus.clean:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Media cannot be served due to scan status")
