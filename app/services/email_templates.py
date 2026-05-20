@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from app.core.config import get_settings
@@ -68,7 +69,12 @@ class EmailTemplateRenderer:
 
     def render_text(self, template_name: str, context: dict | None = None) -> str:
         """Render plain text template."""
-        return self.render(template_name.replace(".html", ".txt"), context, format="txt")
+        text_template = template_name.replace(".html", ".txt")
+        try:
+            return self.render(text_template, context, format="txt")
+        except Exception:
+            html_content = self.render_html(template_name, context)
+            return re.sub(r"<[^>]+>", " ", html_content).replace("&nbsp;", " ")
 
 
 def get_template_renderer() -> EmailTemplateRenderer:

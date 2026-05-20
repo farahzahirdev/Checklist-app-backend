@@ -15,6 +15,7 @@ from app.models.user import User
 from app.models.assessment import Assessment
 from app.models.report import Report
 from app.models.company import Company
+from app.utils.i18n import DEFAULT_LANGUAGE_CODE
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class NotificationEvent:
     assessment_id: Optional[UUID] = None
     report_id: Optional[UUID] = None
     actor_id: Optional[UUID] = None
+    lang_code: str = DEFAULT_LANGUAGE_CODE
     context: dict | None = None  # Additional context for templating
 
 
@@ -51,42 +53,42 @@ class NotificationService:
     EVENT_CONFIG = {
         NotificationEventType.ASSESSMENT_STARTED: {
             "template": "assessment_started.html",
-            "subject_key": "assessment_started",
+            "subject": {"cs": "Hodnocení bylo zahájeno", "en": "Assessment started"},
             "recipients": ["customer"],
         },
         NotificationEventType.ASSESSMENT_SUBMITTED: {
             "template": "assessment_submitted.html",
-            "subject_key": "assessment_submitted",
+            "subject": {"cs": "Hodnocení bylo odesláno", "en": "Assessment submitted"},
             "recipients": ["customer"],
         },
         NotificationEventType.ASSESSMENT_REVIEW_COMPLETED: {
             "template": "assessment_review_completed.html",
-            "subject_key": "assessment_review_completed",
+            "subject": {"cs": "Kontrola hodnocení je dokončena", "en": "Assessment review completed"},
             "recipients": ["customer"],
         },
         NotificationEventType.REPORT_CHANGES_REQUESTED: {
             "template": "report_changes_requested.html",
-            "subject_key": "report_changes_requested",
+            "subject": {"cs": "Zpráva vyžaduje změny", "en": "Report changes requested"},
             "recipients": ["customer"],
         },
         NotificationEventType.REPORT_APPROVED: {
             "template": "report_approved.html",
-            "subject_key": "report_approved",
+            "subject": {"cs": "Zpráva byla schválena", "en": "Report approved"},
             "recipients": ["customer"],
         },
         NotificationEventType.REPORT_PUBLISHED: {
             "template": "report_published.html",
-            "subject_key": "report_published",
+            "subject": {"cs": "Zpráva byla zveřejněna", "en": "Report published"},
             "recipients": ["customer", "company_billing"],
         },
         NotificationEventType.ASSESSMENT_EXPIRED: {
             "template": "assessment_expired.html",
-            "subject_key": "assessment_expired",
+            "subject": {"cs": "Platnost hodnocení vypršela", "en": "Assessment expired"},
             "recipients": ["customer"],
         },
         NotificationEventType.PASSWORD_RESET_ISSUED: {
             "template": "password_reset_issued.html",
-            "subject_key": "password_reset_issued",
+            "subject": {"cs": "Heslo bylo resetováno", "en": "Password reset issued"},
             "recipients": ["customer"],
         },
     }
@@ -127,8 +129,7 @@ class NotificationService:
             html_content = self.renderer.render_html(config["template"], context)
             text_content = self.renderer.render_text(config["template"], context)
 
-            # Get subject (use event type as fallback; ideally fetch from i18n)
-            subject = context.get("subject", config["subject_key"])
+            subject = self._resolve_subject(config["subject"], context.get("lang", DEFAULT_LANGUAGE_CODE))
 
             # Generate correlation ID for tracking
             correlation_id = f"{event.event_type}_{datetime.now().timestamp()}"
@@ -195,9 +196,16 @@ class NotificationService:
 
         return None
 
+    def _resolve_subject(self, subject_map: dict[str, str], lang_code: str) -> str:
+        lang = (lang_code or DEFAULT_LANGUAGE_CODE).lower()
+        if lang == "cz":
+            lang = "cs"
+        return subject_map.get(lang) or subject_map.get(DEFAULT_LANGUAGE_CODE) or next(iter(subject_map.values()))
+
     def _build_context(self, event: NotificationEvent, config: dict) -> dict:
         """Build template context from event data."""
         context = event.context or {}
+        context.setdefault("lang", event.lang_code or DEFAULT_LANGUAGE_CODE)
 
         # Add standard context based on event type
         if event.user_id:
@@ -225,9 +233,6 @@ class NotificationService:
             actor = self.db.get(User, event.actor_id)
             if actor:
                 context.setdefault("actor_email", actor.email)
-
-        # Use event type as subject fallback
-        context.setdefault("subject", f"{event.event_type.replace('_', ' ').title()}")
 
         return context
 

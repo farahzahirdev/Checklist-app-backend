@@ -1,6 +1,16 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% if lang == 'cs' %}
+<h2>Hodnocení zahájeno</h2>
+<p>Dobrý den, {{ customer_name }},</p>
+<p>Právě jste zahájili nové hodnocení: <strong>{{ checklist_title }}</strong></p>
+<p>Na dokončení tohoto hodnocení máte 7 dní od data zahájení. Jakmile hodnocení spustíte, začne běžet časový limit.</p>
+<p>
+    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button">Pokračovat v hodnocení</a>
+</p>
+<p>Pokud máte jakékoli dotazy, neváhejte nás kontaktovat.</p>
+{% else %}
 <h2>Assessment Started</h2>
 <p>Hi {{ customer_name }},</p>
 <p>You have started a new assessment: <strong>{{ checklist_title }}</strong></p>
@@ -9,4 +19,5 @@
     <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button">Continue Assessment</a>
 </p>
 <p>If you have any questions, please don't hesitate to contact us.</p>
+{% endif %}
 {% endblock %}

@@ -13,14 +13,24 @@ from app.schemas.system_setting import (
     SystemSettingResponse,
     SystemSettingUpdateRequest,
 )
+from app.services.settings_manager import localize_setting_description
+from app.utils.i18n_messages import translate
 
 
 router = APIRouter(prefix="/admin/settings", tags=["admin-settings"])
 
 
-def _assert_admin(current_user: User) -> None:
+def _request_language(request: Request) -> str:
+    lang_code = request.query_params.get("lang") or request.headers.get("accept-language", "")
+    lang_code = lang_code.split(",")[0].split("-")[0].lower()
+    if lang_code == "cz":
+        lang_code = "cs"
+    return lang_code if lang_code in {"cs", "en"} else "cs"
+
+
+def _assert_admin(current_user: User, lang_code: str) -> None:
     if current_user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("admin_only", lang_code))
 
 
 @router.get("", response_model=SystemSettingListResponse)
@@ -30,17 +40,24 @@ def list_settings(
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> dict:
-    _assert_admin(current_user)
+    lang_code = _request_language(request)
+    _assert_admin(current_user, lang_code)
 
     query = db.query(SystemSetting).filter(SystemSetting.is_secret.is_(False))
     if category:
         query = query.filter(SystemSetting.category == category)
     settings = query.order_by(SystemSetting.category.asc(), SystemSetting.key.asc()).all()
 
+    localized_settings = []
+    for item in settings:
+        setting = SystemSettingResponse.model_validate(item)
+        setting.description = localize_setting_description(setting.description, lang_code)
+        localized_settings.append(setting)
+
     return {
         "total": len(settings),
         "categories": sorted({item.category for item in settings}),
-        "settings": [SystemSettingResponse.model_validate(item) for item in settings],
+        "settings": localized_settings,
     }
 
 
@@ -52,13 +69,14 @@ def update_setting(
     current_user: Annotated[User, Depends(get_current_user)] = None,
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> SystemSettingResponse:
-    _assert_admin(current_user)
+    lang_code = _request_language(request)
+    _assert_admin(current_user, lang_code)
 
     setting = db.scalar(select(SystemSetting).where(SystemSetting.key == setting_key))
     if setting is None or setting.is_secret:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Setting not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("setting_not_found", lang_code))
     if setting.is_locked:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Setting is locked")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("setting_is_locked", lang_code))
 
     before_value = setting.value
     setting.value = payload.value
@@ -81,4 +99,6 @@ def update_setting(
     db.add(setting)
     db.commit()
     db.refresh(setting)
-    return SystemSettingResponse.model_validate(setting)
+    response = SystemSettingResponse.model_validate(setting)
+    response.description = localize_setting_description(response.description, lang_code)
+    return response

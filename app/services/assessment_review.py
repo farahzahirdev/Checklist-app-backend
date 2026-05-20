@@ -575,7 +575,8 @@ def update_assessment_review(
     db: Session,
     assessment_id: UUID,
     reviewer_id: UUID,
-    review_data: AssessmentReviewUpdate
+    review_data: AssessmentReviewUpdate,
+    lang_code: str = "en",
 ) -> AssessmentReviewResponse:
     """Update overall assessment review."""
     _assert_assessment_review_unlocked(db, assessment_id)
@@ -653,6 +654,7 @@ def update_assessment_review(
                         event_type=NotificationEventType.ASSESSMENT_REVIEW_COMPLETED,
                         user_id=assessment.user_id,
                         assessment_id=assessment.id,
+                        lang_code=lang_code,
                     )
                     notification_service = NotificationService(db)
                     notification_service.notify(event)

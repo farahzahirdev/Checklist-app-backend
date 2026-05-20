@@ -1,6 +1,16 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% if lang == 'cs' %}
+<h2>Platnost hodnocení vypršela</h2>
+<p>Dobrý den, {{ customer_name }},</p>
+<p>Platnost vašeho přístupu k hodnocení vypršela: <strong>{{ checklist_title }}</strong></p>
+<p>Hodnocení jste nedokončili v rámci 7denního okna. Pro opětovné provedení tohoto hodnocení bude nutné zakoupit přístup znovu.</p>
+<p>Pokud se domníváte, že jde o chybu, nebo chcete požádat o prodloužení, kontaktujte prosím náš tým podpory.</p>
+<p>
+    <a href="mailto:{{ support_email }}" class="button">Kontaktovat podporu</a>
+</p>
+{% else %}
 <h2>Assessment Expired</h2>
 <p>Hi {{ customer_name }},</p>
 <p>Your assessment access has expired: <strong>{{ checklist_title }}</strong></p>
@@ -9,4 +19,5 @@
 <p>
     <a href="mailto:{{ support_email }}" class="button">Contact Support</a>
 </p>
+{% endif %}
 {% endblock %}

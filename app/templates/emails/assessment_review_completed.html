@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% if lang == 'cs' %}
+<h2>Kontrola hodnocení dokončena</h2>
+<p>Dobrý den, {{ customer_name }},</p>
+<p>Kontrola vašeho hodnocení byla dokončena: <strong>{{ checklist_title }}</strong></p>
+<p>Vaše zpráva z kontroly je nyní k dispozici. Můžete otevřít podrobnou kontrolní zprávu a zobrazit doporučení auditorů.</p>
+<p>
+    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}/report" class="button">Zobrazit zprávu z kontroly</a>
+</p>
+{% else %}
 <h2>Assessment Review Complete</h2>
 <p>Hi {{ customer_name }},</p>
 <p>The review of your assessment has been completed: <strong>{{ checklist_title }}</strong></p>
@@ -8,4 +17,5 @@
 <p>
     <a href="{{ production_base_url }}/assessments/{{ assessment_id }}/report" class="button">View Review Report</a>
 </p>
+{% endif %}
 {% endblock %}

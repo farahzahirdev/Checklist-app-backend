@@ -58,6 +58,7 @@ def expire_stale_assessments() -> dict:
                     event_type=NotificationEventType.ASSESSMENT_EXPIRED,
                     user_id=assessment.user_id,
                     assessment_id=assessment.id,
+                    lang_code="cs",
                 )
                 notification_service = NotificationService(db)
                 notification_service.notify(event)

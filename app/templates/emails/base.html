@@ -55,7 +55,7 @@
         }
     </style>
 </head>
-<body>
+<body lang="{{ lang or 'en' }}">
     <div class="container">
         <div class="header">
             <h1>{{ app_name }}</h1>
@@ -64,8 +64,13 @@
             {% block content %}{% endblock %}
         </div>
         <div class="footer">
+            {% if lang == 'cs' %}
+            <p>&copy; {{ app_year }} {{ app_name }}. Všechna práva vyhrazena.</p>
+            <p>Máte dotazy? Kontaktujte nás na <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+            {% else %}
             <p>&copy; {{ app_year }} {{ app_name }}. All rights reserved.</p>
             <p>Questions? Contact us at <a href="mailto:{{ support_email }}">{{ support_email }}</a></p>
+            {% endif %}
         </div>
     </div>
 </body>

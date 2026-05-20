@@ -12,72 +12,105 @@ from app.models.system_setting import SystemSetting
 logger = logging.getLogger(__name__)
 
 
+def _localized_text(czech: str, english: str) -> dict[str, str]:
+    return {"cs": czech, "en": english}
+
+
+def _serialize_description(description: Any) -> str | None:
+    if description is None:
+        return None
+    if isinstance(description, str):
+        return description
+    return json.dumps(description, ensure_ascii=False)
+
+
+def localize_setting_description(description: str | None, lang_code: str) -> str | None:
+    if description is None:
+        return None
+
+    try:
+        parsed = json.loads(description)
+    except Exception:
+        return description
+
+    if not isinstance(parsed, dict):
+        return description
+
+    lang = (lang_code or "en").lower()
+    if lang == "cz":
+        lang = "cs"
+    value = parsed.get(lang) or parsed.get("en") or parsed.get("cs")
+    if isinstance(value, str) and value.strip():
+        return value
+    return description
+
+
 DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
     "email_enabled": {
         "value": "false",
         "value_type": "bool",
         "category": "email",
-        "description": "Enable outbound notification emails",
+        "description": _localized_text("Povolit odchozí e-mailová upozornění", "Enable outbound notification emails"),
     },
     "smtp_host": {
         "value": "smtp.office365.com",
         "value_type": "string",
         "category": "email",
-        "description": "SMTP host",
+        "description": _localized_text("SMTP hostitel", "SMTP host"),
     },
     "smtp_port": {
         "value": "587",
         "value_type": "int",
         "category": "email",
-        "description": "SMTP port",
+        "description": _localized_text("SMTP port", "SMTP port"),
     },
     "smtp_use_tls": {
         "value": "true",
         "value_type": "bool",
         "category": "email",
-        "description": "Use TLS for SMTP connection",
+        "description": _localized_text("Použít TLS pro SMTP připojení", "Use TLS for SMTP connection"),
     },
     "email_from_address": {
         "value": "noreply@auditready.cz",
         "value_type": "string",
         "category": "email",
-        "description": "Email sender address",
+        "description": _localized_text("E-mailová adresa odesílatele", "Email sender address"),
     },
     "email_from_name": {
         "value": "AuditReady",
         "value_type": "string",
         "category": "email",
-        "description": "Email sender display name",
+        "description": _localized_text("Zobrazované jméno odesílatele", "Email sender display name"),
     },
     "email_reply_to": {
         "value": "support@auditready.cz",
         "value_type": "string",
         "category": "email",
-        "description": "Reply-to address for notifications",
+        "description": _localized_text("Adresa pro odpověď na oznámení", "Reply-to address for notifications"),
     },
     "email_max_retries": {
         "value": "3",
         "value_type": "int",
         "category": "email",
-        "description": "Maximum retry attempts for failed emails",
+        "description": _localized_text("Maximální počet pokusů o opakování neúspěšného e-mailu", "Maximum retry attempts for failed emails"),
     },
     "email_retry_delay_seconds": {
         "value": "60",
         "value_type": "int",
         "category": "email",
-        "description": "Base retry delay in seconds",
+        "description": _localized_text("Základní prodleva opakování v sekundách", "Base retry delay in seconds"),
     },
     "assessment_completion_days": {
         "value": "7",
         "value_type": "int",
         "category": "lifecycle",
-        "description": "Days available to complete an assessment",
+        "description": _localized_text("Počet dní dostupných pro dokončení hodnocení", "Days available to complete an assessment"),
     },
     "evidence_retention_hours": {
         "value": "48",
         "value_type": "int",
         "category": "lifecycle",
-        "description": "Hours to retain evidence after report publish",
+        "description": _localized_text("Počet hodin uchování důkazů po zveřejnění zprávy", "Hours to retain evidence after report publish"),
     },
 }
 
@@ -104,7 +137,7 @@ def seed_default_settings(db: Session) -> int:
                 value=str(config["value"]),
                 value_type=str(config["value_type"]),
                 category=str(config["category"]),
-                description=config.get("description"),
+                description=_serialize_description(config.get("description")),
                 is_secret=bool(config.get("is_secret", False)),
                 is_locked=bool(config.get("is_locked", False)),
             )

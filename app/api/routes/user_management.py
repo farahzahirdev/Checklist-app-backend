@@ -727,6 +727,7 @@ def reset_user_password(
         event = NotificationEvent(
             event_type=NotificationEventType.PASSWORD_RESET_ISSUED,
             user_id=user.id,
+            lang_code=lang_code,
         )
         notification_service = NotificationService(db)
         notification_service.notify(event)
@@ -738,7 +739,7 @@ def reset_user_password(
     return {
         "user_id": user.id,
         "email": user.email,
-        "message": "Password reset successfully.",
+        "message": translate("password_reset_successful", lang_code),
         "reset_at": user.updated_at,
     }
 

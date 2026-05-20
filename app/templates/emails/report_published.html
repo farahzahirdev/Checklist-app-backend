@@ -1,6 +1,18 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% if lang == 'cs' %}
+<h2>Vaše zpráva je připravena</h2>
+<p>Dobrý den, {{ customer_name }},</p>
+<p>Vaše zpráva z hodnocení byla zveřejněna a je nyní připravena ke stažení: <strong>{{ checklist_title }}</strong></p>
+<p>Finální zpráva obsahuje souhrn zjištění, doporučení a akční plán pro řešení zjištěných nedostatků.</p>
+<div class="alert">
+    <strong>Upozornění:</strong> Uchovávejte tuto zprávu v bezpečí. Obsahuje důvěrné výsledky auditu.
+</div>
+<p>
+    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}/report" class="button">Stáhnout zprávu</a>
+</p>
+{% else %}
 <h2>Your Report is Ready</h2>
 <p>Hi {{ customer_name }},</p>
 <p>Your assessment report has been published and is now ready for download: <strong>{{ checklist_title }}</strong></p>
@@ -11,4 +23,5 @@
 <p>
     <a href="{{ production_base_url }}/assessments/{{ assessment_id }}/report" class="button">Download Report</a>
 </p>
+{% endif %}
 {% endblock %}

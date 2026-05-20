@@ -347,6 +347,7 @@ def request_changes(db: Session, *, report_id: UUID, actor: User, payload: Revie
                 user_id=assessment.user_id,
                 assessment_id=assessment.id,
                 report_id=report.id,
+                lang_code=lang_code,
             )
             notification_service = NotificationService(db)
             notification_service.notify(event)
@@ -385,6 +386,7 @@ def approve_report(db: Session, *, report_id: UUID, actor: User, payload: Review
                 user_id=assessment.user_id,
                 assessment_id=assessment.id,
                 report_id=report.id,
+                lang_code=lang_code,
             )
             notification_service = NotificationService(db)
             notification_service.notify(event)
@@ -554,6 +556,7 @@ def publish_report(
                 user_id=assessment.user_id,
                 assessment_id=assessment.id,
                 report_id=report.id,
+                lang_code=lang_code,
                 context={"company_id": str(assessment.company_id)} if assessment.company_id else None,
             )
             notification_service = NotificationService(db)

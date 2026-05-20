@@ -110,8 +110,9 @@ def create_or_update_assessment_review(
     db: Session = Depends(get_db),
 ) -> AssessmentReviewResponse:
     """Create or update assessment review."""
+    lang_code = get_language_code(request, db)
     try:
-        return update_assessment_review(db, assessment_id, admin.id, review_data)
+        return update_assessment_review(db, assessment_id, admin.id, review_data, lang_code=lang_code)
     except HTTPException:
         raise
     except ValueError as e:
@@ -295,6 +296,7 @@ def quick_approve_assessment(
     db: Session = Depends(get_db),
 ) -> AssessmentReviewResponse:
     """Quick approve assessment."""
+    lang_code = get_language_code(request, db)
     review_data = AssessmentReviewUpdate(
         status="completed",
         summary_notes="Assessment approved via quick review.",
@@ -302,7 +304,7 @@ def quick_approve_assessment(
     )
     
     try:
-        return update_assessment_review(db, assessment_id, admin.id, review_data)
+        return update_assessment_review(db, assessment_id, admin.id, review_data, lang_code=lang_code)
     except HTTPException:
         raise
     except ValueError as e:
@@ -324,6 +326,7 @@ def request_assessment_changes(
     db: Session = Depends(get_db),
 ) -> AssessmentReviewResponse:
     """Request changes to assessment."""
+    lang_code = get_language_code(request, db)
     review_data = AssessmentReviewUpdate(
         status="in_progress",
         summary_notes=f"Changes requested: {request_data.get('reason', 'No reason provided')}",
@@ -332,7 +335,7 @@ def request_assessment_changes(
     )
     
     try:
-        return update_assessment_review(db, assessment_id, admin.id, review_data)
+        return update_assessment_review(db, assessment_id, admin.id, review_data, lang_code=lang_code)
     except HTTPException:
         raise
     except ValueError as e:

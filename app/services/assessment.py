@@ -276,6 +276,7 @@ def start_assessment(
                     event_type=NotificationEventType.ASSESSMENT_STARTED,
                     user_id=user.id,
                     assessment_id=existing.id,
+                    lang_code=lang_code,
                 )
                 notification_service = NotificationService(db)
                 notification_service.notify(event)
@@ -367,6 +368,7 @@ def start_assessment(
             event_type=NotificationEventType.ASSESSMENT_STARTED,
             user_id=user.id,
             assessment_id=assessment.id,
+            lang_code=lang_code,
         )
         notification_service = NotificationService(db)
         notification_service.notify(event)
@@ -905,6 +907,7 @@ def submit_assessment(db: Session, *, user: User, assessment_id: UUID, company_i
             event_type=NotificationEventType.ASSESSMENT_SUBMITTED,
             user_id=user.id,
             assessment_id=assessment.id,
+            lang_code=lang_code,
         )
         notification_service = NotificationService(db)
         notification_service.notify(event)
