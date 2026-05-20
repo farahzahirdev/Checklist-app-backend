@@ -50,6 +50,7 @@ def send_email_task(
     try:
         # Runtime overrides from DB (with env fallback).
         settings.email_enabled = get_runtime_bool(db, "email_enabled", settings.email_enabled)
+        settings.email_provider = get_runtime_str(db, "email_provider", settings.email_provider)
         settings.smtp_host = get_runtime_str(db, "smtp_host", settings.smtp_host)
         settings.smtp_port = get_runtime_int(db, "smtp_port", settings.smtp_port)
         settings.smtp_use_tls = get_runtime_bool(db, "smtp_use_tls", settings.smtp_use_tls)
@@ -61,6 +62,13 @@ def send_email_task(
             "email_retry_delay_seconds",
             settings.email_retry_delay_seconds,
         )
+        # Microsoft Graph OAuth runtime overrides
+        settings.graph_client_id = get_runtime_str(db, "graph_client_id", settings.graph_client_id)
+        settings.graph_client_secret = get_runtime_str(db, "graph_client_secret", settings.graph_client_secret)
+        settings.graph_tenant_id = get_runtime_str(db, "graph_tenant_id", settings.graph_tenant_id)
+        settings.graph_mailbox = get_runtime_str(db, "graph_mailbox", settings.graph_mailbox)
+        settings.graph_redirect_uri = get_runtime_str(db, "graph_redirect_uri", settings.graph_redirect_uri)
+        settings.graph_refresh_token = get_runtime_str(db, "graph_refresh_token", settings.graph_refresh_token)
     finally:
         db.close()
 

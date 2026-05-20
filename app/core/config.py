@@ -44,14 +44,24 @@ class Settings(BaseSettings):
     s3_bucket_arn: str = Field(default="", alias="S3_BUCKET_ARN")
     # Deprecated: Local upload dir (not used for S3-only storage)
     upload_dir: str | None = Field(default=None, alias="UPLOAD_DIR")
-    # Email/Notification settings (Microsoft 365 SMTP)
+
+    # Email/Notification settings (Microsoft 365 SMTP or Microsoft Graph)
     email_enabled: bool = Field(default=False, alias="EMAIL_ENABLED")
-    email_provider: str = Field(default="smtp", alias="EMAIL_PROVIDER")
+    email_provider: str = Field(default="smtp", alias="EMAIL_PROVIDER")  # 'smtp' or 'graph'
+    # SMTP fields
     smtp_host: str = Field(default="", alias="SMTP_HOST")
     smtp_port: int = Field(default=587, alias="SMTP_PORT")
     smtp_username: str = Field(default="", alias="SMTP_USERNAME")
     smtp_password: str = Field(default="", alias="SMTP_PASSWORD")
     smtp_use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
+    # Microsoft Graph OAuth fields
+    graph_client_id: str = Field(default="", alias="GRAPH_CLIENT_ID")
+    graph_client_secret: str = Field(default="", alias="GRAPH_CLIENT_SECRET")
+    graph_tenant_id: str = Field(default="", alias="GRAPH_TENANT_ID")
+    graph_mailbox: str = Field(default="", alias="GRAPH_MAILBOX")  # e.g. info@auditready.cz
+    graph_redirect_uri: str = Field(default="", alias="GRAPH_REDIRECT_URI")
+    graph_refresh_token: str = Field(default="", alias="GRAPH_REFRESH_TOKEN")
+    # Common fields
     email_from_address: str = Field(default="noreply@auditready.cz", alias="EMAIL_FROM_ADDRESS")
     email_from_name: str = Field(default="AuditReady", alias="EMAIL_FROM_NAME")
     email_reply_to: str = Field(default="", alias="EMAIL_REPLY_TO")

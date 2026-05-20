@@ -52,6 +52,12 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "category": "email",
         "description": _localized_text("Povolit odchozí e-mailová upozornění", "Enable outbound notification emails"),
     },
+    "email_provider": {
+        "value": "smtp",
+        "value_type": "string",
+        "category": "email",
+        "description": _localized_text("Poskytovatel e-mailu (smtp nebo graph)", "Email provider to use: 'smtp' for SMTP, 'graph' for Microsoft Graph OAuth"),
+    },
     "smtp_host": {
         "value": "smtp.office365.com",
         "value_type": "string",
@@ -99,6 +105,45 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "value_type": "int",
         "category": "email",
         "description": _localized_text("Základní prodleva opakování v sekundách", "Base retry delay in seconds"),
+    },
+    # Microsoft Graph OAuth fields for email
+    "graph_client_id": {
+        "value": "",
+        "value_type": "string",
+        "category": "email",
+        "description": _localized_text("Microsoft Graph Client ID", "Microsoft Graph Client ID for OAuth app registration"),
+    },
+    "graph_client_secret": {
+        "value": "",
+        "value_type": "string",
+        "category": "email",
+        "description": _localized_text("Microsoft Graph Client Secret", "Microsoft Graph Client Secret for OAuth app registration"),
+        "is_secret": True,
+    },
+    "graph_tenant_id": {
+        "value": "",
+        "value_type": "string",
+        "category": "email",
+        "description": _localized_text("Microsoft Tenant ID", "Microsoft 365 Tenant ID for Graph API"),
+    },
+    "graph_mailbox": {
+        "value": "",
+        "value_type": "string",
+        "category": "email",
+        "description": _localized_text("Graph Mailbox Address", "Email address of the shared mailbox to send from (e.g. info@auditready.cz)"),
+    },
+    "graph_redirect_uri": {
+        "value": "",
+        "value_type": "string",
+        "category": "email",
+        "description": _localized_text("OAuth Redirect URI", "Redirect URI for Microsoft Graph OAuth app"),
+    },
+    "graph_refresh_token": {
+        "value": "",
+        "value_type": "string",
+        "category": "email",
+        "description": _localized_text("Graph Refresh Token", "Refresh token for Microsoft Graph API access (set after admin consent)"),
+        "is_secret": True,
     },
     "assessment_completion_days": {
         "value": "7",

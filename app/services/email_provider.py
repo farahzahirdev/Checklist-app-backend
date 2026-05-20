@@ -1,3 +1,79 @@
+import requests
+import time
+class MicrosoftGraphEmailProvider(EmailProvider):
+    """Microsoft Graph API email provider (OAuth)."""
+
+    def __init__(
+        self,
+        client_id: str,
+        client_secret: str,
+        tenant_id: str,
+        mailbox: str,
+        refresh_token: str,
+        redirect_uri: str = "",
+    ):
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.tenant_id = tenant_id
+        self.mailbox = mailbox
+        self.refresh_token = refresh_token
+        self.redirect_uri = redirect_uri
+        self._access_token = None
+        self._access_token_expiry = 0
+
+    def _get_access_token(self) -> str:
+        now = int(time.time())
+        if self._access_token and now < self._access_token_expiry - 60:
+            return self._access_token
+        token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
+        data = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "grant_type": "refresh_token",
+            "refresh_token": self.refresh_token,
+            "scope": "https://graph.microsoft.com/.default",
+        }
+        if self.redirect_uri:
+            data["redirect_uri"] = self.redirect_uri
+        resp = requests.post(token_url, data=data)
+        resp.raise_for_status()
+        token_data = resp.json()
+        self._access_token = token_data["access_token"]
+        self._access_token_expiry = now + int(token_data.get("expires_in", 3600))
+        return self._access_token
+
+    def send(self, message: EmailMessage) -> bool:
+        try:
+            access_token = self._get_access_token()
+            url = f"https://graph.microsoft.com/v1.0/users/{self.mailbox}/sendMail"
+            payload = {
+                "message": {
+                    "subject": message.subject,
+                    "body": {
+                        "contentType": "HTML",
+                        "content": message.html_content,
+                    },
+                    "toRecipients": [
+                        {"emailAddress": {"address": addr}} for addr in message.to
+                    ],
+                },
+                "saveToSentItems": "true",
+            }
+            if message.from_address:
+                payload["message"]["from"] = {"emailAddress": {"address": message.from_address}}
+            if message.reply_to:
+                payload["message"]["replyTo"] = [{"emailAddress": {"address": message.reply_to}}]
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            }
+            resp = requests.post(url, json=payload, headers=headers)
+            resp.raise_for_status()
+            logger.info(f"Graph email sent to {message.to} with subject: {message.subject}")
+            return True
+        except Exception as e:
+            logger.error(f"Graph API error sending email: {e}")
+            return False
 """Email provider abstraction and implementations."""
 from __future__ import annotations
 
@@ -109,6 +185,23 @@ def get_email_provider(settings) -> EmailProvider | None:
             smtp_password=settings.smtp_password,
             smtp_use_tls=settings.smtp_use_tls,
         )
-
+    elif settings.email_provider == "graph":
+        if not all([
+            settings.graph_client_id,
+            settings.graph_client_secret,
+            settings.graph_tenant_id,
+            settings.graph_mailbox,
+            settings.graph_refresh_token,
+        ]):
+            logger.warning("Graph provider configured but missing credentials")
+            return None
+        return MicrosoftGraphEmailProvider(
+            client_id=settings.graph_client_id,
+            client_secret=settings.graph_client_secret,
+            tenant_id=settings.graph_tenant_id,
+            mailbox=settings.graph_mailbox,
+            refresh_token=settings.graph_refresh_token,
+            redirect_uri=settings.graph_redirect_uri,
+        )
     logger.warning(f"Unknown email provider: {settings.email_provider}")
     return None
