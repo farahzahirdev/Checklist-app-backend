@@ -53,6 +53,8 @@ def send_email_task(
         settings.email_provider = get_runtime_str(db, "email_provider", settings.email_provider)
         settings.smtp_host = get_runtime_str(db, "smtp_host", settings.smtp_host)
         settings.smtp_port = get_runtime_int(db, "smtp_port", settings.smtp_port)
+        settings.smtp_username = get_runtime_str(db, "smtp_username", settings.smtp_username)
+        settings.smtp_password = get_runtime_str(db, "smtp_password", settings.smtp_password)
         settings.smtp_use_tls = get_runtime_bool(db, "smtp_use_tls", settings.smtp_use_tls)
         settings.email_from_address = get_runtime_str(db, "email_from_address", settings.email_from_address)
         settings.email_from_name = get_runtime_str(db, "email_from_name", settings.email_from_name)

@@ -70,6 +70,19 @@ DEFAULT_SETTINGS: dict[str, dict[str, Any]] = {
         "category": "email",
         "description": _localized_text("SMTP port", "SMTP port"),
     },
+    "smtp_username": {
+        "value": "",
+        "value_type": "string",
+        "category": "email",
+        "description": _localized_text("Uživatelské jméno SMTP", "SMTP username (mailbox address for Office 365)"),
+    },
+    "smtp_password": {
+        "value": "",
+        "value_type": "string",
+        "category": "email",
+        "description": _localized_text("Heslo SMTP", "SMTP password"),
+        "is_secret": True,
+    },
     "smtp_use_tls": {
         "value": "true",
         "value_type": "bool",
