@@ -1054,29 +1054,40 @@ def _calculate_chapter_data(db: Session, assessment: Assessment) -> list[dict]:
     """Calculate chapter overview data"""
     from app.models.checklist import ChecklistQuestion
     
-    # Group questions by report_chapter
+    # Group questions by report_chapter; fallback to section code when chapter is not configured.
     questions = db.scalars(
         select(ChecklistQuestion)
         .where(
             ChecklistQuestion.checklist_id == assessment.checklist_id,
             ChecklistQuestion.is_active.is_(True),
-            ChecklistQuestion.report_chapter.is_not(None)
         )
     ).all()
     
+    section_title_cache: dict[UUID, str] = {}
     chapter_map = {}
     for question in questions:
-        chapter = question.report_chapter or "Uncategorized"
-        if chapter not in chapter_map:
-            chapter_map[chapter] = {
-                "chapter_code": chapter,
-                "title": chapter,
+        chapter = (question.report_chapter or "").strip()
+        if chapter:
+            chapter_code = chapter
+            chapter_title = chapter
+        else:
+            section = question.section
+            chapter_code = section.section_code
+            if section.id not in section_title_cache:
+                section_translation = _latest_section_translation(db, section.id)
+                section_title_cache[section.id] = sanitize_text(section_translation.title) if section_translation else section.section_code
+            chapter_title = section_title_cache[section.id]
+
+        if chapter_code not in chapter_map:
+            chapter_map[chapter_code] = {
+                "chapter_code": chapter_code,
+                "title": chapter_title,
                 "questions": [],
                 "score": 0,
                 "max_score": 0
             }
-        chapter_map[chapter]["questions"].append(question)
-        chapter_map[chapter]["max_score"] += 4
+        chapter_map[chapter_code]["questions"].append(question)
+        chapter_map[chapter_code]["max_score"] += 4
     
     # Get answers and calculate scores
     question_ids = [q.id for q in questions]
@@ -1100,7 +1111,7 @@ def _calculate_chapter_data(db: Session, assessment: Assessment) -> list[dict]:
             answer = answer_map.get(question.id)
             if answer and answer.answer_score is not None:
                 total_score += answer.answer_score
-                if answer.answer in [AnswerChoice.no, AnswerChoice.dont_know]:
+                if int(answer.answer_score) <= 2:
                     findings_count += 1
         
         chapter_data.append({
