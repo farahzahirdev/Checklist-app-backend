@@ -39,6 +39,7 @@ from app.schemas.report import (
     UpsertReportSummaryRequest,
     CustomerReportDataResponse,
 )
+from app.services.notifications import NotificationService, NotificationEventType, NotificationEvent
 
 
 def _now() -> datetime:
@@ -335,6 +336,23 @@ def request_changes(db: Session, *, report_id: UUID, actor: User, payload: Revie
         changes_summary=f"Requested changes for report {report_id}",
         after_data={"status": str(report.status), "note": payload.note},
     )
+    
+    # Send notification
+    try:
+        assessment = db.get(Assessment, report.assessment_id)
+        if assessment:
+            event = NotificationEvent(
+                event_type=NotificationEventType.REPORT_CHANGES_REQUESTED,
+                user_id=assessment.user_id,
+                assessment_id=assessment.id,
+                report_id=report.id,
+            )
+            notification_service = NotificationService(db)
+            notification_service.notify(event)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send report_changes_requested notification: {e}", exc_info=True)
 
     return _serialize_report(db, report)
 
@@ -356,6 +374,23 @@ def approve_report(db: Session, *, report_id: UUID, actor: User, payload: Review
         changes_summary=f"Approved report {report_id}",
         after_data={"status": str(report.status), "note": payload.note},
     )
+    
+    # Send notification
+    try:
+        assessment = db.get(Assessment, report.assessment_id)
+        if assessment:
+            event = NotificationEvent(
+                event_type=NotificationEventType.REPORT_APPROVED,
+                user_id=assessment.user_id,
+                assessment_id=assessment.id,
+                report_id=report.id,
+            )
+            notification_service = NotificationService(db)
+            notification_service.notify(event)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send report_approved notification: {e}", exc_info=True)
 
     return _serialize_report(db, report)
 
@@ -507,6 +542,24 @@ def publish_report(
             "has_pdf_password": bool(encrypted_password),
         },
     )
+    
+    # Send notification
+    try:
+        assessment = db.get(Assessment, report.assessment_id)
+        if assessment:
+            event = NotificationEvent(
+                event_type=NotificationEventType.REPORT_PUBLISHED,
+                user_id=assessment.user_id,
+                assessment_id=assessment.id,
+                report_id=report.id,
+                context={"company_id": str(assessment.company_id)} if assessment.company_id else None,
+            )
+            notification_service = NotificationService(db)
+            notification_service.notify(event)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send report_published notification: {e}", exc_info=True)
 
     return _serialize_report(db, report)
 

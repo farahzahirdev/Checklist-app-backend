@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Assessment Submitted</h2>
+<p>Hi {{ customer_name }},</p>
+<p>Thank you for submitting your assessment: <strong>{{ checklist_title }}</strong></p>
+<p>We have received your submission and have begun the review process. Our auditors will review your answers and provide feedback.</p>
+<p>You will receive an email notification when the review is complete.</p>
+<p>
+    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button">View Assessment</a>
+</p>
+{% endblock %}

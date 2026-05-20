@@ -37,6 +37,7 @@ from app.schemas.assessment import (
 from app.utils.i18n_messages import translate
 from app.utils.html_sanitizer import sanitize_html
 from app.schemas.admin_checklist import EvidenceRuleResponse
+from app.services.notifications import NotificationService, NotificationEventType, NotificationEvent
 
 
 def _now_utc() -> datetime:
@@ -266,17 +267,22 @@ def start_assessment(
                 changes_summary=f"Started existing not-started assessment for checklist {checklist_id}",
                 after_data={"checklist_id": str(checklist_id), "status": str(existing.status)},
             )
-        return _serialize_assessment(existing, is_new=False)
     
-    # Check if user already has a SUBMITTED assessment for this checklist
-    # If so, they would need a new payment/access to start another one
-    submitted_for_checklist = db.scalar(
-        select(Assessment).where(
-            Assessment.user_id == user.id,
-            Assessment.checklist_id == checklist_id,
-            Assessment.status == AssessmentStatus.submitted,
+    # Send notification
+    try:
+        event = NotificationEvent(
+            event_type=NotificationEventType.ASSESSMENT_STARTED,
+            user_id=user.id,
+            assessment_id=existing.id,
         )
-    )
+        notification_service = NotificationService(db)
+        notification_service.notify(event)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send assessment_started notification: {e}", exc_info=True)
+    
+    return _serialize_assessment(existing, is_new=False)
     
     if user.role == UserRole.admin:
         access_window = _ensure_access_window(
@@ -343,6 +349,20 @@ def start_assessment(
         changes_summary=f"Started assessment for checklist {checklist_id}",
         after_data={"checklist_id": str(checklist_id), "status": str(assessment.status)},
     )
+    
+    # Send notification
+    try:
+        event = NotificationEvent(
+            event_type=NotificationEventType.ASSESSMENT_STARTED,
+            user_id=user.id,
+            assessment_id=assessment.id,
+        )
+        notification_service = NotificationService(db)
+        notification_service.notify(event)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send assessment_started notification: {e}", exc_info=True)
 
     return _serialize_assessment(assessment, is_new=True)
 
@@ -867,6 +887,18 @@ def submit_assessment(db: Session, *, user: User, assessment_id: UUID, company_i
     except Exception as e:
         # Log error but don't fail the submission (frontend will create draft as fallback)
         logger.error(f"Failed to auto-generate report for assessment {assessment_id}: {e}", exc_info=True)
+
+    # Send notification
+    try:
+        event = NotificationEvent(
+            event_type=NotificationEventType.ASSESSMENT_SUBMITTED,
+            user_id=user.id,
+            assessment_id=assessment.id,
+        )
+        notification_service = NotificationService(db)
+        notification_service.notify(event)
+    except Exception as e:
+        logger.error(f"Failed to send assessment_submitted notification: {e}", exc_info=True)
 
     return AssessmentSubmitResponse(
         assessment_id=assessment.id,

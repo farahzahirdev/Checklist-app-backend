@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Changes Requested for Your Report</h2>
+<p>Hi {{ customer_name }},</p>
+<p>Our auditors have reviewed your assessment and requested changes: <strong>{{ checklist_title }}</strong></p>
+<div class="alert">
+    <strong>Action Required:</strong> Please review the feedback and make the requested changes to your assessment answers.
+</div>
+<p>Once you have made the necessary changes, please resubmit your assessment for final review.</p>
+<p>
+    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button">View Changes Requested</a>
+</p>
+{% endblock %}

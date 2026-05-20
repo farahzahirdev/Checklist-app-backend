@@ -45,6 +45,7 @@ from app.schemas.assessment_review import (
     BulkAnswerReviewResult,
     ReviewAnalytics,
 )
+from app.services.notifications import NotificationService, NotificationEventType, NotificationEvent
 
 
 def _now_utc() -> datetime:
@@ -643,6 +644,22 @@ def update_assessment_review(
             if report and reviewer_user:
                 payload = ReviewActionRequest(note="Assessment review completed; starting report review")
                 start_review(db, report_id=report.id, actor=reviewer_user, payload=payload)
+            
+            # Send notification
+            assessment = db.get(Assessment, assessment_id)
+            if assessment:
+                try:
+                    event = NotificationEvent(
+                        event_type=NotificationEventType.ASSESSMENT_REVIEW_COMPLETED,
+                        user_id=assessment.user_id,
+                        assessment_id=assessment.id,
+                    )
+                    notification_service = NotificationService(db)
+                    notification_service.notify(event)
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Failed to send assessment_review_completed notification: {e}", exc_info=True)
     except Exception:
         # Do not fail the review update if report start fails; log could be added here.
         db.rollback()

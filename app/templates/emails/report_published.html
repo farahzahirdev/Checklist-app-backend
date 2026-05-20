@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Your Report is Ready</h2>
+<p>Hi {{ customer_name }},</p>
+<p>Your assessment report has been published and is now ready for download: <strong>{{ checklist_title }}</strong></p>
+<p>The final report includes comprehensive findings, recommendations, and an action plan for addressing any identified issues.</p>
+<div class="alert">
+    <strong>Note:</strong> Please keep this report secure. It contains confidential audit findings.
+</div>
+<p>
+    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}/report" class="button">Download Report</a>
+</p>
+{% endblock %}

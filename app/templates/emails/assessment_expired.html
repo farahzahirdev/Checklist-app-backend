@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Assessment Expired</h2>
+<p>Hi {{ customer_name }},</p>
+<p>Your assessment access has expired: <strong>{{ checklist_title }}</strong></p>
+<p>You did not complete the assessment within the 7-day window. To perform this assessment, you will need to purchase access again.</p>
+<p>If you believe this is in error or would like to request an extension, please contact our support team.</p>
+<p>
+    <a href="mailto:{{ support_email }}" class="button">Contact Support</a>
+</p>
+{% endblock %}

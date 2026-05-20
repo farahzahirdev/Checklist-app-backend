@@ -61,6 +61,7 @@ from app.services.customer_assessments import (
     get_customer_assessments,
     get_customer_dashboard_enhanced,
 )
+from app.services.notifications import NotificationService, NotificationEventType, NotificationEvent
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -720,6 +721,19 @@ def reset_user_password(
     )
     db.commit()
     db.refresh(user)
+    
+    # Send notification
+    try:
+        event = NotificationEvent(
+            event_type=NotificationEventType.PASSWORD_RESET_ISSUED,
+            user_id=user.id,
+        )
+        notification_service = NotificationService(db)
+        notification_service.notify(event)
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send password_reset_issued notification: {e}", exc_info=True)
 
     return {
         "user_id": user.id,

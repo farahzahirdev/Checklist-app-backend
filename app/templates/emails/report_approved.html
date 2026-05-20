@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Report Approved</h2>
+<p>Hi {{ customer_name }},</p>
+<p>Your report has been approved: <strong>{{ checklist_title }}</strong></p>
+<p>The final report will be published shortly and will be available for download.</p>
+<p>
+    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}/report" class="button">View Report</a>
+</p>
+{% endblock %}

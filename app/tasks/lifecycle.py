@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 
 from celery import shared_task
 from sqlalchemy.orm import Session
+from app.services.notifications import NotificationService, NotificationEventType, NotificationEvent
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,19 @@ def expire_stale_assessments() -> dict:
         for assessment in stale:
             assessment.status = AssessmentStatus.expired
             expired_count += 1
+            
+            # Send notification
+            try:
+                event = NotificationEvent(
+                    event_type=NotificationEventType.ASSESSMENT_EXPIRED,
+                    user_id=assessment.user_id,
+                    assessment_id=assessment.id,
+                )
+                notification_service = NotificationService(db)
+                notification_service.notify(event)
+            except Exception as e:
+                logger.error(f"Failed to send assessment_expired notification for {assessment.id}: {e}", exc_info=True)
+        
         if expired_count:
             db.commit()
             logger.info("Expired %d stale assessments", expired_count)
