@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional, List
 from uuid import UUID
 
-from sqlalchemy import func, select, and_, or_, desc
+from sqlalchemy import func, select, and_, or_, desc, case
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
@@ -877,6 +877,24 @@ def get_assessment_reviews_for_admin(
 
     ids = [r[0] for r in id_sub.all()]
 
+    count_by_review: dict[UUID, tuple[int, int]] = {}
+    if ids:
+        agg_rows = (
+            db.query(
+                AnswerReview.assessment_review_id,
+                func.count(AnswerReview.id),
+                func.coalesce(
+                    func.sum(case((AnswerReview.is_action_required.is_(True), 1), else_=0)),
+                    0,
+                ),
+            )
+            .filter(AnswerReview.assessment_review_id.in_(ids))
+            .group_by(AnswerReview.assessment_review_id)
+            .all()
+        )
+        for review_id, total, action_n in agg_rows:
+            count_by_review[review_id] = (int(total), int(action_n))
+
     if not ids:
         return []
 
@@ -899,7 +917,10 @@ def get_assessment_reviews_for_admin(
     for r in reviews:
         # Create response using Pydantic model with from_attributes=True
         response = AssessmentReviewResponse.model_validate(r, from_attributes=True)
-        
+        ar_n, ac_n = count_by_review.get(r.id, (0, 0))
+        response.answer_reviews_count = ar_n
+        response.action_required_count = ac_n
+
         # Populate additional context fields
         if r.assessment:
             response.customer_email = r.assessment.user.email if r.assessment.user else None
