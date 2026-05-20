@@ -473,4 +473,7 @@ def public_product_detail(db: Session, slug: str) -> ProductDetailResponse | Non
     pricing = _pricing_for_product(db, product)
     checkout_available = bool(pricing and pricing.available and product.status == ProductStatus.published.value)
     base = to_public_product_response(db, product)
-    return ProductDetailResponse(**base.model_dump(), pricing=pricing, checkout_available=checkout_available)
+    base_dict = base.model_dump()
+    # Remove 'pricing' if present to avoid double-injection
+    base_dict.pop('pricing', None)
+    return ProductDetailResponse(**base_dict, pricing=pricing, checkout_available=checkout_available)
