@@ -116,6 +116,7 @@ class ProductBaseResponse(BaseModel):
     cta_label: str | None = None
     created_at: datetime
     updated_at: datetime
+    pricing: ProductPricingInfo | None = None
 
 
 class AdminProductResponse(ProductBaseResponse):

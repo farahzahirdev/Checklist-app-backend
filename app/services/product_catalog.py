@@ -238,6 +238,7 @@ def to_admin_product_response(db: Session, product: Product) -> AdminProductResp
 
 def to_public_product_response(db: Session, product: Product) -> ProductBaseResponse:
     category = _category_response(product.category) if product.category is not None else None
+    pricing = _pricing_for_product(db, product)
     return ProductBaseResponse(
         id=product.id,
         category=category,
@@ -258,6 +259,7 @@ def to_public_product_response(db: Session, product: Product) -> ProductBaseResp
         cta_label=product.cta_label,
         created_at=product.created_at,
         updated_at=product.updated_at,
+        pricing=pricing,
     )
 
 
@@ -425,10 +427,19 @@ def list_public_catalog(db: Session) -> PublicProductCatalogResponse:
         .order_by(Product.display_order.asc(), Product.created_at.asc())
     ).all()
 
+    # Filter products: exclude checklist products where the underlying checklist is not published
+    filtered_products = []
+    for product in products:
+        if product.product_kind == ProductKind.checklist.value and product.checklist_id is not None:
+            checklist = product.checklist
+            if checklist is None or checklist.status != ChecklistStatus.published:
+                continue
+        filtered_products.append(product)
+
     grouped: list[ProductCategoryWithProductsResponse] = []
     total = 0
     for category in categories:
-        category_products = [product for product in products if product.category_id == category.id]
+        category_products = [product for product in filtered_products if product.category_id == category.id]
         total += len(category_products)
         grouped.append(
             ProductCategoryWithProductsResponse(
@@ -444,6 +455,11 @@ def public_product_detail(db: Session, slug: str) -> ProductDetailResponse | Non
     product = get_product_by_slug(db, slug)
     if product is None or product.status not in {ProductStatus.published.value, ProductStatus.coming_soon.value}:
         return None
+    # Exclude unpublished checklists from public access
+    if product.product_kind == ProductKind.checklist.value and product.checklist_id is not None:
+        checklist = product.checklist
+        if checklist is None or checklist.status != ChecklistStatus.published:
+            return None
     pricing = _pricing_for_product(db, product)
     checkout_available = bool(pricing and pricing.available and product.status == ProductStatus.published.value)
     base = to_public_product_response(db, product)
