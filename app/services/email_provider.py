@@ -1,88 +1,15 @@
-import requests
-import time
-class MicrosoftGraphEmailProvider(EmailProvider):
-    """Microsoft Graph API email provider (OAuth)."""
-
-    def __init__(
-        self,
-        client_id: str,
-        client_secret: str,
-        tenant_id: str,
-        mailbox: str,
-        refresh_token: str,
-        redirect_uri: str = "",
-    ):
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.tenant_id = tenant_id
-        self.mailbox = mailbox
-        self.refresh_token = refresh_token
-        self.redirect_uri = redirect_uri
-        self._access_token = None
-        self._access_token_expiry = 0
-
-    def _get_access_token(self) -> str:
-        now = int(time.time())
-        if self._access_token and now < self._access_token_expiry - 60:
-            return self._access_token
-        token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
-        data = {
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "grant_type": "refresh_token",
-            "refresh_token": self.refresh_token,
-            "scope": "https://graph.microsoft.com/.default",
-        }
-        if self.redirect_uri:
-            data["redirect_uri"] = self.redirect_uri
-        resp = requests.post(token_url, data=data)
-        resp.raise_for_status()
-        token_data = resp.json()
-        self._access_token = token_data["access_token"]
-        self._access_token_expiry = now + int(token_data.get("expires_in", 3600))
-        return self._access_token
-
-    def send(self, message: EmailMessage) -> bool:
-        try:
-            access_token = self._get_access_token()
-            url = f"https://graph.microsoft.com/v1.0/users/{self.mailbox}/sendMail"
-            payload = {
-                "message": {
-                    "subject": message.subject,
-                    "body": {
-                        "contentType": "HTML",
-                        "content": message.html_content,
-                    },
-                    "toRecipients": [
-                        {"emailAddress": {"address": addr}} for addr in message.to
-                    ],
-                },
-                "saveToSentItems": "true",
-            }
-            if message.from_address:
-                payload["message"]["from"] = {"emailAddress": {"address": message.from_address}}
-            if message.reply_to:
-                payload["message"]["replyTo"] = [{"emailAddress": {"address": message.reply_to}}]
-            headers = {
-                "Authorization": f"Bearer {access_token}",
-                "Content-Type": "application/json",
-            }
-            resp = requests.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
-            logger.info(f"Graph email sent to {message.to} with subject: {message.subject}")
-            return True
-        except Exception as e:
-            logger.error(f"Graph API error sending email: {e}")
-            return False
 """Email provider abstraction and implementations."""
 from __future__ import annotations
 
 import logging
 import smtplib
+import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from dataclasses import dataclass
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -136,14 +63,11 @@ class SMTPEmailProvider(EmailProvider):
             if message.reply_to:
                 msg["Reply-To"] = message.reply_to
 
-            # Attach plain text version
             if message.text_content:
                 msg.attach(MIMEText(message.text_content, "plain", "utf-8"))
 
-            # Attach HTML version
             msg.attach(MIMEText(message.html_content, "html", "utf-8"))
 
-            # Connect and send
             if self.smtp_use_tls:
                 with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
                     server.starttls()
@@ -168,6 +92,82 @@ class SMTPEmailProvider(EmailProvider):
             return False
 
 
+class MicrosoftGraphEmailProvider(EmailProvider):
+    """Microsoft Graph API email provider (OAuth)."""
+
+    def __init__(
+        self,
+        client_id: str,
+        client_secret: str,
+        tenant_id: str,
+        mailbox: str,
+        refresh_token: str,
+        redirect_uri: str = "",
+    ):
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.tenant_id = tenant_id
+        self.mailbox = mailbox
+        self.refresh_token = refresh_token
+        self.redirect_uri = redirect_uri
+        self._access_token: str | None = None
+        self._access_token_expiry: int = 0
+
+    def _get_access_token(self) -> str:
+        now = int(time.time())
+        if self._access_token and now < self._access_token_expiry - 60:
+            return self._access_token
+        token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
+        data: dict = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "grant_type": "refresh_token",
+            "refresh_token": self.refresh_token,
+            "scope": "https://graph.microsoft.com/.default",
+        }
+        if self.redirect_uri:
+            data["redirect_uri"] = self.redirect_uri
+        resp = requests.post(token_url, data=data, timeout=15)
+        resp.raise_for_status()
+        token_data = resp.json()
+        self._access_token = token_data["access_token"]
+        self._access_token_expiry = now + int(token_data.get("expires_in", 3600))
+        return self._access_token
+
+    def send(self, message: EmailMessage) -> bool:
+        try:
+            access_token = self._get_access_token()
+            url = f"https://graph.microsoft.com/v1.0/users/{self.mailbox}/sendMail"
+            payload: dict = {
+                "message": {
+                    "subject": message.subject,
+                    "body": {
+                        "contentType": "HTML",
+                        "content": message.html_content,
+                    },
+                    "toRecipients": [
+                        {"emailAddress": {"address": addr}} for addr in message.to
+                    ],
+                },
+                "saveToSentItems": "true",
+            }
+            if message.from_address:
+                payload["message"]["from"] = {"emailAddress": {"address": message.from_address}}
+            if message.reply_to:
+                payload["message"]["replyTo"] = [{"emailAddress": {"address": message.reply_to}}]
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            }
+            resp = requests.post(url, json=payload, headers=headers, timeout=15)
+            resp.raise_for_status()
+            logger.info(f"Graph email sent to {message.to} with subject: {message.subject}")
+            return True
+        except Exception as e:
+            logger.error(f"Graph API error sending email: {e}")
+            return False
+
+
 def get_email_provider(settings) -> EmailProvider | None:
     """Factory function to get configured email provider."""
     if not settings.email_enabled:
@@ -185,7 +185,8 @@ def get_email_provider(settings) -> EmailProvider | None:
             smtp_password=settings.smtp_password,
             smtp_use_tls=settings.smtp_use_tls,
         )
-    elif settings.email_provider == "graph":
+
+    if settings.email_provider == "graph":
         if not all([
             settings.graph_client_id,
             settings.graph_client_secret,
@@ -203,5 +204,6 @@ def get_email_provider(settings) -> EmailProvider | None:
             refresh_token=settings.graph_refresh_token,
             redirect_uri=settings.graph_redirect_uri,
         )
+
     logger.warning(f"Unknown email provider: {settings.email_provider}")
     return None
