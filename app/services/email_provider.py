@@ -107,15 +107,11 @@ class MicrosoftGraphEmailProvider(EmailProvider):
         client_secret: str,
         tenant_id: str,
         mailbox: str,
-        refresh_token: str = "",
-        redirect_uri: str = "",
     ):
         self.client_id = client_id
         self.client_secret = client_secret
         self.tenant_id = tenant_id
         self.mailbox = mailbox
-        self.refresh_token = refresh_token
-        self.redirect_uri = redirect_uri
         self._access_token: str | None = None
         self._access_token_expiry: int = 0
         self.last_error: str | None = None
@@ -164,28 +160,6 @@ class MicrosoftGraphEmailProvider(EmailProvider):
         token_data = resp.json()
         return token_data["access_token"], int(token_data.get("expires_in", 3600))
 
-    def _get_access_token_refresh_token(self) -> str:
-        if not self.refresh_token:
-            raise RuntimeError("Graph refresh token is not configured")
-
-        data: dict[str, str] = {
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-            "grant_type": "refresh_token",
-            "refresh_token": self.refresh_token,
-            "scope": "https://graph.microsoft.com/.default",
-        }
-        if self.redirect_uri:
-            data["redirect_uri"] = self.redirect_uri
-        resp = requests.post(self._token_endpoint(), data=data, timeout=15)
-        try:
-            resp.raise_for_status()
-        except requests.HTTPError as exc:
-            detail = self._safe_response_excerpt(resp)
-            raise RuntimeError(f"Graph token endpoint rejected refresh_token request: {detail}") from exc
-        token_data = resp.json()
-        return token_data["access_token"], int(token_data.get("expires_in", 3600))
-
     def _get_access_token(self) -> str:
         now = int(time.time())
         if self._access_token and now < self._access_token_expiry - 60:
@@ -198,20 +172,11 @@ class MicrosoftGraphEmailProvider(EmailProvider):
             self._access_token_expiry = now + int(expires_in)
             return self._access_token
         except Exception as client_cred_exc:
-            # Fallback mode: delegated token refresh (legacy flow).
-            if self.refresh_token:
-                try:
-                    token, expires_in = self._get_access_token_refresh_token()
-                    self._access_token = token
-                    self._access_token_expiry = now + int(expires_in)
-                    return self._access_token
-                except Exception as refresh_exc:
-                    raise RuntimeError(
-                        "Graph token acquisition failed for both client_credentials and refresh_token flows"
-                    ) from refresh_exc
-
+            detail = str(client_cred_exc)
             raise RuntimeError(
-                "Graph client_credentials token request failed. Ensure Azure app has Mail.Send Application permission and admin consent is granted"
+                "Graph client_credentials token request failed. "
+                "Ensure Azure app has Mail.Send Application permission and admin consent is granted. "
+                f"Details: {detail}"
             ) from client_cred_exc
 
         return self._access_token
@@ -294,8 +259,6 @@ def get_email_provider(settings) -> EmailProvider | None:
             client_secret=settings.graph_client_secret,
             tenant_id=settings.graph_tenant_id,
             mailbox=settings.graph_mailbox,
-            refresh_token=settings.graph_refresh_token,
-            redirect_uri=settings.graph_redirect_uri,
         )
 
     logger.warning(f"Unknown email provider: {settings.email_provider}")

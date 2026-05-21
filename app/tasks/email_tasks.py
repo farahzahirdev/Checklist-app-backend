@@ -37,8 +37,6 @@ def _build_graph_fallback_provider(settings) -> MicrosoftGraphEmailProvider | No
         client_secret=settings.graph_client_secret,
         tenant_id=settings.graph_tenant_id,
         mailbox=settings.graph_mailbox,
-        refresh_token=settings.graph_refresh_token,
-        redirect_uri=settings.graph_redirect_uri,
     )
 
 
@@ -79,7 +77,6 @@ def send_email_now(
         settings.graph_tenant_id = get_runtime_str(db, "graph_tenant_id", settings.graph_tenant_id)
         settings.graph_mailbox = get_runtime_str(db, "graph_mailbox", settings.graph_mailbox)
         settings.graph_redirect_uri = get_runtime_str(db, "graph_redirect_uri", settings.graph_redirect_uri)
-        settings.graph_refresh_token = get_runtime_str(db, "graph_refresh_token", settings.graph_refresh_token)
     finally:
         db.close()
 
