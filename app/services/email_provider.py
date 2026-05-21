@@ -6,6 +6,7 @@ import smtplib
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from json import JSONDecodeError
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -122,6 +123,31 @@ class MicrosoftGraphEmailProvider(EmailProvider):
     def _token_endpoint(self) -> str:
         return f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
 
+    @staticmethod
+    def _safe_response_excerpt(response: requests.Response) -> str:
+        """Build a concise and safe HTTP error summary from Graph/AAD responses."""
+        try:
+            body = response.json()
+            if isinstance(body, dict):
+                # Common shape: {"error": "...", "error_description": "..."}
+                err = body.get("error")
+                desc = body.get("error_description")
+                if err or desc:
+                    return f"status={response.status_code} error={err!r} error_description={desc!r}"
+
+                # Some APIs use nested error payloads.
+                nested = body.get("error") if isinstance(body.get("error"), dict) else None
+                if nested:
+                    code = nested.get("code")
+                    msg = nested.get("message")
+                    return f"status={response.status_code} code={code!r} message={msg!r}"
+
+                return f"status={response.status_code} body={str(body)[:400]!r}"
+            return f"status={response.status_code} body={str(body)[:400]!r}"
+        except (ValueError, JSONDecodeError):
+            text = (response.text or "").strip().replace("\n", " ")
+            return f"status={response.status_code} body={text[:400]!r}"
+
     def _get_access_token_client_credentials(self) -> str:
         data: dict[str, str] = {
             "client_id": self.client_id,
@@ -130,7 +156,11 @@ class MicrosoftGraphEmailProvider(EmailProvider):
             "scope": "https://graph.microsoft.com/.default",
         }
         resp = requests.post(self._token_endpoint(), data=data, timeout=15)
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as exc:
+            detail = self._safe_response_excerpt(resp)
+            raise RuntimeError(f"Graph token endpoint rejected client_credentials request: {detail}") from exc
         token_data = resp.json()
         return token_data["access_token"], int(token_data.get("expires_in", 3600))
 
@@ -148,7 +178,11 @@ class MicrosoftGraphEmailProvider(EmailProvider):
         if self.redirect_uri:
             data["redirect_uri"] = self.redirect_uri
         resp = requests.post(self._token_endpoint(), data=data, timeout=15)
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as exc:
+            detail = self._safe_response_excerpt(resp)
+            raise RuntimeError(f"Graph token endpoint rejected refresh_token request: {detail}") from exc
         token_data = resp.json()
         return token_data["access_token"], int(token_data.get("expires_in", 3600))
 
@@ -210,10 +244,16 @@ class MicrosoftGraphEmailProvider(EmailProvider):
             }
             resp = requests.post(url, json=payload, headers=headers, timeout=15)
             if resp.status_code in {401, 403}:
+                detail = self._safe_response_excerpt(resp)
                 raise RuntimeError(
-                    "Graph sendMail unauthorized/forbidden. Verify Mail.Send Application permission and admin consent for the Azure app"
+                    "Graph sendMail unauthorized/forbidden. Verify Mail.Send Application permission "
+                    f"and admin consent for the Azure app. Details: {detail}"
                 )
-            resp.raise_for_status()
+            try:
+                resp.raise_for_status()
+            except requests.HTTPError as exc:
+                detail = self._safe_response_excerpt(resp)
+                raise RuntimeError(f"Graph sendMail request failed: {detail}") from exc
             logger.info(f"Graph email sent to {message.to} with subject: {message.subject}")
             return True
         except Exception as e:
