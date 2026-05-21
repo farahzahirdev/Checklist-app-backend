@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound, select_autoescape
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -72,6 +72,8 @@ class EmailTemplateRenderer:
         try:
             template = self.env.get_template(template_name)
             return template.render(**context)
+        except TemplateNotFound:
+            raise
         except Exception as e:
             logger.error(f"Error rendering template {template_name}: {e}")
             raise
@@ -85,7 +87,7 @@ class EmailTemplateRenderer:
         text_template = template_name.replace(".html", ".txt")
         try:
             return self.render(text_template, context, format="txt")
-        except Exception:
+        except TemplateNotFound:
             html_content = self.render_html(template_name, context)
             return re.sub(r"<[^>]+>", " ", html_content).replace("&nbsp;", " ")
 

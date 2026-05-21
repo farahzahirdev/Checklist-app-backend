@@ -9,7 +9,7 @@ from uuid import UUID
 from datetime import datetime
 
 from sqlalchemy.orm import Session
-from app.tasks.email_tasks import send_email_task
+from app.tasks.email_tasks import send_email_now, send_email_task
 from app.services.email_templates import get_template_renderer
 from app.models.user import User
 from app.models.assessment import Assessment
@@ -134,14 +134,31 @@ class NotificationService:
             # Generate correlation ID for tracking
             correlation_id = f"{event.event_type}_{datetime.now().timestamp()}"
 
-            # Enqueue email task
-            send_email_task.delay(
-                to_addresses=recipients,
-                subject=subject,
-                html_content=html_content,
-                text_content=text_content,
-                correlation_id=correlation_id,
-            )
+            # Enqueue email task; fall back to direct send if broker is unavailable.
+            try:
+                send_email_task.delay(
+                    to_addresses=recipients,
+                    subject=subject,
+                    html_content=html_content,
+                    text_content=text_content,
+                    correlation_id=correlation_id,
+                )
+            except Exception as queue_error:
+                logger.error(
+                    f"[{correlation_id}] Failed to enqueue notification {event.event_type}; sending immediately: {queue_error}"
+                )
+                fallback_result = send_email_now(
+                    to_addresses=recipients,
+                    subject=subject,
+                    html_content=html_content,
+                    text_content=text_content,
+                    correlation_id=correlation_id,
+                )
+                if fallback_result.get("status") != "sent":
+                    logger.error(
+                        f"[{correlation_id}] Fallback email send failed for {event.event_type}: {fallback_result}"
+                    )
+                    return False
 
             logger.info(
                 f"[{correlation_id}] Notification queued for {event.event_type} to {recipients}"

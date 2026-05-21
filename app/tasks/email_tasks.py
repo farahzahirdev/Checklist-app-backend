@@ -11,15 +11,8 @@ from app.services.settings_manager import get_runtime_bool, get_runtime_int, get
 logger = logging.getLogger(__name__)
 
 
-@shared_task(
-    name="email.send_email",
-    queue="celery",
-    max_retries=3,
-    default_retry_delay=60,
-    bind=True,
-)
-def send_email_task(
-    self,
+def send_email_now(
+    *,
     to_addresses: list[str],
     subject: str,
     html_content: str,
@@ -29,22 +22,7 @@ def send_email_task(
     reply_to: str | None = None,
     correlation_id: str | None = None,
 ) -> dict:
-    """
-    Send an email asynchronously.
-    
-    Args:
-        to_addresses: List of recipient email addresses
-        subject: Email subject
-        html_content: HTML email body
-        text_content: Plain text email body (optional)
-        from_address: Sender email address (uses config default if None)
-        from_name: Sender display name (uses config default if None)
-        reply_to: Reply-to address (optional)
-        correlation_id: For tracking/logging purposes
-        
-    Returns:
-        dict with status and details
-    """
+    """Send email immediately in-process (fallback path when queueing fails)."""
     settings = get_settings()
     db = SessionLocal()
     try:
@@ -87,33 +65,97 @@ def send_email_task(
             "correlation_id": correlation_id,
         }
 
+    message = EmailMessage(
+        to=to_addresses,
+        subject=subject,
+        html_content=html_content,
+        text_content=text_content,
+        from_address=from_address or settings.email_from_address,
+        from_name=from_name or settings.email_from_name,
+        reply_to=reply_to or settings.email_reply_to or None,
+    )
+
+    success = provider.send(message)
+    if success:
+        logger.info(f"[{correlation_id}] Email sent successfully to {to_addresses}")
+        return {
+            "status": "sent",
+            "to": to_addresses,
+            "subject": subject,
+            "correlation_id": correlation_id,
+        }
+
+    return {
+        "status": "failed",
+        "to": to_addresses,
+        "error": "Email provider returned False",
+        "correlation_id": correlation_id,
+    }
+
+
+@shared_task(
+    name="email.send_email",
+    queue="celery",
+    max_retries=3,
+    default_retry_delay=60,
+    bind=True,
+)
+def send_email_task(
+    self,
+    to_addresses: list[str],
+    subject: str,
+    html_content: str,
+    text_content: str | None = None,
+    from_address: str | None = None,
+    from_name: str | None = None,
+    reply_to: str | None = None,
+    correlation_id: str | None = None,
+) -> dict:
+    """
+    Send an email asynchronously.
+    
+    Args:
+        to_addresses: List of recipient email addresses
+        subject: Email subject
+        html_content: HTML email body
+        text_content: Plain text email body (optional)
+        from_address: Sender email address (uses config default if None)
+        from_name: Sender display name (uses config default if None)
+        reply_to: Reply-to address (optional)
+        correlation_id: For tracking/logging purposes
+        
+    Returns:
+        dict with status and details
+    """
     try:
-        message = EmailMessage(
-            to=to_addresses,
+        result = send_email_now(
+            to_addresses=to_addresses,
             subject=subject,
             html_content=html_content,
             text_content=text_content,
-            from_address=from_address or settings.email_from_address,
-            from_name=from_name or settings.email_from_name,
-            reply_to=reply_to or settings.email_reply_to or None,
+            from_address=from_address,
+            from_name=from_name,
+            reply_to=reply_to,
+            correlation_id=correlation_id,
         )
-
-        success = provider.send(message)
-
-        if success:
-            logger.info(f"[{correlation_id}] Email sent successfully to {to_addresses}")
-            return {
-                "status": "sent",
-                "to": to_addresses,
-                "subject": subject,
-                "correlation_id": correlation_id,
-            }
-        else:
+        if result.get("status") != "sent":
             logger.warning(f"[{correlation_id}] Email send failed; retrying")
             raise Exception("Email provider returned False")
+        return result
 
     except Exception as exc:
         logger.error(f"[{correlation_id}] Error sending email: {exc}")
+
+        settings = get_settings()
+        db = SessionLocal()
+        try:
+            settings.email_retry_delay_seconds = get_runtime_int(
+                db,
+                "email_retry_delay_seconds",
+                settings.email_retry_delay_seconds,
+            )
+        finally:
+            db.close()
 
         # Retry with exponential backoff
         if self.request.retries < self.max_retries:
