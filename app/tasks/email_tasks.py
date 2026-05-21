@@ -11,6 +11,21 @@ from app.services.settings_manager import get_runtime_bool, get_runtime_int, get
 logger = logging.getLogger(__name__)
 
 
+def _missing_graph_fields(settings) -> list[str]:
+    missing: list[str] = []
+    if not settings.graph_client_id:
+        missing.append("graph_client_id")
+    if not settings.graph_client_secret:
+        missing.append("graph_client_secret")
+    if not settings.graph_tenant_id:
+        missing.append("graph_tenant_id")
+    if not settings.graph_mailbox:
+        missing.append("graph_mailbox")
+    if not settings.graph_refresh_token:
+        missing.append("graph_refresh_token")
+    return missing
+
+
 def _build_graph_fallback_provider(settings) -> MicrosoftGraphEmailProvider | None:
     if not all([
         settings.graph_client_id,
@@ -104,6 +119,7 @@ def send_email_now(
     )
 
     success = provider.send(message)
+    primary_error = getattr(provider, "last_error", None)
     if not success and settings.email_provider == "smtp":
         graph_fallback = _build_graph_fallback_provider(settings)
         if graph_fallback is not None:
@@ -111,6 +127,27 @@ def send_email_now(
                 f"[{correlation_id}] SMTP send failed; retrying once via Microsoft Graph fallback"
             )
             success = graph_fallback.send(message)
+            if not success:
+                fallback_error = getattr(graph_fallback, "last_error", None)
+                return {
+                    "status": "failed",
+                    "to": to_addresses,
+                    "error": fallback_error or primary_error or "Both SMTP and Microsoft Graph send failed",
+                    "correlation_id": correlation_id,
+                }
+        else:
+            missing_fields = _missing_graph_fields(settings)
+            hint = (
+                f"Microsoft Graph fallback unavailable; missing settings: {', '.join(missing_fields)}"
+                if missing_fields
+                else "Microsoft Graph fallback unavailable"
+            )
+            return {
+                "status": "failed",
+                "to": to_addresses,
+                "error": f"{primary_error or 'SMTP send failed'}; {hint}",
+                "correlation_id": correlation_id,
+            }
 
     if success:
         logger.info(f"[{correlation_id}] Email sent successfully to {to_addresses}")
@@ -124,7 +161,7 @@ def send_email_now(
     return {
         "status": "failed",
         "to": to_addresses,
-        "error": "Email provider returned False",
+        "error": primary_error or "Email provider returned False",
         "correlation_id": correlation_id,
     }
 

@@ -51,10 +51,12 @@ class SMTPEmailProvider(EmailProvider):
         self.smtp_username = smtp_username
         self.smtp_password = smtp_password
         self.smtp_use_tls = smtp_use_tls
+        self.last_error: str | None = None
 
     def send(self, message: EmailMessage) -> bool:
         """Send email via SMTP."""
         try:
+            self.last_error = None
             msg = MIMEMultipart("alternative")
             msg["Subject"] = message.subject
             msg["From"] = f"{message.from_name} <{message.from_address}>"
@@ -82,12 +84,15 @@ class SMTPEmailProvider(EmailProvider):
             return True
 
         except smtplib.SMTPAuthenticationError as e:
+            self.last_error = f"SMTP authentication failed: {e}"
             logger.error(f"SMTP authentication failed: {e}")
             return False
         except smtplib.SMTPException as e:
+            self.last_error = f"SMTP error: {e}"
             logger.error(f"SMTP error while sending email: {e}")
             return False
         except Exception as e:
+            self.last_error = f"Unexpected SMTP error: {e}"
             logger.error(f"Unexpected error sending email: {e}")
             return False
 
@@ -112,6 +117,7 @@ class MicrosoftGraphEmailProvider(EmailProvider):
         self.redirect_uri = redirect_uri
         self._access_token: str | None = None
         self._access_token_expiry: int = 0
+        self.last_error: str | None = None
 
     def _get_access_token(self) -> str:
         now = int(time.time())
@@ -136,6 +142,7 @@ class MicrosoftGraphEmailProvider(EmailProvider):
 
     def send(self, message: EmailMessage) -> bool:
         try:
+            self.last_error = None
             access_token = self._get_access_token()
             url = f"https://graph.microsoft.com/v1.0/users/{self.mailbox}/sendMail"
             payload: dict = {
@@ -164,6 +171,7 @@ class MicrosoftGraphEmailProvider(EmailProvider):
             logger.info(f"Graph email sent to {message.to} with subject: {message.subject}")
             return True
         except Exception as e:
+            self.last_error = f"Graph API error: {e}"
             logger.error(f"Graph API error sending email: {e}")
             return False
 
