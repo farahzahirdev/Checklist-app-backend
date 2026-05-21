@@ -2,26 +2,28 @@
 
 {% block content %}
 {% if lang == 'cs' %}
-<h2>U vaší zprávy jsou vyžadovány změny</h2>
-<p>Dobrý den, {{ customer_name }},</p>
-<p>Naši auditoři zkontrolovali vaše hodnocení a požadují změny: <strong>{{ checklist_title }}</strong></p>
+<h2>Byla požadována změna zprávy</h2>
+<p>Dobrý den, {{ actor_name }},</p>
+<p>Potvrzení: úspěšně jste požadovali změny u zprávy pro hodnocení <strong>{{ checklist_title }}</strong>.</p>
+{% if reviewer_note %}
 <div class="alert">
-    <strong>Je třeba jednat:</strong> Projděte si zpětnou vazbu a proveďte požadované změny ve svých odpovědích.
+    <strong>Vaše poznámka pro zákazníka:</strong><br>{{ reviewer_note }}
 </div>
-<p>Jakmile provedete potřebné úpravy, odešlete hodnocení znovu k závěrečné kontrole.</p>
+{% endif %}
 <p>
-    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button">Zobrazit požadované změny</a>
+    <a href="{{ production_base_url }}/admin/reports/{{ report_id }}" class="button">Zobrazit zprávu</a>
 </p>
 {% else %}
-<h2>Changes Requested for Your Report</h2>
-<p>Hi {{ customer_name }},</p>
-<p>Our auditors have reviewed your assessment and requested changes: <strong>{{ checklist_title }}</strong></p>
+<h2>Report Changes Requested</h2>
+<p>Hi {{ actor_name }},</p>
+<p>Confirmation: you have successfully requested changes for the report on assessment <strong>{{ checklist_title }}</strong>.</p>
+{% if reviewer_note %}
 <div class="alert">
-    <strong>Action Required:</strong> Please review the feedback and make the requested changes to your assessment answers.
+    <strong>Your note to the customer:</strong><br>{{ reviewer_note }}
 </div>
-<p>Once you have made the necessary changes, please resubmit your assessment for final review.</p>
+{% endif %}
 <p>
-    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button">View Changes Requested</a>
+    <a href="{{ production_base_url }}/admin/reports/{{ report_id }}" class="button">View Report</a>
 </p>
 {% endif %}
 {% endblock %}

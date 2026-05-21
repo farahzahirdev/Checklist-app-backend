@@ -8,10 +8,11 @@ from typing import Optional
 from uuid import UUID
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.tasks.email_tasks import send_email_now, send_email_task
 from app.services.email_templates import get_template_renderer
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.assessment import Assessment
 from app.models.report import Report
 from app.models.company import Company
@@ -59,22 +60,22 @@ class NotificationService:
         NotificationEventType.ASSESSMENT_SUBMITTED: {
             "template": "assessment_submitted.html",
             "subject": {"cs": "Hodnocení bylo odesláno", "en": "Assessment submitted"},
-            "recipients": ["customer"],
+            "recipients": ["customer", "admin"],
         },
         NotificationEventType.ASSESSMENT_REVIEW_COMPLETED: {
             "template": "assessment_review_completed.html",
             "subject": {"cs": "Kontrola hodnocení je dokončena", "en": "Assessment review completed"},
-            "recipients": ["customer"],
+            "recipients": ["admin"],
         },
         NotificationEventType.REPORT_CHANGES_REQUESTED: {
             "template": "report_changes_requested.html",
             "subject": {"cs": "Zpráva vyžaduje změny", "en": "Report changes requested"},
-            "recipients": ["customer"],
+            "recipients": ["actor"],
         },
         NotificationEventType.REPORT_APPROVED: {
             "template": "report_approved.html",
             "subject": {"cs": "Zpráva byla schválena", "en": "Report approved"},
-            "recipients": ["customer"],
+            "recipients": ["actor"],
         },
         NotificationEventType.REPORT_PUBLISHED: {
             "template": "report_published.html",
@@ -184,6 +185,22 @@ class NotificationService:
                     if user and user.email:
                         recipients.add(user.email)
 
+            elif recipient_type == "actor":
+                if event.actor_id:
+                    actor = self.db.get(User, event.actor_id)
+                    if actor and actor.email:
+                        recipients.add(actor.email)
+
+            elif recipient_type == "admin":
+                admin_users = self.db.scalars(
+                    select(User).where(
+                        User.role.in_([UserRole.admin, UserRole.auditor])
+                    )
+                ).all()
+                for admin_user in admin_users:
+                    if admin_user.email:
+                        recipients.add(admin_user.email)
+
             elif recipient_type == "company_billing":
                 # Resolve company billing email
                 company_id = self._get_company_id(event)
@@ -250,6 +267,7 @@ class NotificationService:
             actor = self.db.get(User, event.actor_id)
             if actor:
                 context.setdefault("actor_email", actor.email)
+                context.setdefault("actor_name", actor.email.split("@")[0])
 
         return context
 

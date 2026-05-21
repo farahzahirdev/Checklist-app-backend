@@ -345,9 +345,11 @@ def request_changes(db: Session, *, report_id: UUID, actor: User, payload: Revie
             event = NotificationEvent(
                 event_type=NotificationEventType.REPORT_CHANGES_REQUESTED,
                 user_id=assessment.user_id,
+                actor_id=actor.id,
                 assessment_id=assessment.id,
                 report_id=report.id,
                 lang_code=lang_code,
+                context={"reviewer_note": payload.note or ""},
             )
             notification_service = NotificationService(db)
             notification_service.notify(event)
@@ -384,6 +386,7 @@ def approve_report(db: Session, *, report_id: UUID, actor: User, payload: Review
             event = NotificationEvent(
                 event_type=NotificationEventType.REPORT_APPROVED,
                 user_id=assessment.user_id,
+                actor_id=actor.id,
                 assessment_id=assessment.id,
                 report_id=report.id,
                 lang_code=lang_code,

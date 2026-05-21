@@ -3,19 +3,29 @@
 {% block content %}
 {% if lang == 'cs' %}
 <h2>Hodnocení odesláno</h2>
+{% if customer_name %}
 <p>Dobrý den, {{ customer_name }},</p>
 <p>Děkujeme za odeslání hodnocení: <strong>{{ checklist_title }}</strong></p>
 <p>Vaše odeslání jsme přijali a zahájili kontrolu. Naši auditoři zkontrolují vaše odpovědi a poskytnou zpětnou vazbu.</p>
 <p>Jakmile bude kontrola dokončena, obdržíte e-mailové upozornění.</p>
+{% else %}
+<p>Dobrý den,</p>
+<p>Nové hodnocení bylo odesláno zákazníkem a čeká na kontrolu: <strong>{{ checklist_title }}</strong></p>
+{% endif %}
 <p>
     <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button">Zobrazit hodnocení</a>
 </p>
 {% else %}
 <h2>Assessment Submitted</h2>
+{% if customer_name %}
 <p>Hi {{ customer_name }},</p>
 <p>Thank you for submitting your assessment: <strong>{{ checklist_title }}</strong></p>
 <p>We have received your submission and have begun the review process. Our auditors will review your answers and provide feedback.</p>
 <p>You will receive an email notification when the review is complete.</p>
+{% else %}
+<p>Hi,</p>
+<p>A new assessment has been submitted by a customer and is awaiting review: <strong>{{ checklist_title }}</strong></p>
+{% endif %}
 <p>
     <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button">View Assessment</a>
 </p>

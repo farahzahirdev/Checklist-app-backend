@@ -3,19 +3,17 @@
 {% block content %}
 {% if lang == 'cs' %}
 <h2>Kontrola hodnocení dokončena</h2>
-<p>Dobrý den, {{ customer_name }},</p>
-<p>Kontrola vašeho hodnocení byla dokončena: <strong>{{ checklist_title }}</strong></p>
-<p>Vaše zpráva z kontroly je nyní k dispozici. Můžete otevřít podrobnou kontrolní zprávu a zobrazit doporučení auditorů.</p>
+<p>Dobrý den,</p>
+<p>Kontrola hodnocení <strong>{{ checklist_title }}</strong> byla dokončena a zpráva je připravena k dalšímu zpracování.</p>
 <p>
-    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}/report" class="button">Zobrazit zprávu z kontroly</a>
+    <a href="{{ production_base_url }}/admin/assessments/{{ assessment_id }}" class="button">Zobrazit hodnocení</a>
 </p>
 {% else %}
-<h2>Assessment Review Complete</h2>
-<p>Hi {{ customer_name }},</p>
-<p>The review of your assessment has been completed: <strong>{{ checklist_title }}</strong></p>
-<p>Your assessment review is now available. You can access the detailed review report to see the auditor's feedback and recommendations.</p>
+<h2>Assessment Review Completed</h2>
+<p>Hi,</p>
+<p>The review of assessment <strong>{{ checklist_title }}</strong> has been completed and the report is ready for further processing.</p>
 <p>
-    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}/report" class="button">View Review Report</a>
+    <a href="{{ production_base_url }}/admin/assessments/{{ assessment_id }}" class="button">View Assessment</a>
 </p>
 {% endif %}
 {% endblock %}

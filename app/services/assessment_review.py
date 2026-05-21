@@ -653,6 +653,7 @@ def update_assessment_review(
                     event = NotificationEvent(
                         event_type=NotificationEventType.ASSESSMENT_REVIEW_COMPLETED,
                         user_id=assessment.user_id,
+                        actor_id=reviewer_id,
                         assessment_id=assessment.id,
                         lang_code=lang_code,
                     )
