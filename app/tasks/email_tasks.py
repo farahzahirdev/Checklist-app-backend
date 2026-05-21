@@ -4,11 +4,30 @@ from __future__ import annotations
 import logging
 from celery import shared_task
 from app.core.config import get_settings
-from app.services.email_provider import EmailMessage, get_email_provider
+from app.services.email_provider import EmailMessage, MicrosoftGraphEmailProvider, get_email_provider
 from app.db.session import SessionLocal
 from app.services.settings_manager import get_runtime_bool, get_runtime_int, get_runtime_str
 
 logger = logging.getLogger(__name__)
+
+
+def _build_graph_fallback_provider(settings) -> MicrosoftGraphEmailProvider | None:
+    if not all([
+        settings.graph_client_id,
+        settings.graph_client_secret,
+        settings.graph_tenant_id,
+        settings.graph_mailbox,
+        settings.graph_refresh_token,
+    ]):
+        return None
+    return MicrosoftGraphEmailProvider(
+        client_id=settings.graph_client_id,
+        client_secret=settings.graph_client_secret,
+        tenant_id=settings.graph_tenant_id,
+        mailbox=settings.graph_mailbox,
+        refresh_token=settings.graph_refresh_token,
+        redirect_uri=settings.graph_redirect_uri,
+    )
 
 
 def send_email_now(
@@ -55,15 +74,24 @@ def send_email_now(
     provider = get_email_provider(settings)
 
     if provider is None:
-        logger.warning(
-            f"[{correlation_id}] Email provider not configured; skipping send to {to_addresses}"
-        )
-        return {
-            "status": "skipped",
-            "reason": "provider_disabled",
-            "to": to_addresses,
-            "correlation_id": correlation_id,
-        }
+        # If SMTP is selected but unavailable/misconfigured, attempt Graph fallback when configured.
+        if settings.email_provider == "smtp":
+            provider = _build_graph_fallback_provider(settings)
+            if provider is not None:
+                logger.warning(
+                    f"[{correlation_id}] SMTP provider unavailable; attempting Microsoft Graph fallback"
+                )
+
+        if provider is None:
+            logger.warning(
+                f"[{correlation_id}] Email provider not configured; skipping send to {to_addresses}"
+            )
+            return {
+                "status": "skipped",
+                "reason": "provider_disabled",
+                "to": to_addresses,
+                "correlation_id": correlation_id,
+            }
 
     message = EmailMessage(
         to=to_addresses,
@@ -76,6 +104,14 @@ def send_email_now(
     )
 
     success = provider.send(message)
+    if not success and settings.email_provider == "smtp":
+        graph_fallback = _build_graph_fallback_provider(settings)
+        if graph_fallback is not None:
+            logger.warning(
+                f"[{correlation_id}] SMTP send failed; retrying once via Microsoft Graph fallback"
+            )
+            success = graph_fallback.send(message)
+
     if success:
         logger.info(f"[{correlation_id}] Email sent successfully to {to_addresses}")
         return {
