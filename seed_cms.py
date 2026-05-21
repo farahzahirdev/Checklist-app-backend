@@ -1185,12 +1185,12 @@ PAGES_DATA = {
                         "buttons": [
                             {
                                 "text": "Get Access",
-                                "url": "/register",
+                                "url": "/products",
                                 "primary": True
                             },
                             {
                                 "text": "View Products",
-                                "url": "/products/audit-readiness-checklist",
+                                "url": "/products",
                                 "primary": False
                             }
                         ]
@@ -1236,12 +1236,12 @@ PAGES_DATA = {
                         "buttons": [
                             {
                                 "text": "Získat přístup",
-                                "url": "/register",
+                                "url": "/products",
                                 "primary": True
                             },
                             {
                                 "text": "Zobrazit produkty",
-                                "url": "/products/audit-readiness-checklist",
+                                "url": "/products",
                                 "primary": False
                             }
                         ]
@@ -2069,13 +2069,13 @@ PAGES_DATA = {
                         "buttons": [
                             {
                                 "text": "Get Access",
-                                "href": "/products/audit-readiness",
-                                "variant": "primary"
+                                "url": "/products",
+                                "primary": True
                             },
                             {
                                 "text": "View Product",
-                                "href": "/products/audit-readiness",
-                                "variant": "secondary"
+                                "url": "/products",
+                                "primary": False
                             }
                         ]
                     }
@@ -2296,13 +2296,13 @@ PAGES_DATA = {
                         "buttons": [
                             {
                                 "text": "Získat přístup",
-                                "href": "/products/audit-readiness",
-                                "variant": "primary"
+                                "url": "/products",
+                                "primary": True
                             },
                             {
                                 "text": "Zobrazit produkt",
-                                "href": "/products/audit-readiness",
-                                "variant": "secondary"
+                                "url": "/products",
+                                "primary": False
                             }
                         ]
                     }
