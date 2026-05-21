@@ -12,6 +12,7 @@ class SystemSettingResponse(BaseModel):
     category: str
     description: str | None = None
     is_secret: bool
+    has_value: bool = False
     is_locked: bool
     created_at: datetime
     updated_at: datetime
@@ -21,7 +22,7 @@ class SystemSettingResponse(BaseModel):
 
 
 class SystemSettingUpdateRequest(BaseModel):
-    value: str = Field(..., min_length=1)
+    value: str = Field(default="")
     reason: str | None = None
 
 

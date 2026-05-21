@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user, get_db
+from app.core.security import encrypt_secret
 from app.models.audit_log import AuditAction, AuditLog
 from app.models.system_setting import SystemSetting
 from app.models.user import User
@@ -18,6 +19,17 @@ from app.utils.i18n_messages import translate
 
 
 router = APIRouter(prefix="/admin/settings", tags=["admin-settings"])
+
+
+def _to_response(item: SystemSetting, lang_code: str) -> SystemSettingResponse:
+    setting = SystemSettingResponse.model_validate(item)
+    setting.description = localize_setting_description(setting.description, lang_code)
+    if setting.is_secret:
+        setting.has_value = bool(item.value and str(item.value).strip())
+        setting.value = ""
+    else:
+        setting.has_value = bool(setting.value and str(setting.value).strip())
+    return setting
 
 
 def _request_language(request: Request) -> str:
@@ -44,16 +56,12 @@ def list_settings(
     _assert_admin(current_user, lang_code)
 
     allowed_keys = set(DEFAULT_SETTINGS.keys())
-    query = db.query(SystemSetting).filter(SystemSetting.is_secret.is_(False), SystemSetting.key.in_(allowed_keys))
+    query = db.query(SystemSetting).filter(SystemSetting.key.in_(allowed_keys))
     if category:
         query = query.filter(SystemSetting.category == category)
     settings = query.order_by(SystemSetting.category.asc(), SystemSetting.key.asc()).all()
 
-    localized_settings = []
-    for item in settings:
-        setting = SystemSettingResponse.model_validate(item)
-        setting.description = localize_setting_description(setting.description, lang_code)
-        localized_settings.append(setting)
+    localized_settings = [_to_response(item, lang_code) for item in settings]
 
     return {
         "total": len(settings),
@@ -76,13 +84,19 @@ def update_setting(
     setting = db.scalar(
         select(SystemSetting).where(SystemSetting.key == setting_key, SystemSetting.key.in_(set(DEFAULT_SETTINGS.keys())))
     )
-    if setting is None or setting.is_secret:
+    if setting is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("setting_not_found", lang_code))
     if setting.is_locked:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("setting_is_locked", lang_code))
+    if not setting.is_secret and not payload.value.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("setting_value_required", lang_code))
 
     before_value = setting.value
-    setting.value = payload.value
+    if setting.is_secret:
+        cleaned_secret = payload.value.strip()
+        setting.value = encrypt_secret(cleaned_secret) if cleaned_secret else ""
+    else:
+        setting.value = payload.value
 
     db.add(
         AuditLog(
@@ -102,6 +116,4 @@ def update_setting(
     db.add(setting)
     db.commit()
     db.refresh(setting)
-    response = SystemSettingResponse.model_validate(setting)
-    response.description = localize_setting_description(response.description, lang_code)
-    return response
+    return _to_response(setting, lang_code)

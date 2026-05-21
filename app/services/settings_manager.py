@@ -4,9 +4,11 @@ import json
 import logging
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.security import decrypt_secret
 from app.models.system_setting import SystemSetting
 
 logger = logging.getLogger(__name__)
@@ -284,8 +286,17 @@ def get_runtime_setting(db: Session, key: str, default: Any) -> Any:
         return default
     if isinstance(setting.value, str) and setting.value.strip() == "":
         return default
+
+    raw_value = setting.value
+    if setting.is_secret:
+        try:
+            raw_value = decrypt_secret(raw_value)
+        except HTTPException:
+            # Backward compatibility for secrets that were previously stored in plaintext.
+            logger.warning("Secret setting key=%s is not encrypted; using raw value", key)
+
     try:
-        return coerce_setting_value(setting.value, setting.value_type)
+        return coerce_setting_value(raw_value, setting.value_type)
     except Exception:
         logger.warning("Invalid value for system setting key=%s; using fallback", key)
         return default
