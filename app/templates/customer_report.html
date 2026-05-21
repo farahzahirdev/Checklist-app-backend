@@ -512,6 +512,21 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0066ff]">Recommendation</div>
                                         <p class="mt-2 text-sm leading-6 text-slate-700">{{ suggestion.suggestion_text }}</p>
+                                        {% if suggestion.section_name or suggestion.module_name or suggestion.heading %}
+                                            <div class="mt-2 text-xs text-slate-500">
+                                                <span>Related to:
+                                                    {% if suggestion.section_name %}
+                                                        Section: <span class="font-semibold">{{ suggestion.section_name }}</span>
+                                                    {% endif %}
+                                                    {% if suggestion.module_name %}
+                                                        Module: <span class="font-semibold">{{ suggestion.module_name }}</span>
+                                                    {% endif %}
+                                                    {% if suggestion.heading %}
+                                                        Heading: <span class="font-semibold">{{ suggestion.heading }}</span>
+                                                    {% endif %}
+                                                </span>
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </article>

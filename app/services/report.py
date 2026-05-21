@@ -104,7 +104,7 @@ def _company_identifier(company: Company | None) -> str:
 
 def _report_code(report: Report, company: Company | None) -> str:
     reference_time = report.draft_generated_at or report.created_at or _now()
-    return f"CKB-{reference_time:%Y}-%m%d-{_company_identifier(company)}-{reference_time:%H%M%S}"
+    return f"CKB-{reference_time:%Y}-{reference_time:%m}{reference_time:%d}-{_company_identifier(company)}-{reference_time:%H%M%S}"
 
 
 def _report_company(report: Report, db: Session) -> Company | None:
