@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     graph_tenant_id: str = Field(default="", alias="GRAPH_TENANT_ID")
     graph_mailbox: str = Field(default="", alias="GRAPH_MAILBOX")  # e.g. info@auditready.cz
     graph_redirect_uri: str = Field(default="", alias="GRAPH_REDIRECT_URI")
-    graph_refresh_token: str = Field(default="", alias="GRAPH_REFRESH_TOKEN")
+    graph_refresh_token: str = Field(default="", alias="GRAPH_REFRESH_TOKEN")  # optional delegated fallback
     # Common fields
     email_from_address: str = Field(default="noreply@auditready.cz", alias="EMAIL_FROM_ADDRESS")
     email_from_name: str = Field(default="AuditReady", alias="EMAIL_FROM_NAME")

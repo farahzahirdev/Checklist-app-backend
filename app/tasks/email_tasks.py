@@ -21,8 +21,6 @@ def _missing_graph_fields(settings) -> list[str]:
         missing.append("graph_tenant_id")
     if not settings.graph_mailbox:
         missing.append("graph_mailbox")
-    if not settings.graph_refresh_token:
-        missing.append("graph_refresh_token")
     return missing
 
 
@@ -32,7 +30,6 @@ def _build_graph_fallback_provider(settings) -> MicrosoftGraphEmailProvider | No
         settings.graph_client_secret,
         settings.graph_tenant_id,
         settings.graph_mailbox,
-        settings.graph_refresh_token,
     ]):
         return None
     return MicrosoftGraphEmailProvider(

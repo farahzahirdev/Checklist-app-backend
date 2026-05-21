@@ -106,7 +106,7 @@ class MicrosoftGraphEmailProvider(EmailProvider):
         client_secret: str,
         tenant_id: str,
         mailbox: str,
-        refresh_token: str,
+        refresh_token: str = "",
         redirect_uri: str = "",
     ):
         self.client_id = client_id
@@ -119,12 +119,26 @@ class MicrosoftGraphEmailProvider(EmailProvider):
         self._access_token_expiry: int = 0
         self.last_error: str | None = None
 
-    def _get_access_token(self) -> str:
-        now = int(time.time())
-        if self._access_token and now < self._access_token_expiry - 60:
-            return self._access_token
-        token_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
-        data: dict = {
+    def _token_endpoint(self) -> str:
+        return f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/token"
+
+    def _get_access_token_client_credentials(self) -> str:
+        data: dict[str, str] = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+            "grant_type": "client_credentials",
+            "scope": "https://graph.microsoft.com/.default",
+        }
+        resp = requests.post(self._token_endpoint(), data=data, timeout=15)
+        resp.raise_for_status()
+        token_data = resp.json()
+        return token_data["access_token"], int(token_data.get("expires_in", 3600))
+
+    def _get_access_token_refresh_token(self) -> str:
+        if not self.refresh_token:
+            raise RuntimeError("Graph refresh token is not configured")
+
+        data: dict[str, str] = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
             "grant_type": "refresh_token",
@@ -133,11 +147,39 @@ class MicrosoftGraphEmailProvider(EmailProvider):
         }
         if self.redirect_uri:
             data["redirect_uri"] = self.redirect_uri
-        resp = requests.post(token_url, data=data, timeout=15)
+        resp = requests.post(self._token_endpoint(), data=data, timeout=15)
         resp.raise_for_status()
         token_data = resp.json()
-        self._access_token = token_data["access_token"]
-        self._access_token_expiry = now + int(token_data.get("expires_in", 3600))
+        return token_data["access_token"], int(token_data.get("expires_in", 3600))
+
+    def _get_access_token(self) -> str:
+        now = int(time.time())
+        if self._access_token and now < self._access_token_expiry - 60:
+            return self._access_token
+
+        # Primary mode: app-only token (client credentials).
+        try:
+            token, expires_in = self._get_access_token_client_credentials()
+            self._access_token = token
+            self._access_token_expiry = now + int(expires_in)
+            return self._access_token
+        except Exception as client_cred_exc:
+            # Fallback mode: delegated token refresh (legacy flow).
+            if self.refresh_token:
+                try:
+                    token, expires_in = self._get_access_token_refresh_token()
+                    self._access_token = token
+                    self._access_token_expiry = now + int(expires_in)
+                    return self._access_token
+                except Exception as refresh_exc:
+                    raise RuntimeError(
+                        "Graph token acquisition failed for both client_credentials and refresh_token flows"
+                    ) from refresh_exc
+
+            raise RuntimeError(
+                "Graph client_credentials token request failed. Ensure Azure app has Mail.Send Application permission and admin consent is granted"
+            ) from client_cred_exc
+
         return self._access_token
 
     def send(self, message: EmailMessage) -> bool:
@@ -167,6 +209,10 @@ class MicrosoftGraphEmailProvider(EmailProvider):
                 "Content-Type": "application/json",
             }
             resp = requests.post(url, json=payload, headers=headers, timeout=15)
+            if resp.status_code in {401, 403}:
+                raise RuntimeError(
+                    "Graph sendMail unauthorized/forbidden. Verify Mail.Send Application permission and admin consent for the Azure app"
+                )
             resp.raise_for_status()
             logger.info(f"Graph email sent to {message.to} with subject: {message.subject}")
             return True
@@ -200,7 +246,6 @@ def get_email_provider(settings) -> EmailProvider | None:
             settings.graph_client_secret,
             settings.graph_tenant_id,
             settings.graph_mailbox,
-            settings.graph_refresh_token,
         ]):
             logger.warning("Graph provider configured but missing credentials")
             return None
