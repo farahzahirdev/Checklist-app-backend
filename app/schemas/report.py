@@ -60,6 +60,8 @@ class ReportResponse(BaseModel):
     final_pdf_published_at: datetime | None = None
     findings_count: int
     summaries_count: int
+    checklist_title: str | None = None
+    checklist_version: str | None = None
     section_overviews: list[ReportSummaryItem] = Field(default_factory=list)
 
 

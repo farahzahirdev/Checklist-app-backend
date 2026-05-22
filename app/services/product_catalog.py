@@ -7,6 +7,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.checklist import Checklist, ChecklistStatus, ChecklistTranslation, ChecklistType
+from app.models.reference import Language
 from app.models.product_catalog import Product, ProductCategory, ProductKind, ProductStatus
 from app.schemas.product_catalog import (
     AdminProductResponse,
@@ -327,18 +328,82 @@ def _resolve_category(db: Session, category_code: str) -> ProductCategory | None
     return db.scalar(select(ProductCategory).where(ProductCategory.code == category_code))
 
 
-def create_product(db: Session, *, payload) -> Product:
+def _auto_create_checklist_for_product(
+    db: Session, *, name: str, description: str | None, actor_id: uuid.UUID
+) -> Checklist:
+    """Create a ChecklistType + Checklist for a new checklist-kind product."""
+    clean_name = re.sub(r"[^a-zA-Z0-9\s]", "", name).strip()
+    words = clean_name.split()
+    base_code = "_".join(words[:3]).lower() if words else "checklist"
+    suffix = uuid.uuid4().hex[:6]
+    type_code = f"{base_code}_{suffix}"
+
+    checklist_type = ChecklistType(
+        code=type_code,
+        name=name,
+        description=description,
+        is_active=True,
+    )
+    db.add(checklist_type)
+    db.flush()
+
+    checklist = Checklist(
+        checklist_type_id=checklist_type.id,
+        version="1.0",
+        created_by=actor_id,
+        updated_by=actor_id,
+    )
+    checklist.status = ChecklistStatus.draft
+    db.add(checklist)
+    db.flush()
+
+    language = db.scalar(select(Language).where(Language.is_default.is_(True)).limit(1)) or db.scalar(
+        select(Language).limit(1)
+    )
+    if language is not None:
+        db.add(
+            ChecklistTranslation(
+                checklist_id=checklist.id,
+                language_id=language.id,
+                title=name,
+                description=description or "",
+            )
+        )
+        db.flush()
+
+    return checklist
+
+
+def create_product(db: Session, *, payload, actor_id: uuid.UUID | None = None) -> Product:
     category = _resolve_category(db, payload.category_code)
     if category is None:
         raise ValueError("product_category_not_found")
+
+    checklist_id = getattr(payload, "checklist_id", None)
     checklist_type_id = payload.checklist_type_id
+
+    # When creating a checklist-kind product with no linked checklist, auto-create one.
+    if (
+        payload.product_kind == ProductKind.checklist
+        and checklist_id is None
+        and actor_id is not None
+    ):
+        auto_checklist = _auto_create_checklist_for_product(
+            db,
+            name=payload.name,
+            description=payload.short_description or payload.description,
+            actor_id=actor_id,
+        )
+        checklist_id = auto_checklist.id
+        checklist_type_id = auto_checklist.checklist_type_id
+
     if checklist_type_id is None and getattr(payload, "checklist_type_code", None):
         checklist_type = db.scalar(select(ChecklistType).where(ChecklistType.code == payload.checklist_type_code))
         if checklist_type is None:
             raise ValueError("checklist_type_not_found")
         checklist_type_id = checklist_type.id
-    if checklist_type_id is None and payload.checklist_id is not None:
-        checklist = db.get(Checklist, payload.checklist_id)
+    if checklist_type_id is None and checklist_id is not None:
+        checklist = db.get(Checklist, checklist_id)
         if checklist is not None:
             checklist_type_id = checklist.checklist_type_id
     slug_source = payload.slug if payload.slug else payload.name
@@ -346,7 +411,7 @@ def create_product(db: Session, *, payload) -> Product:
     product = Product(
         category_id=category.id,
         parent_product_id=payload.parent_product_id,
-        checklist_id=payload.checklist_id,
+        checklist_id=checklist_id,
         checklist_type_id=checklist_type_id,
         slug=slug,
         name=payload.name,

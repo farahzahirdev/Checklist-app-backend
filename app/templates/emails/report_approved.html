@@ -7,7 +7,7 @@
 <p>Potvrzení: zpráva pro hodnocení <strong>{{ checklist_title }}</strong> byla úspěšně schválena.</p>
 <p>Zpráva bude brzy zveřejněna a zákazník obdrží oznámení.</p>
 <p>
-    <a href="{{ production_base_url }}/admin/reports/{{ report_id }}" class="button">Zobrazit zprávu</a>
+    <a href="{{ production_base_url }}/admin/reports/{{ report_id }}" class="button" style="color: #ffffff; text-decoration: none;">Zobrazit zprávu</a>
 </p>
 {% else %}
 <h2>Report Approved</h2>
@@ -15,7 +15,7 @@
 <p>Confirmation: the report for assessment <strong>{{ checklist_title }}</strong> has been successfully approved.</p>
 <p>The report will be published shortly and the customer will be notified.</p>
 <p>
-    <a href="{{ production_base_url }}/admin/reports/{{ report_id }}" class="button">View Report</a>
+    <a href="{{ production_base_url }}/admin/reports/{{ report_id }}" class="button" style="color: #ffffff; text-decoration: none;">View Report</a>
 </p>
 {% endif %}
 {% endblock %}

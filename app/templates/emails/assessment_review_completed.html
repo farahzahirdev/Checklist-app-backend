@@ -6,14 +6,14 @@
 <p>Dobrý den,</p>
 <p>Kontrola hodnocení <strong>{{ checklist_title }}</strong> byla dokončena a zpráva je připravena k dalšímu zpracování.</p>
 <p>
-    <a href="{{ production_base_url }}/admin/assessments/{{ assessment_id }}" class="button">Zobrazit hodnocení</a>
+    <a href="{{ production_base_url }}/admin/assessments/{{ assessment_id }}" class="button" style="color: #ffffff; text-decoration: none;">Zobrazit hodnocení</a>
 </p>
 {% else %}
 <h2>Assessment Review Completed</h2>
 <p>Hi,</p>
 <p>The review of assessment <strong>{{ checklist_title }}</strong> has been completed and the report is ready for further processing.</p>
 <p>
-    <a href="{{ production_base_url }}/admin/assessments/{{ assessment_id }}" class="button">View Assessment</a>
+    <a href="{{ production_base_url }}/admin/assessments/{{ assessment_id }}" class="button" style="color: #ffffff; text-decoration: none;">View Assessment</a>
 </p>
 {% endif %}
 {% endblock %}

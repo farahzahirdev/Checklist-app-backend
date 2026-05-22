@@ -141,7 +141,7 @@ def admin_create_product(
     _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> AdminProductResponse:
-    product = create_product(db, payload=payload)
+    product = create_product(db, payload=payload, actor_id=_admin.id)
     db.commit()
     db.refresh(product)
     return to_admin_product_response(db, product)

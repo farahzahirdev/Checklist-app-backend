@@ -139,6 +139,22 @@ def _serialize_report(db: Session, report: Report) -> ReportResponse:
     findings_count, summaries_count = _report_counts(db, report.id)
     auditor_note = _latest_auditor_note(db, report.id)
     company = _report_company(report, db)
+
+    # Resolve checklist title and version from the linked assessment
+    checklist_title: str | None = None
+    checklist_version: str | None = None
+    assessment = db.get(Assessment, report.assessment_id)
+    if assessment is not None:
+        from app.models.checklist import Checklist
+        checklist = db.get(Checklist, assessment.checklist_id)
+        if checklist is not None:
+            checklist_version = checklist.version
+            translation = _latest_checklist_translation(db, checklist.id)
+            if translation and translation.title:
+                checklist_title = translation.title
+            elif checklist.checklist_type:
+                checklist_title = checklist.checklist_type.name
+
     return ReportResponse(
         id=report.id,
         assessment_id=report.assessment_id,
@@ -163,6 +179,8 @@ def _serialize_report(db: Session, report: Report) -> ReportResponse:
         final_pdf_published_at=report.final_pdf_published_at,
         findings_count=findings_count,
         summaries_count=summaries_count,
+        checklist_title=checklist_title,
+        checklist_version=checklist_version,
         section_overviews=_build_report_section_overviews(db, report),
     )
 
