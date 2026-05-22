@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+import hashlib
+import secrets
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -21,6 +24,7 @@ from app.core.security import (
 from app.core.config import get_settings
 from app.models.audit_log import AuditAction, AuditLog
 from app.models.mfa_totp import MfaTotp
+from app.models.password_reset import PasswordResetToken
 from app.models.company import Company
 from app.models.user import User, UserRole
 from app.schemas.auth import AuthResponse, AuthUserResponse, MfaSetupDetailsResponse, UserRoleCode
@@ -89,6 +93,7 @@ def serialize_user(user: User, db: Session | None = None) -> AuthUserResponse:
         username=user.username,
         role=_role_to_code(user.role),
         is_active=bool(user.is_active),
+        mfa_required=bool(user.mfa_required),
         primary_company_id=user.primary_company_id,
         job_title=user.job_title,
         department=user.department,
@@ -102,6 +107,10 @@ def _get_user_by_email(db: Session, email: str) -> User | None:
 
 def _get_mfa_record(db: Session, user_id: UUID) -> MfaTotp | None:
     return db.scalar(select(MfaTotp).where(MfaTotp.user_id == user_id))
+
+
+def _hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def _audit(db: Session, *, actor_user: User | None, action: AuditAction, target_entity: str, target_id: UUID | None = None) -> None:
@@ -273,7 +282,7 @@ def authenticate_user(db: Session, *, email: str, password: str, lang_code: str 
 
     # For customer users, show both true if MFA is enabled
     if str(user.role) == UserRole.customer.value:
-        if mfa_enabled:
+        if bool(user.mfa_required) and mfa_enabled:
             challenge_token = create_mfa_challenge_token(user_id=str(user.id), role=str(user.role), ttl_minutes=mfa_ttl)
             return AuthResponse(
                 user=serialize_user(user, db),
@@ -282,11 +291,15 @@ def authenticate_user(db: Session, *, email: str, password: str, lang_code: str 
                 mfa_required=True,
                 mfa_enabled=True,
             )
-        else:
-            token = create_access_token(user_id=str(user.id), role=str(user.role), ttl_minutes=auth_ttl)
-            _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
-            db.commit()
-            return AuthResponse(user=serialize_user(user, db), access_token=token, mfa_required=False, mfa_enabled=False)
+        token = create_access_token(user_id=str(user.id), role=str(user.role), ttl_minutes=auth_ttl)
+        _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
+        db.commit()
+        return AuthResponse(
+            user=serialize_user(user, db),
+            access_token=token,
+            mfa_required=bool(user.mfa_required),
+            mfa_enabled=mfa_enabled,
+        )
     # For other users, keep existing logic
     if mfa_enabled:
         challenge_token = create_mfa_challenge_token(user_id=str(user.id), role=str(user.role), ttl_minutes=mfa_ttl)
@@ -411,3 +424,110 @@ def update_user_role(db: Session, *, actor_user: User, user_id: UUID, role_code:
     db.refresh(user)
 
     return AuthResponse(user=serialize_user(user, db), mfa_required=False, mfa_enabled=bool(_get_mfa_record(db, user.id)))
+
+
+def issue_forgot_password_reset(
+    db: Session,
+    *,
+    email: str,
+    lang_code: str = "en",
+) -> None:
+    user = _get_user_by_email(db, email)
+    if user is None or not user.is_active:
+        return
+
+    # Invalidate existing unused tokens for this user.
+    existing = db.scalars(
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.used_at.is_(None),
+        )
+    ).all()
+    now = datetime.now(timezone.utc)
+    for token_row in existing:
+        token_row.used_at = now
+
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = _hash_reset_token(raw_token)
+    expires_at = now + timedelta(minutes=30)
+    db.add(
+        PasswordResetToken(
+            user_id=user.id,
+            issued_by_user_id=None,
+            token_hash=token_hash,
+            reason="Forgot password self-service",
+            expires_at=expires_at,
+        )
+    )
+    db.add(
+        AuditLog(
+            actor_user_id=None,
+            actor_role=None,
+            action=AuditAction.auth_password_change,
+            target_entity="user",
+            target_id=user.id,
+            target_user_id=user.id,
+            changes_summary="Issued forgot-password token",
+            before_json=None,
+            after_json={"password_reset_issued": True},
+        )
+    )
+    db.commit()
+
+    from app.services.notifications import NotificationEvent, NotificationEventType, NotificationService
+    notification = NotificationService(db)
+    notification.notify(
+        NotificationEvent(
+            event_type=NotificationEventType.PASSWORD_RESET_ISSUED,
+            user_id=user.id,
+            lang_code=lang_code,
+            context={"reset_token": raw_token},
+        )
+    )
+
+
+def reset_password_with_token(
+    db: Session,
+    *,
+    token: str,
+    new_password: str,
+    confirm_password: str,
+    lang_code: str = "en",
+) -> None:
+    if new_password != confirm_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="password_mismatch")
+
+    validation_error = get_password_validation_error(new_password)
+    if validation_error is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=validation_error)
+
+    token_hash = _hash_reset_token(token)
+    now = datetime.now(timezone.utc)
+    reset_row = db.scalar(
+        select(PasswordResetToken).where(
+            PasswordResetToken.token_hash == token_hash,
+            PasswordResetToken.used_at.is_(None),
+            PasswordResetToken.expires_at > now,
+        )
+    )
+    if reset_row is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_token")
+
+    user = db.get(User, reset_row.user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="user_not_found")
+
+    user.password_hash = hash_password(new_password)
+    reset_row.used_at = now
+    db.add(
+        AuditLog(
+            actor_user_id=user.id,
+            actor_role=str(user.role),
+            action=AuditAction.auth_password_change,
+            target_entity="user",
+            target_id=user.id,
+            target_user_id=user.id,
+            changes_summary="Password reset via token",
+        )
+    )
+    db.commit()

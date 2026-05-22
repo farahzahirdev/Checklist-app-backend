@@ -175,6 +175,8 @@ class CustomerResponse(BaseModel):
     id: UUID
     email: str
     is_active: bool
+    mfa_required: bool = True
+    mfa_enabled: bool = False
     created_at: datetime
     updated_at: datetime
     
@@ -200,6 +202,29 @@ class CustomerDetailResponse(CustomerResponse):
         ],
         description="Fixed permissions for all customers (read-only)"
     )
+
+
+class CustomerMfaRequiredUpdateRequest(BaseModel):
+    mfa_required: bool = Field(..., description="Whether MFA is required for this customer")
+    reason: str | None = Field(None, max_length=500)
+
+
+class CustomerMfaRequiredUpdateResponse(BaseModel):
+    customer_id: UUID
+    mfa_required: bool
+    mfa_enabled: bool
+    message: str
+
+
+class CustomerMfaResetRequest(BaseModel):
+    reason: str | None = Field(None, max_length=500)
+
+
+class CustomerMfaResetResponse(BaseModel):
+    customer_id: UUID
+    mfa_required: bool
+    mfa_enabled: bool
+    message: str
 
 
 class CustomerBanRequest(BaseModel):

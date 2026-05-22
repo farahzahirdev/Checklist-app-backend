@@ -364,6 +364,10 @@ class NotificationService:
                 context.setdefault("actor_email", actor.email)
                 context.setdefault("actor_name", actor.email.split("@")[0])
 
+        if event.event_type == NotificationEventType.PASSWORD_RESET_ISSUED and context.get("reset_token"):
+            base_url = context.get("production_base_url") or ""
+            context.setdefault("reset_password_url", f"{base_url}/reset-password?token={context['reset_token']}")
+
         return context
 
 

@@ -8,10 +8,12 @@ from app.db.session import get_db
 from app.models.user import UserRole
 from app.schemas.auth import (
     AuthResponse,
+    ForgotPasswordRequest,
     LoginRequest,
     MfaChallengeVerifyRequest,
     MfaSetupDetailsResponse,
     MfaVerifyRequest,
+    ResetPasswordWithTokenRequest,
     RegistrationRequest,
     RoleAssignment,
 )
@@ -19,7 +21,9 @@ from app.schemas.common import MessageResponse
 from app.services.auth import (
     authenticate_user,
     confirm_mfa_enrollment,
+    issue_forgot_password_reset,
     register_user,
+    reset_password_with_token,
     serialize_user,
     start_mfa_enrollment,
     update_user_role,
@@ -77,6 +81,36 @@ def login(request: LoginRequest, http_request: Request, db: Session = Depends(ge
     except HTTPException as exc:
         exc.detail = translate(exc.detail, lang_code)
         raise
+
+
+@router.post(
+    "/forgot-password",
+    response_model=MessageResponse,
+    summary="Request Password Reset",
+    description="Issues a password reset token and sends an email if the account exists.",
+)
+def forgot_password(request: ForgotPasswordRequest, http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
+    lang_code = get_language_code(http_request, db)
+    issue_forgot_password_reset(db, email=request.email, lang_code=lang_code)
+    return MessageResponse(message=translate("password_reset_email_sent_if_exists", lang_code))
+
+
+@router.post(
+    "/reset-password",
+    response_model=MessageResponse,
+    summary="Reset Password With Token",
+    description="Resets account password using a valid password-reset token.",
+)
+def reset_password(request: ResetPasswordWithTokenRequest, http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
+    lang_code = get_language_code(http_request, db)
+    reset_password_with_token(
+        db,
+        token=request.token,
+        new_password=request.new_password,
+        confirm_password=request.confirm_password,
+        lang_code=lang_code,
+    )
+    return MessageResponse(message=translate("password_changed", lang_code))
 
 
 @router.post(

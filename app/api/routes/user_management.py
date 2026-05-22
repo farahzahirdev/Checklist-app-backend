@@ -21,6 +21,7 @@ from app.models.audit_log import AuditAction, AuditLog
 from app.utils.i18n import get_language_code
 from app.utils.i18n_messages import translate
 from app.models.user import User, UserRole
+from app.models.mfa_totp import MfaTotp
 from app.schemas.user_management import (
     CreateAdminRequest,
     CreateAdminResponse,
@@ -49,6 +50,10 @@ from app.schemas.user_management import (
     UserPasswordResetRequest,
     UserPasswordResetResponse,
     UserResponse,
+    CustomerMfaRequiredUpdateRequest,
+    CustomerMfaRequiredUpdateResponse,
+    CustomerMfaResetRequest,
+    CustomerMfaResetResponse,
 )
 from app.services.rbac import RBACService
 from app.services.user_management import UserManagementService, FixedPermissionSet
@@ -799,7 +804,18 @@ def list_customers(
 
     return {
         "total": total,
-        "customers": customers,
+        "customers": [
+            {
+                "id": c.id,
+                "email": c.email,
+                "is_active": c.is_active,
+                "mfa_required": bool(c.mfa_required),
+                "mfa_enabled": bool(c.mfa_totp and c.mfa_totp.is_verified),
+                "created_at": c.created_at,
+                "updated_at": c.updated_at,
+            }
+            for c in customers
+        ],
         "skip": skip,
         "limit": limit,
     }
@@ -856,6 +872,8 @@ def get_customer(
         "job_title": customer.job_title,
         "department": customer.department,
         "is_active": customer.is_active,
+        "mfa_required": bool(customer.mfa_required),
+        "mfa_enabled": bool(customer.mfa_totp and customer.mfa_totp.is_verified),
         "created_at": customer.created_at,
         "updated_at": customer.updated_at,
         "primary_company_id": str(customer.primary_company_id) if customer.primary_company_id else None,
@@ -929,6 +947,103 @@ def activate_customer(
     db.commit()
     
     return {"status": "success", "message": translate("customer_reactivated", lang_code)}
+
+
+@router.patch("/customers/{customer_id}/mfa-required", response_model=CustomerMfaRequiredUpdateResponse)
+def update_customer_mfa_required(
+    customer_id: UUID,
+    request: Request,
+    payload: CustomerMfaRequiredUpdateRequest,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
+) -> dict:
+    """Enable/disable MFA requirement for a customer account."""
+    lang_code = get_language_code(request, db)
+    if not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=translate("only_admins_can_manage_users", lang_code),
+        )
+
+    customer = db.query(User).filter(User.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("customer_not_found", lang_code))
+    if customer.role != UserRole.customer.value:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("user_is_not_a_customer", lang_code))
+
+    previous_required = bool(customer.mfa_required)
+    customer.mfa_required = bool(payload.mfa_required)
+    db.add(
+        AuditLog(
+            actor_user_id=current_user.id,
+            actor_role=str(current_user.role),
+            action=AuditAction.user_update,
+            target_entity="user",
+            target_id=customer.id,
+            target_user_id=customer.id,
+            changes_summary=payload.reason or f"Set customer MFA required to {customer.mfa_required}",
+            before_json={"mfa_required": previous_required},
+            after_json={"mfa_required": customer.mfa_required},
+        )
+    )
+    db.commit()
+    db.refresh(customer)
+    return {
+        "customer_id": customer.id,
+        "mfa_required": bool(customer.mfa_required),
+        "mfa_enabled": bool(customer.mfa_totp and customer.mfa_totp.is_verified),
+        "message": translate("customer_mfa_requirement_updated", lang_code),
+    }
+
+
+@router.post("/customers/{customer_id}/mfa/reset", response_model=CustomerMfaResetResponse)
+def reset_customer_mfa(
+    customer_id: UUID,
+    request: Request,
+    payload: CustomerMfaResetRequest,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
+) -> dict:
+    """Delete customer's MFA enrollment so they can relink authenticator app."""
+    lang_code = get_language_code(request, db)
+    if not RBACService.has_permission(db, current_user.id, "user_management", "manage"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=translate("only_admins_can_manage_users", lang_code),
+        )
+
+    customer = db.query(User).filter(User.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("customer_not_found", lang_code))
+    if customer.role != UserRole.customer.value:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("user_is_not_a_customer", lang_code))
+
+    mfa_record = db.query(MfaTotp).filter(MfaTotp.user_id == customer.id).first()
+    had_mfa = bool(mfa_record and mfa_record.is_verified)
+    if mfa_record:
+        db.delete(mfa_record)
+
+    db.add(
+        AuditLog(
+            actor_user_id=current_user.id,
+            actor_role=str(current_user.role),
+            action=AuditAction.user_update,
+            target_entity="user",
+            target_id=customer.id,
+            target_user_id=customer.id,
+            changes_summary=payload.reason or "Reset customer MFA enrollment",
+            before_json={"mfa_enabled": had_mfa},
+            after_json={"mfa_enabled": False},
+        )
+    )
+    db.commit()
+    db.refresh(customer)
+    return {
+        "customer_id": customer.id,
+        "mfa_required": bool(customer.mfa_required),
+        "mfa_enabled": False,
+        "message": translate("customer_mfa_reset_successful", lang_code),
+    }
 
 
 # ============================================================================

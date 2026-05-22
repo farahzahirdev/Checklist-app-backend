@@ -15,6 +15,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordWithTokenRequest(BaseModel):
+    token: str = Field(min_length=12)
+    new_password: str = Field(min_length=8)
+    confirm_password: str = Field(min_length=8)
+
+
 class RegistrationRequest(BaseModel):
     """Customer sign-up request with optional profile and company info."""
     
@@ -72,6 +82,8 @@ class AuthUserResponse(BaseModel):
     username: str | None = None
     role: UserRoleCode
     is_active: bool
+    mfa_required: bool = True
+    preferred_language: str = "en"
     primary_company_id: UUID | None = None
     job_title: str | None = None
     department: str | None = None
@@ -117,6 +129,7 @@ class CustomerProfileResponse(BaseModel):
     job_title: str | None = None
     department: str | None = None
     primary_company_id: UUID | None = None
+    preferred_language: str = "en"
     is_active: bool
     created_at: str | None = None
     updated_at: str | None = None
@@ -140,6 +153,7 @@ class UpdateProfileRequest(BaseModel):
     username: str | None = Field(None, max_length=100, description="Unique username")
     job_title: str | None = Field(None, max_length=255, description="Job title")
     department: str | None = Field(None, max_length=255, description="Department")
+    preferred_language: str | None = Field(None, pattern="^(en|cs)$", description="Preferred language")
     
     # Company fields (auto-create/update if provided)
     company_name: str | None = Field(None, max_length=255, description="Company name")
