@@ -141,6 +141,7 @@ class AdminProfileResponse(BaseModel):
     username: str | None = None
     job_title: str | None = None
     department: str | None = None
+    preferred_language: str = "en"
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -157,6 +158,7 @@ class AdminProfileUpdateRequest(BaseModel):
     username: str | None = Field(None, max_length=100, description="Unique username")
     job_title: str | None = Field(None, max_length=255, description="Job title")
     department: str | None = Field(None, max_length=255, description="Department")
+    preferred_language: str | None = Field(None, pattern="^(en|cs)$", description="Preferred language")
 
 
 class AdminChangePasswordRequest(BaseModel):

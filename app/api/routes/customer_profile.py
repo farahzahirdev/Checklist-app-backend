@@ -36,6 +36,7 @@ def _serialize_profile(user: User, db: Session) -> dict:
         "username": user.username,
         "job_title": user.job_title,
         "department": user.department,
+        "preferred_language": user.preferred_language or "en",
         "primary_company_id": user.primary_company_id,
         "is_active": user.is_active,
         "created_at": user.created_at.isoformat() if hasattr(user, 'created_at') and user.created_at else None,
@@ -153,6 +154,9 @@ def update_profile(
         
         if request.department is not None:
             current_user.department = request.department.strip()
+
+        if request.preferred_language is not None:
+            current_user.preferred_language = request.preferred_language.strip().lower()
         
         # Handle company creation/update if any company fields provided
         company_fields_provided = any([

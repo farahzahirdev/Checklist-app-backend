@@ -49,7 +49,7 @@ class NotificationEvent:
 
 
 class NotificationService:
-    """Orchestrate notifications: event → recipients → template → task."""
+    """Orchestrate notifications: event -> recipients -> template -> task."""
 
     # Map event types to templates and subject keys
     EVENT_CONFIG = {
@@ -179,82 +179,94 @@ class NotificationService:
                 )
                 return False
 
-            # Build template context
-            context = self._build_context(event, config)
+            language_batches = self._group_recipients_by_language(recipients, event)
 
-            # Render templates
-            html_content = self.renderer.render_html(config["template"], context)
-            text_content = self.renderer.render_text(config["template"], context)
+            for lang_code, lang_recipients in language_batches.items():
+                if not lang_recipients:
+                    continue
 
-            subject = self._resolve_subject(config["subject"], context.get("lang", DEFAULT_LANGUAGE_CODE))
+                event_for_lang = NotificationEvent(
+                    event_type=event.event_type,
+                    user_id=event.user_id,
+                    assessment_id=event.assessment_id,
+                    report_id=event.report_id,
+                    actor_id=event.actor_id,
+                    lang_code=lang_code,
+                    context=event.context,
+                )
 
-            audit_context = {
-                "target_entity": "notification_email",
-                "actor_user_id": str(event.actor_id) if event.actor_id else None,
-                "target_user_id": str(event.user_id) if event.user_id else None,
-                "target_id": str(event.report_id or event.assessment_id or event.user_id)
-                if (event.report_id or event.assessment_id or event.user_id)
-                else None,
-                "notification_event_type": event.event_type.value,
-                "assessment_id": str(event.assessment_id) if event.assessment_id else None,
-                "report_id": str(event.report_id) if event.report_id else None,
-                "lang_code": event.lang_code,
-                "dispatch_mode": "celery_queue",
-            }
+                # Build template context and render content per language batch.
+                context = self._build_context(event_for_lang, config)
+                html_content = self.renderer.render_html(config["template"], context)
+                text_content = self.renderer.render_text(config["template"], context)
+                subject = self._resolve_subject(config["subject"], context.get("lang", DEFAULT_LANGUAGE_CODE))
 
-            # Enqueue email task; fall back to direct send if broker is unavailable.
-            try:
-                send_email_task.delay(
-                    to_addresses=recipients,
-                    subject=subject,
-                    html_content=html_content,
-                    text_content=text_content,
-                    correlation_id=correlation_id,
-                    audit_context=audit_context,
-                )
-                self._audit_email_notification(
-                    action="email_notification_queued",
-                    event=event,
-                    correlation_id=correlation_id,
-                    recipients=recipients,
-                    success=True,
-                    changes_summary=f"Queued notification email for {event.event_type}",
-                    metadata={"delivery_status": "queued", "transport": "celery"},
-                )
-            except Exception as queue_error:
-                logger.error(
-                    f"[{correlation_id}] Failed to enqueue notification {event.event_type}; sending immediately: {queue_error}"
-                )
-                self._audit_email_notification(
-                    action="email_queue_failed",
-                    event=event,
-                    correlation_id=correlation_id,
-                    recipients=recipients,
-                    success=False,
-                    changes_summary=(
-                        f"Failed to enqueue notification email for {event.event_type}; using fallback send"
-                    ),
-                    error_message=str(queue_error),
-                    metadata={"delivery_status": "queue_failed", "transport": "celery"},
-                )
-                fallback_audit_context = {
-                    **audit_context,
-                    "dispatch_mode": "direct_fallback",
-                    "queue_error": str(queue_error),
+                audit_context = {
+                    "target_entity": "notification_email",
+                    "actor_user_id": str(event.actor_id) if event.actor_id else None,
+                    "target_user_id": str(event.user_id) if event.user_id else None,
+                    "target_id": str(event.report_id or event.assessment_id or event.user_id)
+                    if (event.report_id or event.assessment_id or event.user_id)
+                    else None,
+                    "notification_event_type": event.event_type.value,
+                    "assessment_id": str(event.assessment_id) if event.assessment_id else None,
+                    "report_id": str(event.report_id) if event.report_id else None,
+                    "lang_code": lang_code,
+                    "dispatch_mode": "celery_queue",
                 }
-                fallback_result = send_email_now(
-                    to_addresses=recipients,
-                    subject=subject,
-                    html_content=html_content,
-                    text_content=text_content,
-                    correlation_id=correlation_id,
-                    audit_context=fallback_audit_context,
-                )
-                if fallback_result.get("status") != "sent":
-                    logger.error(
-                        f"[{correlation_id}] Fallback email send failed for {event.event_type}: {fallback_result}"
+
+                try:
+                    send_email_task.delay(
+                        to_addresses=lang_recipients,
+                        subject=subject,
+                        html_content=html_content,
+                        text_content=text_content,
+                        correlation_id=correlation_id,
+                        audit_context=audit_context,
                     )
-                    return False
+                    self._audit_email_notification(
+                        action="email_notification_queued",
+                        event=event,
+                        correlation_id=correlation_id,
+                        recipients=lang_recipients,
+                        success=True,
+                        changes_summary=f"Queued notification email for {event.event_type}",
+                        metadata={"delivery_status": "queued", "transport": "celery", "lang_code": lang_code},
+                    )
+                except Exception as queue_error:
+                    logger.error(
+                        f"[{correlation_id}] Failed to enqueue notification {event.event_type}; sending immediately: {queue_error}"
+                    )
+                    self._audit_email_notification(
+                        action="email_queue_failed",
+                        event=event,
+                        correlation_id=correlation_id,
+                        recipients=lang_recipients,
+                        success=False,
+                        changes_summary=(
+                            f"Failed to enqueue notification email for {event.event_type}; using fallback send"
+                        ),
+                        error_message=str(queue_error),
+                        metadata={"delivery_status": "queue_failed", "transport": "celery", "lang_code": lang_code},
+                    )
+                    fallback_audit_context = {
+                        **audit_context,
+                        "dispatch_mode": "direct_fallback",
+                        "queue_error": str(queue_error),
+                    }
+                    fallback_result = send_email_now(
+                        to_addresses=lang_recipients,
+                        subject=subject,
+                        html_content=html_content,
+                        text_content=text_content,
+                        correlation_id=correlation_id,
+                        audit_context=fallback_audit_context,
+                    )
+                    if fallback_result.get("status") != "sent":
+                        logger.error(
+                            f"[{correlation_id}] Fallback email send failed for {event.event_type}: {fallback_result}"
+                        )
+                        return False
 
             logger.info(
                 f"[{correlation_id}] Notification queued for {event.event_type} to {recipients}"
@@ -330,6 +342,27 @@ class NotificationService:
         if lang == "cz":
             lang = "cs"
         return subject_map.get(lang) or subject_map.get(DEFAULT_LANGUAGE_CODE) or next(iter(subject_map.values()))
+
+    def _normalize_lang(self, lang_code: str | None) -> str:
+        lang = (lang_code or DEFAULT_LANGUAGE_CODE).lower().strip()
+        if lang == "cz":
+            return "cs"
+        if lang not in {"en", "cs"}:
+            return DEFAULT_LANGUAGE_CODE
+        return lang
+
+    def _resolve_recipient_language(self, email: str, event: NotificationEvent) -> str:
+        user = self.db.scalar(select(User).where(User.email == email.lower()))
+        if user and getattr(user, "preferred_language", None):
+            return self._normalize_lang(user.preferred_language)
+        return self._normalize_lang(event.lang_code)
+
+    def _group_recipients_by_language(self, recipients: list[str], event: NotificationEvent) -> dict[str, list[str]]:
+        grouped: dict[str, list[str]] = {}
+        for recipient in recipients:
+            lang = self._resolve_recipient_language(recipient, event)
+            grouped.setdefault(lang, []).append(recipient)
+        return grouped
 
     def _build_context(self, event: NotificationEvent, config: dict) -> dict:
         """Build template context from event data."""

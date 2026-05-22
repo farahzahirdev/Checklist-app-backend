@@ -94,6 +94,7 @@ def serialize_user(user: User, db: Session | None = None) -> AuthUserResponse:
         role=_role_to_code(user.role),
         is_active=bool(user.is_active),
         mfa_required=bool(user.mfa_required),
+        preferred_language=(user.preferred_language or "en"),
         primary_company_id=user.primary_company_id,
         job_title=user.job_title,
         department=user.department,

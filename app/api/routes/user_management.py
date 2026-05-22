@@ -81,6 +81,7 @@ def _serialize_admin_profile(user: User) -> dict:
         "username": user.username,
         "job_title": user.job_title,
         "department": user.department,
+        "preferred_language": user.preferred_language or "en",
         "is_active": user.is_active,
         "created_at": user.created_at,
         "updated_at": user.updated_at,
@@ -133,6 +134,7 @@ def update_admin_profile(
         "username": current_user.username,
         "job_title": current_user.job_title,
         "department": current_user.department,
+        "preferred_language": current_user.preferred_language,
     }
 
     if payload.email is not None:
@@ -166,6 +168,9 @@ def update_admin_profile(
     if payload.department is not None:
         current_user.department = payload.department.strip()
 
+    if payload.preferred_language is not None:
+        current_user.preferred_language = payload.preferred_language.strip().lower()
+
     db.add(
         AuditLog(
             actor_user_id=current_user.id,
@@ -181,6 +186,7 @@ def update_admin_profile(
                 "username": current_user.username,
                 "job_title": current_user.job_title,
                 "department": current_user.department,
+                "preferred_language": current_user.preferred_language,
             },
             changes_summary=f"{current_user.role} updated own profile",
         )
