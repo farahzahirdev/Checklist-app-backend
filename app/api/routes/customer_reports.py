@@ -2,15 +2,20 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.dependencies.auth import get_current_user
 from app.db.session import get_db
 from app.models.assessment import Assessment
 from app.models.report import Report, ReportStatus
 from app.models.user import User, UserRole
-from app.schemas.report import ReportResponse, CustomerReportDataResponse, ReportPdfPasswordResponse
-from app.services.report import get_report_by_assessment, get_customer_report_data, get_report_pdf_password
+from app.schemas.report import (
+    ReportResponse,
+    CustomerReportDataResponse,
+    ReportPdfPasswordResponse,
+    PaginatedCustomerReportsResponse,
+)
+from app.services.report import get_report_by_assessment, get_customer_report_data, get_report_pdf_password, get_report
 from app.services.company_context import resolve_company_id, user_has_company_access
 from app.utils.i18n import get_language_code
 
@@ -19,16 +24,20 @@ router = APIRouter(prefix="/customer/reports", tags=["customer-reports"])
 
 @router.get(
     "/my-reports",
-    response_model=list[ReportResponse],
+    response_model=PaginatedCustomerReportsResponse,
     summary="List Customer's Reports",
-    description="Returns all reports for the current customer's assessments. Only approved/published reports are included.",
+    description="Returns paginated reports for the current customer's assessments. Only approved/published reports are included.",
 )
 def list_customer_reports(
     request: Request,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, ge=1, le=100),
+    sort_by: str = Query(default="final_pdf_published_at"),
+    sort_order: str = Query(default="desc"),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[ReportResponse]:
-    """Get all reports for the current customer"""
+) -> PaginatedCustomerReportsResponse:
+    """Get paginated reports for the current customer"""
     if current_user.role != UserRole.customer:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -40,24 +49,34 @@ def list_customer_reports(
     if not user_has_company_access(db, user=current_user, company_id=resolved_company_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only customers can access their reports")
     
-    # Get all assessments for the customer
-    assessment_query = select(Assessment).where(Assessment.user_id == current_user.id)
+    base_filters = [
+        Assessment.user_id == current_user.id,
+        Report.status.in_([ReportStatus.approved, ReportStatus.published]),
+    ]
     if resolved_company_id is not None:
-        assessment_query = assessment_query.where(Assessment.company_id == resolved_company_id)
-    assessments = db.scalars(assessment_query).all()
-    
-    reports = []
-    for assessment in assessments:
-        try:
-            report = get_report_by_assessment(db, assessment_id=assessment.id, lang_code=lang_code)
-            # Only include approved or published reports
-            if report.status in [ReportStatus.approved, ReportStatus.published]:
-                reports.append(report)
-        except HTTPException:
-            # Skip assessments without reports
-            continue
-    
-    return reports
+        base_filters.append(Assessment.company_id == resolved_company_id)
+
+    sort_col = {
+        "final_pdf_published_at": Report.final_pdf_published_at,
+        "approved_at": Report.approved_at,
+        "draft_generated_at": Report.draft_generated_at,
+        "created_at": Report.created_at,
+    }.get(sort_by, Report.final_pdf_published_at)
+
+    query = select(Report).join(Assessment, Report.assessment_id == Assessment.id).where(*base_filters)
+    if sort_order == "asc":
+        query = query.order_by(sort_col.asc().nulls_last())
+    else:
+        query = query.order_by(sort_col.desc().nulls_last())
+
+    total = db.scalar(
+        select(func.count(Report.id)).join(Assessment, Report.assessment_id == Assessment.id).where(*base_filters)
+    ) or 0
+
+    report_rows = db.scalars(query.offset(skip).limit(limit)).all()
+    reports = [get_report(db, report_id=row.id, lang_code=lang_code) for row in report_rows]
+
+    return PaginatedCustomerReportsResponse(reports=reports, total=total)
 
 
 @router.get(

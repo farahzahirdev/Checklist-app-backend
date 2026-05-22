@@ -65,6 +65,11 @@ class ReportResponse(BaseModel):
     section_overviews: list[ReportSummaryItem] = Field(default_factory=list)
 
 
+class PaginatedCustomerReportsResponse(BaseModel):
+    reports: list[ReportResponse] = Field(default_factory=list)
+    total: int
+
+
 class GenerateDraftReportRequest(BaseModel):
     assessment_id: UUID
 

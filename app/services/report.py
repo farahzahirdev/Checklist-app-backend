@@ -480,6 +480,14 @@ def list_reports(
             count_query = count_query.filter(Report.status == ReportStatus(status))
         except ValueError:
             pass
+    if search:
+        search_term = f"%{search.strip()}%"
+        count_query = (
+            count_query
+            .join(Assessment, Report.assessment_id == Assessment.id)
+            .join(UserModel, Assessment.user_id == UserModel.id)
+            .filter(UserModel.email.ilike(search_term))
+        )
     total = db.scalar(count_query) or 0
     reports = query.offset(skip).limit(limit).all()
     
