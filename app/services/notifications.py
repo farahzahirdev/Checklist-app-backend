@@ -11,6 +11,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.tasks.email_tasks import send_email_now, send_email_task
+from app.services.audit_log import create_audit_log
 from app.services.email_templates import get_template_renderer
 from app.models.user import User, UserRole
 from app.models.assessment import Assessment
@@ -98,6 +99,48 @@ class NotificationService:
         self.db = db
         self.renderer = get_template_renderer()
 
+    def _audit_email_notification(
+        self,
+        *,
+        action: str,
+        event: NotificationEvent,
+        correlation_id: str,
+        recipients: list[str],
+        success: bool,
+        changes_summary: str,
+        error_message: str | None = None,
+        metadata: dict | None = None,
+    ) -> None:
+        """Write email-notification lifecycle events into admin-visible audit logs."""
+        try:
+            target_id = event.report_id or event.assessment_id or event.user_id
+            create_audit_log(
+                db=self.db,
+                action=action,
+                target_entity="notification_email",
+                actor_user_id=event.actor_id,
+                target_id=target_id,
+                target_user_id=event.user_id,
+                changes_summary=changes_summary,
+                success=success,
+                error_message=error_message,
+                metadata={
+                    "correlation_id": correlation_id,
+                    "notification_event_type": event.event_type.value,
+                    "recipients": recipients,
+                    "assessment_id": str(event.assessment_id) if event.assessment_id else None,
+                    "report_id": str(event.report_id) if event.report_id else None,
+                    "lang_code": event.lang_code,
+                    **(metadata or {}),
+                },
+            )
+        except Exception as audit_error:
+            logger.error(
+                "Failed to write notification email audit log: %s",
+                audit_error,
+                exc_info=True,
+            )
+
     def notify(self, event: NotificationEvent) -> bool:
         """
         Process a notification event and enqueue email task.
@@ -114,12 +157,25 @@ class NotificationService:
 
         try:
             config = self.EVENT_CONFIG[event.event_type]
+            correlation_id = f"{event.event_type}_{datetime.now().timestamp()}"
 
             # Resolve recipients
             recipients = self._resolve_recipients(event, config["recipients"])
             if not recipients:
                 logger.warning(
                     f"No recipients resolved for event {event.event_type} (user_id={event.user_id})"
+                )
+                self._audit_email_notification(
+                    action="email_delivery_skipped",
+                    event=event,
+                    correlation_id=correlation_id,
+                    recipients=[],
+                    success=False,
+                    changes_summary=(
+                        f"Skipped notification email for {event.event_type}: no recipients resolved"
+                    ),
+                    error_message="No recipients resolved",
+                    metadata={"delivery_status": "skipped", "reason": "no_recipients"},
                 )
                 return False
 
@@ -132,8 +188,19 @@ class NotificationService:
 
             subject = self._resolve_subject(config["subject"], context.get("lang", DEFAULT_LANGUAGE_CODE))
 
-            # Generate correlation ID for tracking
-            correlation_id = f"{event.event_type}_{datetime.now().timestamp()}"
+            audit_context = {
+                "target_entity": "notification_email",
+                "actor_user_id": str(event.actor_id) if event.actor_id else None,
+                "target_user_id": str(event.user_id) if event.user_id else None,
+                "target_id": str(event.report_id or event.assessment_id or event.user_id)
+                if (event.report_id or event.assessment_id or event.user_id)
+                else None,
+                "notification_event_type": event.event_type.value,
+                "assessment_id": str(event.assessment_id) if event.assessment_id else None,
+                "report_id": str(event.report_id) if event.report_id else None,
+                "lang_code": event.lang_code,
+                "dispatch_mode": "celery_queue",
+            }
 
             # Enqueue email task; fall back to direct send if broker is unavailable.
             try:
@@ -143,17 +210,45 @@ class NotificationService:
                     html_content=html_content,
                     text_content=text_content,
                     correlation_id=correlation_id,
+                    audit_context=audit_context,
+                )
+                self._audit_email_notification(
+                    action="email_notification_queued",
+                    event=event,
+                    correlation_id=correlation_id,
+                    recipients=recipients,
+                    success=True,
+                    changes_summary=f"Queued notification email for {event.event_type}",
+                    metadata={"delivery_status": "queued", "transport": "celery"},
                 )
             except Exception as queue_error:
                 logger.error(
                     f"[{correlation_id}] Failed to enqueue notification {event.event_type}; sending immediately: {queue_error}"
                 )
+                self._audit_email_notification(
+                    action="email_queue_failed",
+                    event=event,
+                    correlation_id=correlation_id,
+                    recipients=recipients,
+                    success=False,
+                    changes_summary=(
+                        f"Failed to enqueue notification email for {event.event_type}; using fallback send"
+                    ),
+                    error_message=str(queue_error),
+                    metadata={"delivery_status": "queue_failed", "transport": "celery"},
+                )
+                fallback_audit_context = {
+                    **audit_context,
+                    "dispatch_mode": "direct_fallback",
+                    "queue_error": str(queue_error),
+                }
                 fallback_result = send_email_now(
                     to_addresses=recipients,
                     subject=subject,
                     html_content=html_content,
                     text_content=text_content,
                     correlation_id=correlation_id,
+                    audit_context=fallback_audit_context,
                 )
                 if fallback_result.get("status") != "sent":
                     logger.error(

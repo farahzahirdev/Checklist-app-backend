@@ -105,6 +105,15 @@ class AuditAction(StrEnum):
     cms_image_update = "cms_image_update"
     cms_image_delete = "cms_image_delete"
 
+    # Email/notification delivery actions
+    email_notification_queued = "email_notification_queued"
+    email_queue_failed = "email_queue_failed"
+    email_delivery_sent = "email_delivery_sent"
+    email_delivery_failed = "email_delivery_failed"
+    email_delivery_skipped = "email_delivery_skipped"
+    email_retry_scheduled = "email_retry_scheduled"
+    email_retries_exhausted = "email_retries_exhausted"
+
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"

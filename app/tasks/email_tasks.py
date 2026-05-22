@@ -2,13 +2,63 @@
 from __future__ import annotations
 
 import logging
+from uuid import UUID
 from celery import shared_task
 from app.core.config import get_settings
 from app.services.email_provider import EmailMessage, MicrosoftGraphEmailProvider, get_email_provider
 from app.db.session import SessionLocal
+from app.services.audit_log import create_audit_log
 from app.services.settings_manager import get_runtime_bool, get_runtime_int, get_runtime_str
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_uuid(value: str | None) -> UUID | None:
+    if not value:
+        return None
+    try:
+        return UUID(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _audit_email_delivery(
+    *,
+    action: str,
+    success: bool,
+    correlation_id: str | None,
+    to_addresses: list[str],
+    subject: str,
+    changes_summary: str,
+    error_message: str | None = None,
+    metadata: dict | None = None,
+    audit_context: dict | None = None,
+) -> None:
+    """Persist email delivery lifecycle events into the shared audit log."""
+    db = SessionLocal()
+    try:
+        create_audit_log(
+            db=db,
+            action=action,
+            target_entity=(audit_context or {}).get("target_entity") or "notification_email",
+            actor_user_id=_parse_uuid((audit_context or {}).get("actor_user_id")),
+            target_id=_parse_uuid((audit_context or {}).get("target_id")),
+            target_user_id=_parse_uuid((audit_context or {}).get("target_user_id")),
+            changes_summary=changes_summary,
+            success=success,
+            error_message=error_message,
+            metadata={
+                "correlation_id": correlation_id,
+                "to_addresses": to_addresses,
+                "subject": subject,
+                **(audit_context or {}),
+                **(metadata or {}),
+            },
+        )
+    except Exception as audit_error:
+        logger.error("[%s] Failed to create email audit log: %s", correlation_id, audit_error)
+    finally:
+        db.close()
 
 
 def _missing_graph_fields(settings) -> list[str]:
@@ -50,6 +100,7 @@ def send_email_now(
     from_name: str | None = None,
     reply_to: str | None = None,
     correlation_id: str | None = None,
+    audit_context: dict | None = None,
 ) -> dict:
     """Send email immediately in-process (fallback path when queueing fails)."""
     settings = get_settings()
@@ -95,6 +146,17 @@ def send_email_now(
             logger.warning(
                 f"[{correlation_id}] Email provider not configured; skipping send to {to_addresses}"
             )
+            _audit_email_delivery(
+                action="email_delivery_skipped",
+                success=False,
+                correlation_id=correlation_id,
+                to_addresses=to_addresses,
+                subject=subject,
+                changes_summary="Skipped email send because provider is not configured",
+                error_message="provider_disabled",
+                metadata={"delivery_status": "skipped", "reason": "provider_disabled"},
+                audit_context=audit_context,
+            )
             return {
                 "status": "skipped",
                 "reason": "provider_disabled",
@@ -123,6 +185,17 @@ def send_email_now(
             success = graph_fallback.send(message)
             if not success:
                 fallback_error = getattr(graph_fallback, "last_error", None)
+                _audit_email_delivery(
+                    action="email_delivery_failed",
+                    success=False,
+                    correlation_id=correlation_id,
+                    to_addresses=to_addresses,
+                    subject=subject,
+                    changes_summary="Email delivery failed via SMTP and Microsoft Graph fallback",
+                    error_message=fallback_error or primary_error or "Both SMTP and Microsoft Graph send failed",
+                    metadata={"delivery_status": "failed", "provider": "smtp+graph_fallback"},
+                    audit_context=audit_context,
+                )
                 return {
                     "status": "failed",
                     "to": to_addresses,
@@ -136,6 +209,17 @@ def send_email_now(
                 if missing_fields
                 else "Microsoft Graph fallback unavailable"
             )
+            _audit_email_delivery(
+                action="email_delivery_failed",
+                success=False,
+                correlation_id=correlation_id,
+                to_addresses=to_addresses,
+                subject=subject,
+                changes_summary="SMTP delivery failed and Graph fallback was unavailable",
+                error_message=f"{primary_error or 'SMTP send failed'}; {hint}",
+                metadata={"delivery_status": "failed", "provider": "smtp", "fallback": "unavailable"},
+                audit_context=audit_context,
+            )
             return {
                 "status": "failed",
                 "to": to_addresses,
@@ -145,6 +229,16 @@ def send_email_now(
 
     if success:
         logger.info(f"[{correlation_id}] Email sent successfully to {to_addresses}")
+        _audit_email_delivery(
+            action="email_delivery_sent",
+            success=True,
+            correlation_id=correlation_id,
+            to_addresses=to_addresses,
+            subject=subject,
+            changes_summary="Email delivered successfully",
+            metadata={"delivery_status": "sent"},
+            audit_context=audit_context,
+        )
         return {
             "status": "sent",
             "to": to_addresses,
@@ -152,6 +246,17 @@ def send_email_now(
             "correlation_id": correlation_id,
         }
 
+    _audit_email_delivery(
+        action="email_delivery_failed",
+        success=False,
+        correlation_id=correlation_id,
+        to_addresses=to_addresses,
+        subject=subject,
+        changes_summary="Email provider returned unsuccessful status",
+        error_message=primary_error or "Email provider returned False",
+        metadata={"delivery_status": "failed"},
+        audit_context=audit_context,
+    )
     return {
         "status": "failed",
         "to": to_addresses,
@@ -177,6 +282,7 @@ def send_email_task(
     from_name: str | None = None,
     reply_to: str | None = None,
     correlation_id: str | None = None,
+    audit_context: dict | None = None,
 ) -> dict:
     """
     Send an email asynchronously.
@@ -204,6 +310,7 @@ def send_email_task(
             from_name=from_name,
             reply_to=reply_to,
             correlation_id=correlation_id,
+            audit_context=audit_context,
         )
         if result.get("status") != "sent":
             logger.warning(f"[{correlation_id}] Email send failed; retrying")
@@ -228,9 +335,38 @@ def send_email_task(
         if self.request.retries < self.max_retries:
             retry_delay = settings.email_retry_delay_seconds * (2 ** self.request.retries)
             logger.info(f"[{correlation_id}] Retrying email send in {retry_delay}s")
+            _audit_email_delivery(
+                action="email_retry_scheduled",
+                success=False,
+                correlation_id=correlation_id,
+                to_addresses=to_addresses,
+                subject=subject,
+                changes_summary="Email delivery failed; retry scheduled",
+                error_message=str(exc),
+                metadata={
+                    "delivery_status": "retry_scheduled",
+                    "retry_attempt": self.request.retries + 1,
+                    "retry_delay_seconds": retry_delay,
+                },
+                audit_context=audit_context,
+            )
             raise self.retry(exc=exc, countdown=retry_delay)
 
         logger.error(f"[{correlation_id}] Email send failed after {self.max_retries} retries")
+        _audit_email_delivery(
+            action="email_retries_exhausted",
+            success=False,
+            correlation_id=correlation_id,
+            to_addresses=to_addresses,
+            subject=subject,
+            changes_summary="Email delivery failed after all retry attempts",
+            error_message=str(exc),
+            metadata={
+                "delivery_status": "failed",
+                "retries": self.request.retries,
+            },
+            audit_context=audit_context,
+        )
         return {
             "status": "failed",
             "to": to_addresses,

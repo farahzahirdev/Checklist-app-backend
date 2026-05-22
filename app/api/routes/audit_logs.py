@@ -5,10 +5,12 @@ from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, desc, extract, func
 
 from app.api.dependencies.auth import get_current_user, require_roles
 from app.db.session import get_db
-from app.models.user import UserRole
+from app.models.audit_log import AuditLog
+from app.models.user import User, UserRole
 from app.schemas.audit_log import (
     AuditLogResponse,
     AuditLogListResponse,
@@ -75,6 +77,10 @@ def get_audit_log_filter_options(
         "Report": [
             {"value": action.value, "label": action.value.replace("report_", "").replace("_", " ").title()}
             for action in AuditAction if action.value.startswith("report_")
+        ],
+        "Email": [
+            {"value": action.value, "label": action.value.replace("email_", "").replace("_", " ").title()}
+            for action in AuditAction if action.value.startswith("email_")
         ]
     }
     
@@ -95,7 +101,8 @@ def get_audit_log_filter_options(
         {"value": "report", "label": "Report"},
         {"value": "payment", "label": "Payment"},
         {"value": "media", "label": "Media"},
-        {"value": "system", "label": "System"}
+        {"value": "system", "label": "System"},
+        {"value": "notification_email", "label": "Notification Email"}
     ]
     
     return {
