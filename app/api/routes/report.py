@@ -63,14 +63,26 @@ def generate_draft_report_route(
 def list_reports_route(
     request: Request,
     status: str | None = None,
+    search: str | None = None,
+    sort_by: str = "draft_generated_at",
+    sort_order: str = "desc",
     skip: int = 0,
-    limit: int = 50,
+    limit: int = 20,
     _admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     from app.services.report import list_reports
     lang_code = get_language_code(request, db)
-    return list_reports(db, status=status, skip=skip, limit=limit, lang_code=lang_code)
+    return list_reports(
+        db,
+        status=status,
+        search=search,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        skip=skip,
+        limit=limit,
+        lang_code=lang_code,
+    )
 
 
 @router.get(

@@ -419,11 +419,23 @@ def approve_report(db: Session, *, report_id: UUID, actor: User, payload: Review
     return _serialize_report(db, report)
 
 
-def list_reports(db: Session, *, status: str | None = None, skip: int = 0, limit: int = 50, lang_code: str = "en") -> dict[str, Any]:
-    """List all reports with optional status filtering."""
+def list_reports(
+    db: Session,
+    *,
+    status: str | None = None,
+    search: str | None = None,
+    sort_by: str = "draft_generated_at",
+    sort_order: str = "desc",
+    skip: int = 0,
+    limit: int = 50,
+    lang_code: str = "en",
+) -> dict[str, Any]:
+    """List all reports with optional status filtering, search, sorting and pagination."""
     from sqlalchemy.orm import joinedload
     from app.models.checklist import Checklist, ChecklistTranslation
-    
+    from app.models.user import User as UserModel
+
+    # Build base query
     query = (
         db.query(Report)
         .options(
@@ -431,17 +443,44 @@ def list_reports(db: Session, *, status: str | None = None, skip: int = 0, limit
             joinedload(Report.assessment).joinedload(Assessment.checklist).joinedload(Checklist.translations),
             joinedload(Report.company),
         )
-        .order_by(desc(Report.created_at))
     )
-    
+
     if status:
         try:
             status_enum = ReportStatus(status)
             query = query.filter(Report.status == status_enum)
         except ValueError:
             pass  # Invalid status, ignore filter
-    
-    total = db.scalar(select(func.count(Report.id)))
+
+    if search:
+        search_term = f"%{search.strip()}%"
+        query = (
+            query
+            .join(Assessment, Report.assessment_id == Assessment.id)
+            .join(UserModel, Assessment.user_id == UserModel.id)
+            .filter(UserModel.email.ilike(search_term))
+        )
+
+    # Sorting
+    _sort_col = {
+        "draft_generated_at": Report.draft_generated_at,
+        "approved_at": Report.approved_at,
+        "reviewed_at": Report.reviewed_at,
+        "created_at": Report.created_at,
+    }.get(sort_by, Report.draft_generated_at)
+
+    if sort_order == "asc":
+        query = query.order_by(_sort_col.asc().nulls_last())
+    else:
+        query = query.order_by(_sort_col.desc().nulls_last())
+
+    count_query = db.query(func.count(Report.id))
+    if status:
+        try:
+            count_query = count_query.filter(Report.status == ReportStatus(status))
+        except ValueError:
+            pass
+    total = db.scalar(count_query) or 0
     reports = query.offset(skip).limit(limit).all()
     
     # Batch query findings and summaries counts to avoid N+1 queries
