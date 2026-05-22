@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
+from urllib.parse import urlsplit, urlunsplit
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,6 +18,7 @@ from app.models.user import User, UserRole
 from app.models.assessment import Assessment
 from app.models.report import Report
 from app.models.company import Company
+from app.core.config import get_settings
 from app.utils.i18n import DEFAULT_LANGUAGE_CODE
 
 logger = logging.getLogger(__name__)
@@ -98,6 +100,7 @@ class NotificationService:
     def __init__(self, db: Session):
         self.db = db
         self.renderer = get_template_renderer()
+        self.settings = get_settings()
 
     def _audit_email_notification(
         self,
@@ -364,6 +367,30 @@ class NotificationService:
             grouped.setdefault(lang, []).append(recipient)
         return grouped
 
+    def _resolve_frontend_base_url(self, context: dict) -> str:
+        base_url = (context.get("production_base_url") or "").strip()
+        if not base_url:
+            try:
+                from app.services.settings_manager import get_runtime_str
+                base_url = get_runtime_str(self.db, "production_base_url", self.settings.production_base_url)
+            except Exception:
+                base_url = self.settings.production_base_url
+
+        base_url = (base_url or "").strip()
+        if not base_url:
+            return ""
+        if not base_url.startswith(("http://", "https://")):
+            base_url = f"http://{base_url.lstrip('/')}"
+
+        parsed = urlsplit(base_url)
+        path = parsed.path.rstrip("/")
+        # Guard against common API-base settings; password-reset links must target frontend pages.
+        if path in {"/api", "/api/v1", "/api/api/v1"} or path.startswith("/api/"):
+            path = ""
+
+        normalized = urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+        return normalized.rstrip("/")
+
     def _build_context(self, event: NotificationEvent, config: dict) -> dict:
         """Build template context from event data."""
         context = event.context or {}
@@ -398,8 +425,10 @@ class NotificationService:
                 context.setdefault("actor_name", actor.email.split("@")[0])
 
         if event.event_type == NotificationEventType.PASSWORD_RESET_ISSUED and context.get("reset_token"):
-            base_url = context.get("production_base_url") or ""
-            context.setdefault("reset_password_url", f"{base_url}/reset-password?token={context['reset_token']}")
+            base_url = self._resolve_frontend_base_url(context)
+            if base_url:
+                context.setdefault("production_base_url", base_url)
+                context.setdefault("reset_password_url", f"{base_url}/reset-password?token={context['reset_token']}")
 
         return context
 

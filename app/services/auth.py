@@ -432,6 +432,7 @@ def issue_forgot_password_reset(
     *,
     email: str,
     lang_code: str = "en",
+    production_base_url: str | None = None,
 ) -> None:
     user = _get_user_by_email(db, email)
     if user is None or not user.is_active:
@@ -482,7 +483,10 @@ def issue_forgot_password_reset(
             event_type=NotificationEventType.PASSWORD_RESET_ISSUED,
             user_id=user.id,
             lang_code=lang_code,
-            context={"reset_token": raw_token},
+            context={
+                "reset_token": raw_token,
+                "production_base_url": production_base_url,
+            },
         )
     )
 

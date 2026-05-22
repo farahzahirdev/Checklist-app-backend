@@ -91,7 +91,13 @@ def login(request: LoginRequest, http_request: Request, db: Session = Depends(ge
 )
 def forgot_password(request: ForgotPasswordRequest, http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
     lang_code = get_language_code(http_request, db)
-    issue_forgot_password_reset(db, email=request.email, lang_code=lang_code)
+    frontend_base_url = (http_request.headers.get("origin") or str(http_request.base_url)).rstrip("/")
+    issue_forgot_password_reset(
+        db,
+        email=request.email,
+        lang_code=lang_code,
+        production_base_url=frontend_base_url,
+    )
     return MessageResponse(message=translate("password_reset_email_sent_if_exists", lang_code))
 
 
