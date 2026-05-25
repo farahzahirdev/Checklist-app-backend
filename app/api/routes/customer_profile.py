@@ -59,6 +59,16 @@ def _serialize_profile(user: User, db: Session) -> dict:
         "company_slug": None,
         "company_country": None,
         "company_description": None,
+        "billing_contact_name": None,
+        "billing_email": None,
+        "billing_phone": None,
+        "billing_address_line1": None,
+        "billing_address_line2": None,
+        "billing_city": None,
+        "billing_state": None,
+        "billing_postal_code": None,
+        "billing_country": None,
+        "billing_tax_id": None,
     }
     
     # If user has a primary company, fetch its details
@@ -74,6 +84,16 @@ def _serialize_profile(user: User, db: Session) -> dict:
             profile_data["company_slug"] = company.slug
             profile_data["company_country"] = company.country
             profile_data["company_description"] = company.description
+            profile_data["billing_contact_name"] = company.billing_contact_name
+            profile_data["billing_email"] = company.billing_email
+            profile_data["billing_phone"] = company.billing_phone
+            profile_data["billing_address_line1"] = company.billing_address_line1
+            profile_data["billing_address_line2"] = company.billing_address_line2
+            profile_data["billing_city"] = company.billing_city
+            profile_data["billing_state"] = company.billing_state
+            profile_data["billing_postal_code"] = company.billing_postal_code
+            profile_data["billing_country"] = company.billing_country
+            profile_data["billing_tax_id"] = company.billing_tax_id
     
     return profile_data
 
@@ -85,19 +105,52 @@ def _build_profile_completion(user: User, db: Session) -> ProfileCompletionRespo
     if user.primary_company_id:
         company = db.query(Company).filter(Company.id == user.primary_company_id).first()
 
+    personal_complete = all(
+        bool((value or "").strip())
+        for value in [user.full_name, user.username, user.job_title, user.department]
+    )
+
+    company_complete = bool(
+        company
+        and (company.name or "").strip()
+        and (company.slug or "").strip()
+        and (company.industry or "").strip()
+        and (company.size or "").strip()
+        and (company.region or "").strip()
+        and (company.country or "").strip()
+        and (company.website or "").strip()
+    )
+
+    mfa_record = getattr(user, "mfa_totp", None)
+    mfa_complete = bool(mfa_record and mfa_record.is_verified)
+
+    notification_complete = all(
+        value is not None
+        for value in [
+            user.email_notifications_enabled,
+            user.email_pref_reports_alert,
+            user.email_pref_payment_success_alert,
+            user.email_pref_assessment_submitted,
+            user.email_pref_assessment_started,
+        ]
+    )
+
+    billing_complete = bool(
+        company
+        and (company.billing_contact_name or "").strip()
+        and (company.billing_email or "").strip()
+        and (company.billing_address_line1 or "").strip()
+        and (company.billing_city or "").strip()
+        and (company.billing_postal_code or "").strip()
+        and (company.billing_country or "").strip()
+    )
+
     checks: list[ProfileCompletionItem] = [
-        ProfileCompletionItem(section="profile", field="full_name", label="Full name", completed=bool((user.full_name or "").strip())),
-        ProfileCompletionItem(section="profile", field="username", label="Username", completed=bool((user.username or "").strip())),
-        ProfileCompletionItem(section="profile", field="job_title", label="Job title", completed=bool((user.job_title or "").strip())),
-        ProfileCompletionItem(section="profile", field="department", label="Department", completed=bool((user.department or "").strip())),
-        ProfileCompletionItem(section="company", field="company_assigned", label="Primary company assigned", completed=company is not None),
-        ProfileCompletionItem(section="company", field="company_name", label="Company name", completed=bool(company and (company.name or "").strip())),
-        ProfileCompletionItem(section="company", field="company_slug", label="Company slug", completed=bool(company and (company.slug or "").strip())),
-        ProfileCompletionItem(section="company", field="company_industry", label="Company industry", completed=bool(company and (company.industry or "").strip())),
-        ProfileCompletionItem(section="company", field="company_size", label="Company size", completed=bool(company and (company.size or "").strip())),
-        ProfileCompletionItem(section="company", field="company_region", label="Company region", completed=bool(company and (company.region or "").strip())),
-        ProfileCompletionItem(section="company", field="company_country", label="Company country", completed=bool(company and (company.country or "").strip())),
-        ProfileCompletionItem(section="company", field="company_website", label="Company website", completed=bool(company and (company.website or "").strip())),
+        ProfileCompletionItem(section="profile", field="personal_details", label="Personal details completion", completed=personal_complete),
+        ProfileCompletionItem(section="company", field="organizational_company_details", label="Organizational/company details completion", completed=company_complete),
+        ProfileCompletionItem(section="security", field="mfa_setup", label="MFA setup completion", completed=mfa_complete),
+        ProfileCompletionItem(section="preferences", field="notification_preferences", label="Notification preference configuration completion", completed=notification_complete),
+        ProfileCompletionItem(section="billing", field="billing_details", label="Billing details completion", completed=billing_complete),
     ]
 
     completed_fields = [item for item in checks if item.completed]
@@ -297,6 +350,16 @@ def update_profile(
             request.company_country is not None,
             request.company_size is not None,
             request.company_description is not None,
+            request.billing_contact_name is not None,
+            request.billing_email is not None,
+            request.billing_phone is not None,
+            request.billing_address_line1 is not None,
+            request.billing_address_line2 is not None,
+            request.billing_city is not None,
+            request.billing_state is not None,
+            request.billing_postal_code is not None,
+            request.billing_country is not None,
+            request.billing_tax_id is not None,
         ])
         
         if company_fields_provided:
@@ -332,6 +395,16 @@ def update_profile(
                     country=request.company_country.strip() if request.company_country else None,
                     size=request.company_size.strip() if request.company_size else None,
                     description=request.company_description.strip() if request.company_description else None,
+                    billing_contact_name=request.billing_contact_name.strip() if request.billing_contact_name else None,
+                    billing_email=request.billing_email.strip() if request.billing_email else None,
+                    billing_phone=request.billing_phone.strip() if request.billing_phone else None,
+                    billing_address_line1=request.billing_address_line1.strip() if request.billing_address_line1 else None,
+                    billing_address_line2=request.billing_address_line2.strip() if request.billing_address_line2 else None,
+                    billing_city=request.billing_city.strip() if request.billing_city else None,
+                    billing_state=request.billing_state.strip() if request.billing_state else None,
+                    billing_postal_code=request.billing_postal_code.strip() if request.billing_postal_code else None,
+                    billing_country=request.billing_country.strip() if request.billing_country else None,
+                    billing_tax_id=request.billing_tax_id.strip() if request.billing_tax_id else None,
                     is_active=True,
                 )
                 db.add(company)
@@ -378,6 +451,26 @@ def update_profile(
                         company.size = request.company_size.strip() if request.company_size else None
                     if request.company_description is not None:
                         company.description = request.company_description.strip() if request.company_description else None
+                    if request.billing_contact_name is not None:
+                        company.billing_contact_name = request.billing_contact_name.strip() if request.billing_contact_name else None
+                    if request.billing_email is not None:
+                        company.billing_email = request.billing_email.strip() if request.billing_email else None
+                    if request.billing_phone is not None:
+                        company.billing_phone = request.billing_phone.strip() if request.billing_phone else None
+                    if request.billing_address_line1 is not None:
+                        company.billing_address_line1 = request.billing_address_line1.strip() if request.billing_address_line1 else None
+                    if request.billing_address_line2 is not None:
+                        company.billing_address_line2 = request.billing_address_line2.strip() if request.billing_address_line2 else None
+                    if request.billing_city is not None:
+                        company.billing_city = request.billing_city.strip() if request.billing_city else None
+                    if request.billing_state is not None:
+                        company.billing_state = request.billing_state.strip() if request.billing_state else None
+                    if request.billing_postal_code is not None:
+                        company.billing_postal_code = request.billing_postal_code.strip() if request.billing_postal_code else None
+                    if request.billing_country is not None:
+                        company.billing_country = request.billing_country.strip() if request.billing_country else None
+                    if request.billing_tax_id is not None:
+                        company.billing_tax_id = request.billing_tax_id.strip() if request.billing_tax_id else None
         
         db.commit()
         db.refresh(current_user)

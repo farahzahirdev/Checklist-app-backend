@@ -69,6 +69,18 @@ class Company(Base):
     website: Mapped[str | None] = mapped_column(String(255), nullable=True)
     region: Mapped[str | None] = mapped_column(String(100), nullable=True)  # e.g., "EU", "US", "APAC"
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # Billing details (no card data is stored; Stripe checkout handles payments)
+    billing_contact_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    billing_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    billing_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    billing_address_line1: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    billing_address_line2: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    billing_city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    billing_state: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    billing_postal_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    billing_country: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    billing_tax_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     
     # Business context
     industry: Mapped[str | None] = mapped_column(String(50), nullable=True)  # CompanyIndustry

@@ -2414,6 +2414,9 @@ PAGES_DATA = {
     },
 }
 
+# About page is now maintained outside CMS and must not be seeded.
+PAGES_DATA.pop("about-us", None)
+
 def seed_database():
     """Seed the CMS database with initial content."""
     db: Session = SessionLocal()

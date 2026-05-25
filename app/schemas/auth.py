@@ -157,6 +157,16 @@ class CustomerProfileResponse(BaseModel):
     company_slug: str | None = None
     company_country: str | None = None
     company_description: str | None = None
+    billing_contact_name: str | None = None
+    billing_email: str | None = None
+    billing_phone: str | None = None
+    billing_address_line1: str | None = None
+    billing_address_line2: str | None = None
+    billing_city: str | None = None
+    billing_state: str | None = None
+    billing_postal_code: str | None = None
+    billing_country: str | None = None
+    billing_tax_id: str | None = None
 
 
 class UpdateProfileRequest(BaseModel):
@@ -182,6 +192,16 @@ class UpdateProfileRequest(BaseModel):
     company_country: str | None = Field(None, max_length=255, description="Country")
     company_size: str | None = Field(None, max_length=100, description="Company size")
     company_description: str | None = Field(None, description="Company description")
+    billing_contact_name: str | None = Field(None, max_length=255, description="Billing contact name")
+    billing_email: str | None = Field(None, max_length=320, description="Billing contact email")
+    billing_phone: str | None = Field(None, max_length=50, description="Billing contact phone")
+    billing_address_line1: str | None = Field(None, max_length=255, description="Billing address line 1")
+    billing_address_line2: str | None = Field(None, max_length=255, description="Billing address line 2")
+    billing_city: str | None = Field(None, max_length=100, description="Billing city")
+    billing_state: str | None = Field(None, max_length=100, description="Billing state/region")
+    billing_postal_code: str | None = Field(None, max_length=50, description="Billing postal code")
+    billing_country: str | None = Field(None, max_length=100, description="Billing country")
+    billing_tax_id: str | None = Field(None, max_length=100, description="Billing tax/VAT ID")
 
 
 class ChangePasswordRequest(BaseModel):

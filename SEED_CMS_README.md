@@ -6,14 +6,13 @@ This script seeds the CMS database with default content for all public pages in 
 
 The seed script creates the following pages with both Czech (cs) and English (en) versions:
 
-1. **about-us** - About page with mission statement
-2. **contact** - Contact page with support information
-3. **faq** - FAQ page
-4. **products** - Products/services page
-5. **resources-public** - Resources and guides page
-6. **privacy-policy** - Privacy policy (legal page)
-7. **terms-of-service** - Terms of service (legal page)
-8. **cookies** - Cookie policy (legal page)
+1. **contact** - Contact page with support information
+2. **faq** - FAQ page
+3. **products** - Products/services page
+4. **resources-public** - Resources and guides page
+5. **privacy-policy** - Privacy policy (legal page)
+6. **terms-of-service** - Terms of service (legal page)
+7. **cookies** - Cookie policy (legal page)
 
 ## How to Run
 
@@ -41,12 +40,10 @@ python seed_cms.py
 
 ```
 ✓ Using admin user: admin
-✓ Seeded about-us (en)
-✓ Seeded about-us (cs)
 ✓ Seeded contact (en)
 ✓ Seeded contact (cs)
 ...
-✅ Successfully seeded 16 pages into CMS
+✅ Successfully seeded 14 pages into CMS
 ```
 
 ## What the Seed Does

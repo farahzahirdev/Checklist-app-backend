@@ -17,6 +17,9 @@ from app.schemas.cms import (
 from app.utils.audit_logger import AuditLogger
 
 
+EXCLUDED_CMS_SLUGS = {"about-us"}
+
+
 class CMSService:
     """Service layer for CMS operations"""
 
@@ -45,6 +48,9 @@ class CMSService:
         Returns:
             Page object or None if not found
         """
+        if slug in EXCLUDED_CMS_SLUGS:
+            return None
+
         query = select(Page).where(
             Page.slug == slug,
             Page.language == language
@@ -74,7 +80,8 @@ class CMSService:
         """
         query = select(Page).where(
             Page.id == page_id,
-            Page.language == language
+            Page.language == language,
+            Page.slug.notin_(EXCLUDED_CMS_SLUGS),
         )
         
         if not include_drafts:
@@ -101,8 +108,8 @@ class CMSService:
         Returns:
             Tuple of (pages list, total count)
         """
-        query = select(Page)
-        count_query = select(func.count(Page.id))
+        query = select(Page).where(Page.slug.notin_(EXCLUDED_CMS_SLUGS))
+        count_query = select(func.count(Page.id)).where(Page.slug.notin_(EXCLUDED_CMS_SLUGS))
         
         if language:
             query = query.where(Page.language == language)
@@ -136,6 +143,9 @@ class CMSService:
         Returns:
             Created Page object
         """
+        if data.slug in EXCLUDED_CMS_SLUGS:
+            raise ValueError(f"Page slug '{data.slug}' is not available for CMS management")
+
         # Check if page already exists for this slug+language combination
         existing = self.get_page_by_slug(data.slug, data.language, include_drafts=True)
         if existing:
@@ -185,6 +195,8 @@ class CMSService:
         """
         page = self.db.scalar(select(Page).where(Page.id == page_id))
         if not page:
+            raise ValueError(f"Page with ID {page_id} not found")
+        if page.slug in EXCLUDED_CMS_SLUGS:
             raise ValueError(f"Page with ID {page_id} not found")
         
         # Track changes for audit log
@@ -236,6 +248,8 @@ class CMSService:
         """
         page = self.db.scalar(select(Page).where(Page.id == page_id))
         if not page:
+            return False
+        if page.slug in EXCLUDED_CMS_SLUGS:
             return False
         
         # Log the action
