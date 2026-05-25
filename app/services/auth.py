@@ -149,7 +149,7 @@ def register_user(
     password: str,
     full_name: str | None = None,
     username: str | None = None,
-    company_name: str | None = None,
+    company_name: str,
     job_title: str | None = None,
     department: str | None = None,
     company_industry: str | None = None,
@@ -166,7 +166,7 @@ def register_user(
         password: User password (required, must be strong)
         full_name: User's full name (optional)
         username: Unique username (optional)
-        company_name: User's company name (optional, can create company or assign existing)
+        company_name: User's company or organization name (required)
         job_title: User's job title (optional)
         department: User's department (optional)
         company_industry: Company industry classification (optional)
@@ -181,7 +181,12 @@ def register_user(
 
     if not (email or "").strip():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="email_missing")
-    
+
+    trimmed_company_name = (company_name or "").strip()
+    if not trimmed_company_name:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="company_name_required")
+    company_name = trimmed_company_name
+
     validation_error = get_password_validation_error(password)
     if validation_error is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=validation_error)
@@ -218,45 +223,39 @@ def register_user(
     # Assign default customer permissions via RBAC
     RBACService.assign_role_by_code(db, user.id, "customer", user.id)
     
-    # If company information is provided, create or link to company
-    if company_name:
-        # Create slug from company name
-        slug = company_name.lower().replace(" ", "-").replace("_", "-")
-        slug = "".join(c for c in slug if c.isalnum() or c == "-")
-        
-        # Check if company with this slug already exists
-        existing_company = db.query(Company).filter(Company.slug == slug).first()
-        
-        if existing_company:
-            company = existing_company
-        else:
-            # Create new company
-            company = Company(
-                name=company_name,
-                slug=slug,
-                industry=company_industry,
-                size=company_size,
-                region=company_region,
-                is_active=True
-            )
-            db.add(company)
-            db.flush()
-        
-        # Set as user's primary company
-        user.primary_company_id = str(company.id)
-        user.job_title = job_title
-        user.department = department
-        
-        # Create user-company assignment
-        assignment = UserCompanyAssignment(
-            user_id=user.id,
-            company_id=company.id,
-            role="owner" if not existing_company else "staff",
-            job_title=job_title,
-            department=department,
-            is_active=True
+    # Create or link to company (organization name is required at registration)
+    slug = company_name.lower().replace(" ", "-").replace("_", "-")
+    slug = "".join(c for c in slug if c.isalnum() or c == "-")
+
+    existing_company = db.query(Company).filter(Company.slug == slug).first()
+
+    if existing_company:
+        company = existing_company
+    else:
+        company = Company(
+            name=company_name,
+            slug=slug,
+            industry=company_industry,
+            size=company_size,
+            region=company_region,
+            is_active=True,
         )
-        db.add(assignment)
+        db.add(company)
+        db.flush()
+
+    user.primary_company_id = str(company.id)
+    user.job_title = job_title
+    user.department = department
+
+    assignment = UserCompanyAssignment(
+        user_id=user.id,
+        company_id=company.id,
+        role="owner" if not existing_company else "staff",
+        job_title=job_title,
+        department=department,
+        is_active=True,
+    )
+    db.add(assignment)
     
     db.commit()
     db.refresh(user)

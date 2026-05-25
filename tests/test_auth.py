@@ -173,7 +173,12 @@ def test_signed_token_round_trip() -> None:
 def test_register_login_and_mfa_flow() -> None:
     db = FakeSession()
 
-    registered = register_user(db, email="user@example.com", password="Strong-password-123")
+    registered = register_user(
+        db,
+        email="user@example.com",
+        password="Strong-password-123",
+        company_name="Example Corp",
+    )
     assert registered.user.email == "user@example.com"
     assert registered.access_token is not None
     assert registered.user.role == UserRoleCode.customer
@@ -205,7 +210,12 @@ def test_register_login_and_mfa_flow() -> None:
 
 def test_register_allows_eight_character_password() -> None:
     db = FakeSession()
-    registered = register_user(db, email="eight@example.com", password="Passw0rd")
+    registered = register_user(
+        db,
+        email="eight@example.com",
+        password="Passw0rd",
+        company_name="Eight Corp",
+    )
     assert registered.user.email == "eight@example.com"
     assert registered.access_token is not None
     assert registered.user.role == UserRoleCode.customer
@@ -214,7 +224,12 @@ def test_register_allows_eight_character_password() -> None:
 def test_register_rejects_password_missing_uppercase() -> None:
     db = FakeSession()
     with pytest.raises(Exception) as exc_info:
-        register_user(db, email="noupper@example.com", password="password1")
+        register_user(
+            db,
+            email="noupper@example.com",
+            password="password1",
+            company_name="No Upper Corp",
+        )
 
     assert "missing_uppercase" in str(exc_info.value)
 
@@ -222,7 +237,12 @@ def test_register_rejects_password_missing_uppercase() -> None:
 def test_register_rejects_password_missing_lowercase() -> None:
     db = FakeSession()
     with pytest.raises(Exception) as exc_info:
-        register_user(db, email="nolower@example.com", password="PASSWORD1")
+        register_user(
+            db,
+            email="nolower@example.com",
+            password="PASSWORD1",
+            company_name="No Lower Corp",
+        )
 
     assert "missing_lowercase" in str(exc_info.value)
 

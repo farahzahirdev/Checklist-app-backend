@@ -39,7 +39,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     "/register",
     response_model=AuthResponse,
     summary="Register User",
-    description="Creates a new customer account with optional profile and company information. All fields except email and password are optional.",
+    description="Creates a new customer account. Email, password, and company/organization name are required; industry, size, and region are optional.",
 )
 def register(request: RegistrationRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
     lang_code = get_language_code(http_request, db)

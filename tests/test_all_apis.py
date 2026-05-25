@@ -239,7 +239,8 @@ class TestAuthAPI:
         unique_email = f"newuser{int(time.time())}@test.com"
         response = client.post("/api/api/v1/auth/register", json={
             "email": unique_email,
-            "password": "NewUser123!"
+            "password": "NewUser123!",
+            "company_name": "Test Organization",
         })
         assert response.status_code == 200
         data = response.json()
@@ -638,7 +639,8 @@ class TestAPIIntegration:
         # 1. Register new user
         register_response = client.post("/api/api/v1/auth/register", json={
             "email": "journey@test.com",
-            "password": "Journey123!"
+            "password": "Journey123!",
+            "company_name": "Journey Organization",
         })
         assert register_response.status_code == 200
         token = register_response.json()["access_token"]

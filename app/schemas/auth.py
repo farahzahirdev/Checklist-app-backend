@@ -1,7 +1,7 @@
 from enum import IntEnum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class UserRoleCode(IntEnum):
@@ -26,25 +26,33 @@ class ResetPasswordWithTokenRequest(BaseModel):
 
 
 class RegistrationRequest(BaseModel):
-    """Customer sign-up request with optional profile and company info."""
-    
+    """Customer sign-up request with required organization name."""
+
     # Required
     email: EmailStr
     password: str = Field(min_length=8)
-    
+    company_name: str = Field(..., max_length=255, description="User's company or organization name")
+
     # Optional: User profile
     full_name: str | None = Field(None, max_length=255, description="User's full name")
     username: str | None = Field(None, max_length=100, description="Unique username")
-    
-    # Optional: Company/Organization context
-    company_name: str | None = Field(None, max_length=255, description="User's company name")
     job_title: str | None = Field(None, max_length=255, description="Job title")
     department: str | None = Field(None, max_length=255, description="Department")
-    
+
     # Optional: Company context for audit
     company_industry: str | None = Field(None, max_length=50, description="Industry (finance, healthcare, tech, etc.)")
     company_size: str | None = Field(None, max_length=50, description="Company size (startup, small, medium, large, enterprise)")
     company_region: str | None = Field(None, max_length=100, description="Geographic region (EU, US, APAC, etc.)")
+
+    @field_validator("company_name", mode="before")
+    @classmethod
+    def validate_company_name(cls, value: object) -> str:
+        if value is None:
+            raise ValueError("company_name_required")
+        stripped = str(value).strip()
+        if not stripped:
+            raise ValueError("company_name_required")
+        return stripped
 
 
 class RoleAssignment(BaseModel):
