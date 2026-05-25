@@ -17,6 +17,8 @@ from app.models.user import User
 from app.schemas.auth import (
     ChangePasswordRequest,
     CustomerProfileResponse,
+    EmailPreferencesResponse,
+    EmailPreferencesUpdateRequest,
     ProfileCompletionItem,
     ProfileCompletionResponse,
     UpdateProfileRequest,
@@ -111,6 +113,16 @@ def _build_profile_completion(user: User, db: Session) -> ProfileCompletionRespo
     )
 
 
+def _serialize_email_preferences(user: User) -> EmailPreferencesResponse:
+    return EmailPreferencesResponse(
+        notifications_enabled=bool(user.email_notifications_enabled),
+        reports_alert=bool(user.email_pref_reports_alert),
+        payment_success_alert=bool(user.email_pref_payment_success_alert),
+        assessment_submitted_alert=bool(user.email_pref_assessment_submitted),
+        assessment_started_alert=bool(user.email_pref_assessment_started),
+    )
+
+
 @router.get(
     "/profile",
     response_model=CustomerProfileResponse,
@@ -154,6 +166,50 @@ def get_profile_completion(
 
 
 @router.get(
+    "/profile/email-preferences",
+    response_model=EmailPreferencesResponse,
+    summary="Get Email Preferences",
+    description="Returns user notification preferences for report/payment/assessment emails.",
+)
+def get_email_preferences(
+    current_user: User = Depends(get_current_user),
+) -> EmailPreferencesResponse:
+    return _serialize_email_preferences(current_user)
+
+
+@router.patch(
+    "/profile/email-preferences",
+    response_model=EmailPreferencesResponse,
+    summary="Update Email Preferences",
+    description="Update user email notifications. notifications_enabled works as master on/off toggle.",
+)
+def update_email_preferences(
+    request: EmailPreferencesUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> EmailPreferencesResponse:
+    if request.notifications_enabled is not None:
+        current_user.email_notifications_enabled = request.notifications_enabled
+
+    if request.reports_alert is not None:
+        current_user.email_pref_reports_alert = request.reports_alert
+
+    if request.payment_success_alert is not None:
+        current_user.email_pref_payment_success_alert = request.payment_success_alert
+
+    if request.assessment_submitted_alert is not None:
+        current_user.email_pref_assessment_submitted = request.assessment_submitted_alert
+
+    if request.assessment_started_alert is not None:
+        current_user.email_pref_assessment_started = request.assessment_started_alert
+
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return _serialize_email_preferences(current_user)
+
+
+@router.patch(
     "/profile",
     response_model=CustomerProfileResponse,
     summary="Update Customer Profile",
