@@ -42,7 +42,7 @@ router = APIRouter(prefix="/customer/assessments", tags=["customer-assessments"]
     "/",
     response_model=CustomerAssessmentListResponse,
     summary="List Customer Assessments",
-    description="Get a paginated list of customer's assessments with filtering and sorting options. Returns all statuses by default unless status filter is provided.",
+    description="Get a paginated list of customer's assessments with filtering and sorting options. Returns all statuses by default unless status filter is provided. Response includes pagination metadata (skip, limit, has_more).",
 )
 def list_customer_assessments(
     request: Request,

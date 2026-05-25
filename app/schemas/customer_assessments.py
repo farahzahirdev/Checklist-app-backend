@@ -107,6 +107,9 @@ class CustomerAssessmentListResponse(BaseModel):
     """Response for customer assessment list endpoint."""
     assessments: list[AssessmentSummary]
     total: int
+    skip: int = 0
+    limit: int = 50
+    has_more: bool = False
     filters_applied: dict | None = None
     generated_at: datetime
 

@@ -118,7 +118,7 @@ def get_customer_assessments(
             )
         )
     
-    # Count total
+    # Count total DB-backed assessments before pagination.
     total = query.count()
     
     # Apply sorting
@@ -137,12 +137,17 @@ def get_customer_assessments(
     else:
         query = query.order_by(sort_column)
     
-    # Apply pagination
-    results = query.offset(skip).limit(limit).all()
-    
+    # Include purchased checklists with active access but without active assessment as synthetic
+    # "not_started" rows. When synthetic rows are enabled, we paginate after combining all rows
+    # so paging stays correct across pages.
+    should_include_synthetic_startables = status_filter is None or AssessmentStatus.not_started in status_filter
+
+    # Apply pagination directly only when synthetic rows are not in play.
+    results = query.all() if should_include_synthetic_startables else query.offset(skip).limit(limit).all()
+
     report_lookup = _report_lookup_for_assessments(db, [assessment.id for assessment, *_ in results])
 
-    # Build response
+    # Build response rows from persisted assessments.
     result_assessments = []
     for assessment, checklist, checklist_type, translation, language in results:
         # Get translation
@@ -167,11 +172,6 @@ def get_customer_assessments(
             last_activity=assessment.updated_at,
         ))
 
-    # Include purchased checklists with active access but without active assessment as synthetic "not_started" rows.
-    # This keeps customer audit lists complete on the first page, including newly purchased checklists.
-    should_include_synthetic_startables = skip == 0 and (
-        status_filter is None or AssessmentStatus.not_started in status_filter
-    )
     if should_include_synthetic_startables:
         synthetic_startables: list[AssessmentSummary] = []
         available_checklists = _get_available_checklists(db, user_id, lang_code)
@@ -222,26 +222,37 @@ def get_customer_assessments(
             )
 
         if synthetic_startables:
-            total += len(synthetic_startables)
             result_assessments.extend(synthetic_startables)
 
-            if sort_by == "expires_at":
-                result_assessments.sort(
-                    key=lambda item: item.expires_at,
-                    reverse=(sort_order == "desc"),
-                )
-            elif sort_by == "status":
-                result_assessments.sort(
-                    key=lambda item: str(item.status),
-                    reverse=(sort_order == "desc"),
-                )
-            elif sort_by == "completion":
-                result_assessments.sort(
-                    key=lambda item: item.completion_percent,
-                    reverse=(sort_order == "desc"),
-                )
+        if sort_by == "expires_at":
+            result_assessments.sort(
+                key=lambda item: item.expires_at,
+                reverse=(sort_order == "desc"),
+            )
+        elif sort_by == "status":
+            result_assessments.sort(
+                key=lambda item: str(item.status),
+                reverse=(sort_order == "desc"),
+            )
+        elif sort_by == "completion":
+            result_assessments.sort(
+                key=lambda item: item.completion_percent,
+                reverse=(sort_order == "desc"),
+            )
+        elif sort_by == "created_at":
+            result_assessments.sort(
+                key=lambda item: item.started_at or datetime.min.replace(tzinfo=timezone.utc),
+                reverse=(sort_order == "desc"),
+            )
+        else:
+            # Default updated_at-style ordering for mixed persisted/synthetic rows.
+            result_assessments.sort(
+                key=lambda item: item.last_activity or item.started_at or datetime.min.replace(tzinfo=timezone.utc),
+                reverse=(sort_order == "desc"),
+            )
 
-            result_assessments = result_assessments[:limit]
+        total = len(result_assessments)
+        result_assessments = result_assessments[skip: skip + limit]
     
     filters_applied = {
         "status": status_filter,
@@ -252,6 +263,9 @@ def get_customer_assessments(
     return CustomerAssessmentListResponse(
         assessments=result_assessments,
         total=total,
+        skip=skip,
+        limit=limit,
+        has_more=(skip + len(result_assessments)) < total,
         filters_applied=filters_applied if any(filters_applied.values()) else None,
         generated_at=_now_utc(),
     )
