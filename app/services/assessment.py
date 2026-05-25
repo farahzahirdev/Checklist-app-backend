@@ -236,6 +236,12 @@ def start_assessment(
     completion_days = get_runtime_int(db, "assessment_completion_days", settings.assessment_completion_days)
     company_id = resolve_company_id(user, company_id)
 
+    if user.role != UserRole.admin and company_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate("profile_completion_required", lang_code),
+        )
+
     checklist = db.get(Checklist, checklist_id)
     if checklist is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))

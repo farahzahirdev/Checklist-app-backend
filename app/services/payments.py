@@ -77,7 +77,10 @@ def create_checkout_session_for_user(
     # Resolve company and require it for non-admin users
     resolved_company_id = resolve_company_id(user, company_id)
     if resolved_company_id is None and getattr(user, "role", None) != "admin":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please set up a company before checkout.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=translate("profile_completion_required", lang_code),
+        )
 
     # Block repurchase: user may not buy the same checklist again until their report is published
     if checklist_id:

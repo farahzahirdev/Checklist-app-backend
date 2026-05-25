@@ -41,6 +41,11 @@ def _serialize_profile(user: User, db: Session) -> dict:
         "job_title": user.job_title,
         "department": user.department,
         "preferred_language": user.preferred_language or "en",
+        "notifications_enabled": bool(user.email_notifications_enabled),
+        "reports_alert": bool(user.email_pref_reports_alert),
+        "payment_success_alert": bool(user.email_pref_payment_success_alert),
+        "assessment_submitted_alert": bool(user.email_pref_assessment_submitted),
+        "assessment_started_alert": bool(user.email_pref_assessment_started),
         "primary_company_id": user.primary_company_id,
         "is_active": user.is_active,
         "created_at": user.created_at.isoformat() if hasattr(user, 'created_at') and user.created_at else None,
@@ -266,6 +271,21 @@ def update_profile(
             if normalized_lang == "cz":
                 normalized_lang = "cs"
             current_user.preferred_language = normalized_lang
+
+        if request.notifications_enabled is not None:
+            current_user.email_notifications_enabled = request.notifications_enabled
+
+        if request.reports_alert is not None:
+            current_user.email_pref_reports_alert = request.reports_alert
+
+        if request.payment_success_alert is not None:
+            current_user.email_pref_payment_success_alert = request.payment_success_alert
+
+        if request.assessment_submitted_alert is not None:
+            current_user.email_pref_assessment_submitted = request.assessment_submitted_alert
+
+        if request.assessment_started_alert is not None:
+            current_user.email_pref_assessment_started = request.assessment_started_alert
         
         # Handle company creation/update if any company fields provided
         company_fields_provided = any([

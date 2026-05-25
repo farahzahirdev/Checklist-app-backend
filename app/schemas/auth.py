@@ -130,6 +130,11 @@ class CustomerProfileResponse(BaseModel):
     department: str | None = None
     primary_company_id: UUID | None = None
     preferred_language: str = "en"
+    notifications_enabled: bool = True
+    reports_alert: bool = True
+    payment_success_alert: bool = True
+    assessment_submitted_alert: bool = True
+    assessment_started_alert: bool = True
     is_active: bool
     created_at: str | None = None
     updated_at: str | None = None
@@ -154,6 +159,11 @@ class UpdateProfileRequest(BaseModel):
     job_title: str | None = Field(None, max_length=255, description="Job title")
     department: str | None = Field(None, max_length=255, description="Department")
     preferred_language: str | None = Field(None, pattern="^(en|cs)$", description="Preferred language")
+    notifications_enabled: bool | None = Field(None, description="Master email notifications toggle")
+    reports_alert: bool | None = Field(None, description="Report-related email alerts")
+    payment_success_alert: bool | None = Field(None, description="Payment success email alerts")
+    assessment_submitted_alert: bool | None = Field(None, description="Assessment submitted email alerts")
+    assessment_started_alert: bool | None = Field(None, description="Assessment started/expired email alerts")
     
     # Company fields (auto-create/update if provided)
     company_name: str | None = Field(None, max_length=255, description="Company name")
