@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if lang == 'cs' %}
+<h2>Vítejte v AuditReady</h2>
+<p>Dobrý den, {{ customer_name }},</p>
+<p>Děkujeme za registraci do AuditReady.</p>
+<p>Váš účet je připraven. Můžete se přihlásit a dokončit svůj profil a nastavení společnosti.</p>
+<p>
+    <a href="{{ production_base_url }}/login" class="button" style="color: #ffffff; text-decoration: none;">Přihlásit se</a>
+</p>
+{% else %}
+<h2>Welcome to AuditReady</h2>
+<p>Hi {{ customer_name }},</p>
+<p>Thanks for signing up to AuditReady.</p>
+<p>Your account is ready. You can sign in now and complete your profile and company setup.</p>
+<p>
+    <a href="{{ production_base_url }}/login" class="button" style="color: #ffffff; text-decoration: none;">Sign In</a>
+</p>
+{% endif %}
+{% endblock %}

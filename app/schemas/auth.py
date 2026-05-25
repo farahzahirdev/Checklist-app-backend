@@ -172,3 +172,33 @@ class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=1, description="Current password for verification")
     new_password: str = Field(min_length=8, description="New password (must be strong)")
     confirm_password: str = Field(min_length=8, description="Confirm new password")
+
+
+class ProfileCompletionItem(BaseModel):
+    section: str
+    field: str
+    label: str
+    completed: bool
+
+
+class ProfileCompletionResponse(BaseModel):
+    completion_percent: float
+    is_complete: bool
+    missing_fields: list[ProfileCompletionItem]
+    completed_fields: list[ProfileCompletionItem]
+
+
+class EmailPreferencesResponse(BaseModel):
+    notifications_enabled: bool
+    reports_alert: bool
+    payment_success_alert: bool
+    assessment_submitted_alert: bool
+    assessment_started_alert: bool
+
+
+class EmailPreferencesUpdateRequest(BaseModel):
+    notifications_enabled: bool | None = None
+    reports_alert: bool | None = None
+    payment_success_alert: bool | None = None
+    assessment_submitted_alert: bool | None = None
+    assessment_started_alert: bool | None = None

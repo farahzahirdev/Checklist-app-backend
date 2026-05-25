@@ -19,6 +19,7 @@ from app.models.assessment import Assessment
 from app.models.report import Report
 from app.models.company import Company
 from app.core.config import get_settings
+from app.services.settings_manager import get_runtime_int
 from app.utils.i18n import DEFAULT_LANGUAGE_CODE
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,8 @@ class NotificationEventType(StrEnum):
     REPORT_PUBLISHED = "report_published"
     ASSESSMENT_EXPIRED = "assessment_expired"
     PASSWORD_RESET_ISSUED = "password_reset_issued"
+    PAYMENT_SUCCESS = "payment_success"
+    SIGNUP_WELCOME = "signup_welcome"
 
 
 @dataclass
@@ -93,6 +96,16 @@ class NotificationService:
         NotificationEventType.PASSWORD_RESET_ISSUED: {
             "template": "password_reset_issued.html",
             "subject": {"cs": "Heslo bylo resetováno", "en": "Password reset issued"},
+            "recipients": ["customer"],
+        },
+        NotificationEventType.PAYMENT_SUCCESS: {
+            "template": "payment_success.html",
+            "subject": {"cs": "Platba byla úspěšná", "en": "Payment successful"},
+            "recipients": ["customer"],
+        },
+        NotificationEventType.SIGNUP_WELCOME: {
+            "template": "signup_welcome.html",
+            "subject": {"cs": "Vítejte v AuditReady", "en": "Thanks for signing up to AuditReady"},
             "recipients": ["customer"],
         },
     }
@@ -292,13 +305,13 @@ class NotificationService:
             if recipient_type == "customer":
                 if event.user_id:
                     user = self.db.get(User, event.user_id)
-                    if user and user.email:
+                    if user and user.email and self._is_user_event_enabled(user, event.event_type):
                         recipients.add(user.email)
 
             elif recipient_type == "actor":
                 if event.actor_id:
                     actor = self.db.get(User, event.actor_id)
-                    if actor and actor.email:
+                    if actor and actor.email and self._is_user_event_enabled(actor, event.event_type):
                         recipients.add(actor.email)
 
             elif recipient_type == "admin":
@@ -308,7 +321,7 @@ class NotificationService:
                     )
                 ).all()
                 for admin_user in admin_users:
-                    if admin_user.email:
+                    if admin_user.email and self._is_user_event_enabled(admin_user, event.event_type):
                         recipients.add(admin_user.email)
 
             elif recipient_type == "company_billing":
@@ -320,6 +333,30 @@ class NotificationService:
                         recipients.add(company.email)
 
         return list(recipients)
+
+    def _is_user_event_enabled(self, user: User, event_type: NotificationEventType) -> bool:
+        if not bool(getattr(user, "email_notifications_enabled", True)):
+            return False
+
+        report_events = {
+            NotificationEventType.ASSESSMENT_REVIEW_COMPLETED,
+            NotificationEventType.REPORT_CHANGES_REQUESTED,
+            NotificationEventType.REPORT_APPROVED,
+            NotificationEventType.REPORT_PUBLISHED,
+        }
+        if event_type in report_events:
+            return bool(getattr(user, "email_pref_reports_alert", True))
+
+        if event_type == NotificationEventType.PAYMENT_SUCCESS:
+            return bool(getattr(user, "email_pref_payment_success_alert", True))
+
+        if event_type == NotificationEventType.ASSESSMENT_SUBMITTED:
+            return bool(getattr(user, "email_pref_assessment_submitted", True))
+
+        if event_type in {NotificationEventType.ASSESSMENT_STARTED, NotificationEventType.ASSESSMENT_EXPIRED}:
+            return bool(getattr(user, "email_pref_assessment_started", True))
+
+        return True
 
     def _get_company_id(self, event: NotificationEvent) -> UUID | None:
         """Resolve company ID from event context."""
@@ -410,6 +447,9 @@ class NotificationService:
                 context.setdefault("assessment_status", assessment.status)
                 if assessment.checklist:
                     context.setdefault("checklist_title", assessment.checklist.version)
+
+                days = get_runtime_int(self.db, "assessment_completion_days", self.settings.assessment_completion_days)
+                context.setdefault("access_window_days", days)
 
         if event.report_id:
             report = self.db.get(Report, event.report_id)

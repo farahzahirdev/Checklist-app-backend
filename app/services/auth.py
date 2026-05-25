@@ -178,6 +178,9 @@ def register_user(
         AuthResponse with user and access token
     """
     from app.models.company import Company, UserCompanyAssignment
+
+    if not (email or "").strip():
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="email_missing")
     
     validation_error = get_password_validation_error(password)
     if validation_error is not None:
@@ -256,6 +259,19 @@ def register_user(
     token = create_access_token(user_id=str(user.id), role=str(user.role), ttl_minutes=auth_ttl)
     _audit(db, actor_user=user, action=AuditAction.auth_login, target_entity="user", target_id=user.id)
     db.commit()
+
+    try:
+        from app.services.notifications import NotificationEvent, NotificationEventType, NotificationService
+
+        NotificationService(db).notify(
+            NotificationEvent(
+                event_type=NotificationEventType.SIGNUP_WELCOME,
+                user_id=user.id,
+                lang_code=lang_code,
+            )
+        )
+    except Exception:
+        pass
     
     # At registration, MFA is never enabled or required
     return AuthResponse(user=serialize_user(user, db), access_token=token, mfa_required=True, mfa_enabled=False)

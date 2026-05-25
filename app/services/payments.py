@@ -22,6 +22,7 @@ from app.services.stripe_products import get_stripe_price_for_checklist
 from app.utils.i18n_messages import translate
 from app.services.company_context import resolve_company_id
 from app.services.settings_manager import get_runtime_str, get_runtime_int
+from app.services.notifications import NotificationEvent, NotificationEventType, NotificationService
 
 def _stripe_required(lang_code: str = "en") -> Any:
     settings = get_settings()
@@ -318,6 +319,25 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
     db.commit()
     db.refresh(payment)
 
+    if event_type in {"payment_intent.succeeded", "checkout.session.completed"} and payment.status == PaymentStatus.succeeded:
+        try:
+            NotificationService(db).notify(
+                NotificationEvent(
+                    event_type=NotificationEventType.PAYMENT_SUCCESS,
+                    user_id=payment.user_id,
+                    lang_code="en",
+                    context={
+                        "payment_id": str(payment.id),
+                        "amount_cents": payment.amount_cents,
+                        "amount_formatted": f"{payment.amount_cents / 100:.2f} {payment.currency}",
+                        "currency": payment.currency,
+                        "checklist_id": str(payment.checklist_id) if payment.checklist_id else None,
+                    },
+                )
+            )
+        except Exception:
+            pass
+
     return PaymentState(
         payment_id=payment.id,
         checklist_id=payment.checklist_id,
@@ -372,6 +392,25 @@ def admin_set_payment_status(
 
     db.commit()
     db.refresh(payment)
+
+    if payment_status == PaymentStatus.succeeded:
+        try:
+            NotificationService(db).notify(
+                NotificationEvent(
+                    event_type=NotificationEventType.PAYMENT_SUCCESS,
+                    user_id=payment.user_id,
+                    lang_code="en",
+                    context={
+                        "payment_id": str(payment.id),
+                        "amount_cents": payment.amount_cents,
+                        "amount_formatted": f"{payment.amount_cents / 100:.2f} {payment.currency}",
+                        "currency": payment.currency,
+                        "checklist_id": str(payment.checklist_id) if payment.checklist_id else None,
+                    },
+                )
+            )
+        except Exception:
+            pass
 
     if access_window is None:
         access_window = db.scalar(select(AccessWindow).where(AccessWindow.payment_id == payment.id))

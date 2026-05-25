@@ -278,6 +278,7 @@ def start_assessment(
                     user_id=user.id,
                     assessment_id=existing.id,
                     lang_code=lang_code,
+                    context={"access_window_days": completion_days},
                 )
                 notification_service = NotificationService(db)
                 notification_service.notify(event)
@@ -370,6 +371,7 @@ def start_assessment(
             user_id=user.id,
             assessment_id=assessment.id,
             lang_code=lang_code,
+            context={"access_window_days": completion_days},
         )
         notification_service = NotificationService(db)
         notification_service.notify(event)

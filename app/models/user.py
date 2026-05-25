@@ -50,6 +50,11 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     mfa_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     preferred_language: Mapped[str] = mapped_column(String(5), nullable=False, default="en")
+    email_notifications_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    email_pref_reports_alert: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    email_pref_payment_success_alert: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    email_pref_assessment_submitted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    email_pref_assessment_started: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

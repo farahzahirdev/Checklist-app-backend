@@ -17,6 +17,10 @@ from app.models.user import User
 from app.schemas.auth import (
     ChangePasswordRequest,
     CustomerProfileResponse,
+    EmailPreferencesResponse,
+    EmailPreferencesUpdateRequest,
+    ProfileCompletionItem,
+    ProfileCompletionResponse,
     UpdateProfileRequest,
 )
 from app.utils.i18n import get_language_code
@@ -69,6 +73,51 @@ def _serialize_profile(user: User, db: Session) -> dict:
     return profile_data
 
 
+def _build_profile_completion(user: User, db: Session) -> ProfileCompletionResponse:
+    from app.models.company import Company
+
+    company = None
+    if user.primary_company_id:
+        company = db.query(Company).filter(Company.id == user.primary_company_id).first()
+
+    checks: list[ProfileCompletionItem] = [
+        ProfileCompletionItem(section="profile", field="full_name", label="Full name", completed=bool((user.full_name or "").strip())),
+        ProfileCompletionItem(section="profile", field="username", label="Username", completed=bool((user.username or "").strip())),
+        ProfileCompletionItem(section="profile", field="job_title", label="Job title", completed=bool((user.job_title or "").strip())),
+        ProfileCompletionItem(section="profile", field="department", label="Department", completed=bool((user.department or "").strip())),
+        ProfileCompletionItem(section="company", field="company_assigned", label="Primary company assigned", completed=company is not None),
+        ProfileCompletionItem(section="company", field="company_name", label="Company name", completed=bool(company and (company.name or "").strip())),
+        ProfileCompletionItem(section="company", field="company_slug", label="Company slug", completed=bool(company and (company.slug or "").strip())),
+        ProfileCompletionItem(section="company", field="company_industry", label="Company industry", completed=bool(company and (company.industry or "").strip())),
+        ProfileCompletionItem(section="company", field="company_size", label="Company size", completed=bool(company and (company.size or "").strip())),
+        ProfileCompletionItem(section="company", field="company_region", label="Company region", completed=bool(company and (company.region or "").strip())),
+        ProfileCompletionItem(section="company", field="company_country", label="Company country", completed=bool(company and (company.country or "").strip())),
+        ProfileCompletionItem(section="company", field="company_website", label="Company website", completed=bool(company and (company.website or "").strip())),
+    ]
+
+    completed_fields = [item for item in checks if item.completed]
+    missing_fields = [item for item in checks if not item.completed]
+    total = len(checks)
+    completion_percent = round((len(completed_fields) / total) * 100.0, 2) if total else 100.0
+
+    return ProfileCompletionResponse(
+        completion_percent=completion_percent,
+        is_complete=len(missing_fields) == 0,
+        missing_fields=missing_fields,
+        completed_fields=completed_fields,
+    )
+
+
+def _serialize_email_preferences(user: User) -> EmailPreferencesResponse:
+    return EmailPreferencesResponse(
+        notifications_enabled=bool(user.email_notifications_enabled),
+        reports_alert=bool(user.email_pref_reports_alert),
+        payment_success_alert=bool(user.email_pref_payment_success_alert),
+        assessment_submitted_alert=bool(user.email_pref_assessment_submitted),
+        assessment_started_alert=bool(user.email_pref_assessment_started),
+    )
+
+
 @router.get(
     "/profile",
     response_model=CustomerProfileResponse,
@@ -96,6 +145,63 @@ def get_profile(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=translate("profile_retrieval_failed", lang_code)
         ) from exc
+
+
+@router.get(
+    "/profile/completion",
+    response_model=ProfileCompletionResponse,
+    summary="Get Profile Completion",
+    description="Returns what profile/company setup fields are still missing for the authenticated user.",
+)
+def get_profile_completion(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ProfileCompletionResponse:
+    return _build_profile_completion(current_user, db)
+
+
+@router.get(
+    "/profile/email-preferences",
+    response_model=EmailPreferencesResponse,
+    summary="Get Email Preferences",
+    description="Returns user notification preferences for report/payment/assessment emails.",
+)
+def get_email_preferences(
+    current_user: User = Depends(get_current_user),
+) -> EmailPreferencesResponse:
+    return _serialize_email_preferences(current_user)
+
+
+@router.patch(
+    "/profile/email-preferences",
+    response_model=EmailPreferencesResponse,
+    summary="Update Email Preferences",
+    description="Update user email notifications. notifications_enabled works as master on/off toggle.",
+)
+def update_email_preferences(
+    request: EmailPreferencesUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> EmailPreferencesResponse:
+    if request.notifications_enabled is not None:
+        current_user.email_notifications_enabled = request.notifications_enabled
+
+    if request.reports_alert is not None:
+        current_user.email_pref_reports_alert = request.reports_alert
+
+    if request.payment_success_alert is not None:
+        current_user.email_pref_payment_success_alert = request.payment_success_alert
+
+    if request.assessment_submitted_alert is not None:
+        current_user.email_pref_assessment_submitted = request.assessment_submitted_alert
+
+    if request.assessment_started_alert is not None:
+        current_user.email_pref_assessment_started = request.assessment_started_alert
+
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return _serialize_email_preferences(current_user)
 
 
 @router.patch(

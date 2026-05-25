@@ -356,13 +356,13 @@ def create_checklist_from_file(
             # Position should be 1..4 (top-to-bottom in UI). Scores remain 4..1.
             scores = [4, 3, 2, 1]
             for idx, (score, col_key) in enumerate(zip(scores, col_keys)):
-                desc = get_column_value(row, col_key, headers) if col_key else None
-                label = fixed_labels.get(score, f"Score {score}")
+                guidance_title = get_column_value(row, col_key, headers) if col_key else None
+                label = sanitize_text(guidance_title) if guidance_title else fixed_labels.get(score, f"Score {score}")
                 answer_options.append({
                     "position": idx + 1,
                     "label": label,
                     "score": score,
-                    "description": desc,
+                    "description": None,
                 })
             return answer_options
 
@@ -482,8 +482,6 @@ def create_checklist_from_file(
 
                 # Build answer options for this row
                 answer_options = build_answer_options(row)
-                if not any(opt["description"] for opt in answer_options):
-                    warnings.append(f"Row {row_number}: No answer guidance provided for any score column.")
 
                 # Create parent question if this is a new parent ID
                 parent_question_id = None

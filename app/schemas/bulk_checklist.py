@@ -18,11 +18,11 @@ class ColumnMapping(BaseModel):
     expected_implementation_col: str | None = Field(default=None, description="Column for expected implementation")
     source_ref_col: str | None = Field(default=None, description="Column for source reference")
 
-    # Score guidance columns (optional but recommended)
-    guidance_score_4_col: str | None = Field(default=None, description="Column for score 4 guidance")
-    guidance_score_3_col: str | None = Field(default=None, description="Column for score 3 guidance")
-    guidance_score_2_col: str | None = Field(default=None, description="Column for score 2 guidance")
-    guidance_score_1_col: str | None = Field(default=None, description="Column for score 1 guidance")
+    # Score guidance columns are mapped to answer option titles/labels (optional but recommended)
+    guidance_score_4_col: str | None = Field(default=None, description="Column for score 4 answer title")
+    guidance_score_3_col: str | None = Field(default=None, description="Column for score 3 answer title")
+    guidance_score_2_col: str | None = Field(default=None, description="Column for score 2 answer title")
+    guidance_score_1_col: str | None = Field(default=None, description="Column for score 1 answer title")
 
 
 class ColumnMappingResponse(BaseModel):

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if lang == 'cs' %}
+<h2>Platba byla úspěšná</h2>
+<p>Dobrý den, {{ customer_name }},</p>
+<p>Vaše platba byla úspěšně zpracována.</p>
+<div class="alert">
+    <p><strong>Částka:</strong> {{ amount_formatted or ((amount_cents or 0) / 100) ~ ' ' ~ (currency or 'USD') }}</p>
+</div>
+<p>Děkujeme, že používáte AuditReady.</p>
+{% else %}
+<h2>Payment Successful</h2>
+<p>Hi {{ customer_name }},</p>
+<p>Your payment has been processed successfully.</p>
+<div class="alert">
+    <p><strong>Amount:</strong> {{ amount_formatted or ((amount_cents or 0) / 100) ~ ' ' ~ (currency or 'USD') }}</p>
+</div>
+<p>Thank you for using AuditReady.</p>
+{% endif %}
+{% endblock %}
