@@ -3,17 +3,23 @@
 {% block content %}
 {% if lang == 'cs' %}
 <h2>Vítejte v AuditReady</h2>
-<p>Dobrý den, {{ customer_name }},</p>
+<p>{% if customer_name %}Dobrý den, {{ customer_name }},{% else %}Dobrý den,{% endif %}</p>
 <p>Děkujeme za registraci do AuditReady.</p>
 <p>Váš účet je připraven. Můžete se přihlásit a dokončit svůj profil a nastavení společnosti.</p>
+<div class="alert">
+    <p><strong>Tip:</strong> Dokončením profilu a údajů o společnosti urychlíte zahájení prvního hodnocení.</p>
+</div>
 <p>
     <a href="{{ production_base_url }}/login" class="button" style="color: #ffffff; text-decoration: none;">Přihlásit se</a>
 </p>
 {% else %}
 <h2>Welcome to AuditReady</h2>
-<p>Hi {{ customer_name }},</p>
+<p>{% if customer_name %}Hi {{ customer_name }},{% else %}Hi,{% endif %}</p>
 <p>Thanks for signing up to AuditReady.</p>
 <p>Your account is ready. You can sign in now and complete your profile and company setup.</p>
+<div class="alert">
+    <p><strong>Tip:</strong> Completing your profile and company details will help you start your first assessment faster.</p>
+</div>
 <p>
     <a href="{{ production_base_url }}/login" class="button" style="color: #ffffff; text-decoration: none;">Sign In</a>
 </p>

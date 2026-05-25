@@ -196,6 +196,12 @@ def register_user(
         if existing_username:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("username_already_taken", lang_code))
     
+    normalized_pref_lang = (lang_code or "en").strip().lower()
+    if normalized_pref_lang == "cz":
+        normalized_pref_lang = "cs"
+    if normalized_pref_lang not in {"en", "cs"}:
+        normalized_pref_lang = "en"
+
     # Create user with optional profile info
     user = User(
         email=email.lower(),
@@ -203,7 +209,8 @@ def register_user(
         role=UserRole.customer.value,
         is_active=True,
         full_name=full_name,
-        username=username.lower() if username else None
+        username=username.lower() if username else None,
+        preferred_language=normalized_pref_lang,
     )
     db.add(user)
     db.flush()

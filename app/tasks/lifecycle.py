@@ -35,6 +35,7 @@ def expire_stale_assessments() -> dict:
     """
     from app.db.session import SessionLocal
     from app.models.assessment import Assessment, AssessmentStatus
+    from app.models.user import User
 
     db: Session = SessionLocal()
     expired_count = 0
@@ -54,11 +55,13 @@ def expire_stale_assessments() -> dict:
             
             # Send notification
             try:
+                user = db.get(User, assessment.user_id)
+                notify_lang = getattr(user, "preferred_language", "en") if user else "en"
                 event = NotificationEvent(
                     event_type=NotificationEventType.ASSESSMENT_EXPIRED,
                     user_id=assessment.user_id,
                     assessment_id=assessment.id,
-                    lang_code="cs",
+                    lang_code=notify_lang or "en",
                 )
                 notification_service = NotificationService(db)
                 notification_service.notify(event)

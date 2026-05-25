@@ -3,9 +3,12 @@
 {% block content %}
 {% if lang == 'cs' %}
 <h2>Hodnocení zahájeno</h2>
-<p>Dobrý den, {{ customer_name }},</p>
+<p>{% if customer_name %}Dobrý den, {{ customer_name }},{% else %}Dobrý den,{% endif %}</p>
 <p>Právě jste zahájili nové hodnocení: <strong>{{ checklist_title }}</strong></p>
-<p>Na dokončení tohoto hodnocení máte {{ access_window_days or 7 }} dní od data zahájení. Jakmile hodnocení spustíte, začne běžet časový limit.</p>
+<div class="alert">
+    <p><strong>Časový limit:</strong> Na dokončení tohoto hodnocení máte {{ access_window_days or 7 }} dní od data zahájení.</p>
+</div>
+<p>Jakmile hodnocení spustíte, začne běžet časový limit.</p>
 <p>Pokud hodnocení nedokončíte v tomto okně, přístup k hodnocení propadne.</p>
 <p>
     <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button" style="color: #ffffff; text-decoration: none;">Pokračovat v hodnocení</a>
@@ -13,9 +16,12 @@
 <p>Pokud máte jakékoli dotazy, neváhejte nás kontaktovat.</p>
 {% else %}
 <h2>Assessment Started</h2>
-<p>Hi {{ customer_name }},</p>
+<p>{% if customer_name %}Hi {{ customer_name }},{% else %}Hi,{% endif %}</p>
 <p>You have started a new assessment: <strong>{{ checklist_title }}</strong></p>
-<p>You have {{ access_window_days or 7 }} days to complete this assessment from the start date. Once you start the assessment, the timer begins.</p>
+<div class="alert">
+    <p><strong>Time window:</strong> You have {{ access_window_days or 7 }} days to complete this assessment from the start date.</p>
+</div>
+<p>Once you start the assessment, the timer begins.</p>
 <p>If the assessment is not completed within this window, your assessment access will be forfeited.</p>
 <p>
     <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button" style="color: #ffffff; text-decoration: none;">Continue Assessment</a>

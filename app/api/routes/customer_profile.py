@@ -262,7 +262,10 @@ def update_profile(
             current_user.department = request.department.strip()
 
         if request.preferred_language is not None:
-            current_user.preferred_language = request.preferred_language.strip().lower()
+            normalized_lang = request.preferred_language.strip().lower()
+            if normalized_lang == "cz":
+                normalized_lang = "cs"
+            current_user.preferred_language = normalized_lang
         
         # Handle company creation/update if any company fields provided
         company_fields_provided = any([

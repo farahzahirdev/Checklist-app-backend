@@ -3,19 +3,27 @@
 {% block content %}
 {% if lang == 'cs' %}
 <h2>Platba byla úspěšná</h2>
-<p>Dobrý den, {{ customer_name }},</p>
+<p>{% if customer_name %}Dobrý den, {{ customer_name }},{% else %}Dobrý den,{% endif %}</p>
 <p>Vaše platba byla úspěšně zpracována.</p>
 <div class="alert">
     <p><strong>Částka:</strong> {{ amount_formatted or ((amount_cents or 0) / 100) ~ ' ' ~ (currency or 'USD') }}</p>
 </div>
+<p>Přístup k hodnocení je nyní aktivní a můžete pokračovat v práci.</p>
+<p>
+    <a href="{{ production_base_url }}/assessments" class="button" style="color: #ffffff; text-decoration: none;">Přejít na hodnocení</a>
+</p>
 <p>Děkujeme, že používáte AuditReady.</p>
 {% else %}
 <h2>Payment Successful</h2>
-<p>Hi {{ customer_name }},</p>
+<p>{% if customer_name %}Hi {{ customer_name }},{% else %}Hi,{% endif %}</p>
 <p>Your payment has been processed successfully.</p>
 <div class="alert">
     <p><strong>Amount:</strong> {{ amount_formatted or ((amount_cents or 0) / 100) ~ ' ' ~ (currency or 'USD') }}</p>
 </div>
+<p>Your assessment access is now active and you can continue your work.</p>
+<p>
+    <a href="{{ production_base_url }}/assessments" class="button" style="color: #ffffff; text-decoration: none;">Go to Assessments</a>
+</p>
 <p>Thank you for using AuditReady.</p>
 {% endif %}
 {% endblock %}

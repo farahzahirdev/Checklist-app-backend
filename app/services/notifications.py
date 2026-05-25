@@ -305,7 +305,12 @@ class NotificationService:
             if recipient_type == "customer":
                 if event.user_id:
                     user = self.db.get(User, event.user_id)
-                    if user and user.email and self._is_user_event_enabled(user, event.event_type):
+                    if (
+                        user
+                        and user.email
+                        and user.role == UserRole.customer
+                        and self._is_user_event_enabled(user, event.event_type)
+                    ):
                         recipients.add(user.email)
 
             elif recipient_type == "actor":

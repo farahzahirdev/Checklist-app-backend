@@ -321,11 +321,13 @@ def handle_webhook_event(db: Session, event: Any) -> PaymentState | None:
 
     if event_type in {"payment_intent.succeeded", "checkout.session.completed"} and payment.status == PaymentStatus.succeeded:
         try:
+            notify_user = db.get(User, payment.user_id)
+            notify_lang = getattr(notify_user, "preferred_language", "en") or "en"
             NotificationService(db).notify(
                 NotificationEvent(
                     event_type=NotificationEventType.PAYMENT_SUCCESS,
                     user_id=payment.user_id,
-                    lang_code="en",
+                    lang_code=notify_lang,
                     context={
                         "payment_id": str(payment.id),
                         "amount_cents": payment.amount_cents,
@@ -395,11 +397,12 @@ def admin_set_payment_status(
 
     if payment_status == PaymentStatus.succeeded:
         try:
+            notify_lang = getattr(user, "preferred_language", "en") or "en"
             NotificationService(db).notify(
                 NotificationEvent(
                     event_type=NotificationEventType.PAYMENT_SUCCESS,
                     user_id=payment.user_id,
-                    lang_code="en",
+                    lang_code=notify_lang,
                     context={
                         "payment_id": str(payment.id),
                         "amount_cents": payment.amount_cents,
