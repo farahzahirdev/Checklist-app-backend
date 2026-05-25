@@ -23,6 +23,7 @@ class AssessmentSummary(BaseModel):
     expires_at: datetime
     days_until_expiry: int
     has_report: bool = False
+    report_id: UUID | None = None
     report_status: str | None = None
     last_activity: datetime | None = None
 

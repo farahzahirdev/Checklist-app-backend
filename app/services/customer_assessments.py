@@ -100,19 +100,10 @@ def get_customer_assessments(
         .filter(Language.code == lang_code if lang_code != "en" else True)
     )
     
-    now = _now_utc()
-
     # Apply filters
     if status_filter:
-        # Explicit filter provided — use it as-is
+        # Explicit filter provided — use it as-is.
         query = query.filter(Assessment.status.in_(status_filter))
-    else:
-        # Default: only show active (non-submitted, non-closed, non-expired) assessments
-        # Also exclude assessments past their expiry date even if DB status hasn't been updated yet
-        query = query.filter(
-            Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
-            Assessment.expires_at > now,
-        )
     
     if checklist_type_filter:
         query = query.filter(ChecklistType.code.in_(checklist_type_filter))
@@ -171,9 +162,86 @@ def get_customer_assessments(
             expires_at=assessment.expires_at,
             days_until_expiry=_days_until_expiry(assessment.expires_at),
             has_report=report_details is not None,
+            report_id=report_details[0] if report_details else None,
             report_status=report_details[1] if report_details else None,
             last_activity=assessment.updated_at,
         ))
+
+    # Include purchased checklists with active access but without active assessment as synthetic "not_started" rows.
+    # This keeps customer audit lists complete on the first page, including newly purchased checklists.
+    should_include_synthetic_startables = skip == 0 and (
+        status_filter is None or AssessmentStatus.not_started in status_filter
+    )
+    if should_include_synthetic_startables:
+        synthetic_startables: list[AssessmentSummary] = []
+        available_checklists = _get_available_checklists(db, user_id, lang_code)
+        access_window_ids = [c.access_window_id for c in available_checklists if c.access_window_id is not None]
+        access_window_expiry: dict[UUID, datetime] = {}
+        if access_window_ids:
+            access_window_expiry = {
+                window_id: expires_at
+                for window_id, expires_at in db.execute(
+                    select(AccessWindow.id, AccessWindow.expires_at).where(AccessWindow.id.in_(access_window_ids))
+                ).all()
+            }
+
+        for checklist in available_checklists:
+            if not checklist.can_start or checklist.access_window_id is None:
+                continue
+
+            if checklist_type_filter and checklist.checklist_type_code not in checklist_type_filter:
+                continue
+
+            if search:
+                search_term = search.strip().lower()
+                if search_term and search_term not in checklist.title.lower() and search_term not in checklist.checklist_type_name.lower():
+                    continue
+
+            expires_at = access_window_expiry.get(checklist.access_window_id)
+            if not expires_at:
+                continue
+
+            synthetic_startables.append(
+                AssessmentSummary(
+                    id=checklist.access_window_id,
+                    checklist_id=checklist.checklist_id,
+                    checklist_title=checklist.title,
+                    checklist_type_code=checklist.checklist_type_code,
+                    checklist_version=checklist.version,
+                    status=AssessmentStatus.not_started,
+                    completion_percent=0,
+                    started_at=None,
+                    submitted_at=None,
+                    expires_at=expires_at,
+                    days_until_expiry=_days_until_expiry(expires_at),
+                    has_report=False,
+                    report_id=None,
+                    report_status=None,
+                    last_activity=None,
+                )
+            )
+
+        if synthetic_startables:
+            total += len(synthetic_startables)
+            result_assessments.extend(synthetic_startables)
+
+            if sort_by == "expires_at":
+                result_assessments.sort(
+                    key=lambda item: item.expires_at,
+                    reverse=(sort_order == "desc"),
+                )
+            elif sort_by == "status":
+                result_assessments.sort(
+                    key=lambda item: str(item.status),
+                    reverse=(sort_order == "desc"),
+                )
+            elif sort_by == "completion":
+                result_assessments.sort(
+                    key=lambda item: item.completion_percent,
+                    reverse=(sort_order == "desc"),
+                )
+
+            result_assessments = result_assessments[:limit]
     
     filters_applied = {
         "status": status_filter,
@@ -485,6 +553,7 @@ def get_customer_dashboard_enhanced(
             expires_at=assessment.expires_at,
             days_until_expiry=_days_until_expiry(assessment.expires_at),
             has_report=report_details is not None,
+            report_id=report_details[0] if report_details else None,
             report_status=report_details[1] if report_details else None,
             last_activity=assessment.updated_at,
         ))
@@ -526,6 +595,7 @@ def get_customer_dashboard_enhanced(
             expires_at=assessment.expires_at,
             days_until_expiry=_days_until_expiry(assessment.expires_at),
             has_report=report_details is not None,
+            report_id=report_details[0] if report_details else None,
             report_status=report_details[1] if report_details else None,
             last_activity=assessment.updated_at,
         ))
@@ -570,6 +640,7 @@ def get_customer_dashboard_enhanced(
             expires_at=assessment.expires_at,
             days_until_expiry=_days_until_expiry(assessment.expires_at),
             has_report=report_details is not None,
+            report_id=report_details[0] if report_details else None,
             report_status=report_details[1] if report_details else None,
             last_activity=assessment.updated_at,
         ))
