@@ -61,16 +61,40 @@ def _days_until_expiry(expires_at: datetime) -> int:
     return delta.days
 
 
-def _report_lookup_for_assessments(db: Session, assessment_ids: list[UUID]) -> dict[UUID, tuple[UUID, ReportStatus]]:
+def _report_lookup_for_assessments(db: Session, assessment_ids: list[UUID]) -> dict[UUID, tuple[UUID, ReportStatus, datetime | None]]:
     if not assessment_ids:
         return {}
 
     rows = db.execute(
-        select(Report.assessment_id, Report.id, Report.status).where(Report.assessment_id.in_(assessment_ids))
+        select(Report.assessment_id, Report.id, Report.status, Report.final_pdf_published_at).where(Report.assessment_id.in_(assessment_ids))
     ).all()
     return {
-        assessment_id: (report_id, report_status)
-        for assessment_id, report_id, report_status in rows
+        assessment_id: (report_id, report_status, final_pdf_published_at)
+        for assessment_id, report_id, report_status, final_pdf_published_at in rows
+    }
+
+
+def _access_window_lookup(
+    db: Session,
+    access_window_ids: list[UUID],
+) -> dict[UUID, tuple[datetime, datetime, datetime | None]]:
+    if not access_window_ids:
+        return {}
+
+    rows = db.execute(
+        select(
+            AccessWindow.id,
+            AccessWindow.activated_at,
+            AccessWindow.expires_at,
+            Payment.paid_at,
+        )
+        .outerjoin(Payment, Payment.id == AccessWindow.payment_id)
+        .where(AccessWindow.id.in_(access_window_ids))
+    ).all()
+
+    return {
+        access_window_id: (activated_at, expires_at, paid_at)
+        for access_window_id, activated_at, expires_at, paid_at in rows
     }
 
 
@@ -146,6 +170,10 @@ def get_customer_assessments(
     results = query.all() if should_include_synthetic_startables else query.offset(skip).limit(limit).all()
 
     report_lookup = _report_lookup_for_assessments(db, [assessment.id for assessment, *_ in results])
+    access_window_lookup = _access_window_lookup(
+        db,
+        [assessment.access_window_id for assessment, *_ in results],
+    )
 
     # Build response rows from persisted assessments.
     result_assessments = []
@@ -153,6 +181,7 @@ def get_customer_assessments(
         # Get translation
         title = translation.title if translation else f"Checklist v{checklist.version}"
         report_details = report_lookup.get(assessment.id)
+        access_window_details = access_window_lookup.get(assessment.access_window_id)
         
         result_assessments.append(AssessmentSummary(
             id=assessment.id,
@@ -169,6 +198,10 @@ def get_customer_assessments(
             has_report=report_details is not None,
             report_id=report_details[0] if report_details else None,
             report_status=report_details[1] if report_details else None,
+            report_published_at=report_details[2] if report_details else None,
+            purchased_at=access_window_details[2] if access_window_details else None,
+            access_window_started_at=access_window_details[0] if access_window_details else None,
+            access_window_expires_at=access_window_details[1] if access_window_details else assessment.expires_at,
             last_activity=assessment.updated_at,
         ))
 
@@ -176,14 +209,7 @@ def get_customer_assessments(
         synthetic_startables: list[AssessmentSummary] = []
         available_checklists = _get_available_checklists(db, user_id, lang_code)
         access_window_ids = [c.access_window_id for c in available_checklists if c.access_window_id is not None]
-        access_window_expiry: dict[UUID, datetime] = {}
-        if access_window_ids:
-            access_window_expiry = {
-                window_id: expires_at
-                for window_id, expires_at in db.execute(
-                    select(AccessWindow.id, AccessWindow.expires_at).where(AccessWindow.id.in_(access_window_ids))
-                ).all()
-            }
+        synthetic_access_window_lookup = _access_window_lookup(db, access_window_ids)
 
         for checklist in available_checklists:
             if not checklist.can_start or checklist.access_window_id is None:
@@ -197,9 +223,11 @@ def get_customer_assessments(
                 if search_term and search_term not in checklist.title.lower() and search_term not in checklist.checklist_type_name.lower():
                     continue
 
-            expires_at = access_window_expiry.get(checklist.access_window_id)
-            if not expires_at:
+            access_window_details = synthetic_access_window_lookup.get(checklist.access_window_id)
+            if not access_window_details:
                 continue
+
+            access_window_start, expires_at, purchased_at = access_window_details
 
             synthetic_startables.append(
                 AssessmentSummary(
@@ -217,6 +245,10 @@ def get_customer_assessments(
                     has_report=False,
                     report_id=None,
                     report_status=None,
+                    report_published_at=None,
+                    purchased_at=purchased_at,
+                    access_window_started_at=access_window_start,
+                    access_window_expires_at=expires_at,
                     last_activity=None,
                 )
             )

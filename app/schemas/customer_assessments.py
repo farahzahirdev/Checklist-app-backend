@@ -25,6 +25,10 @@ class AssessmentSummary(BaseModel):
     has_report: bool = False
     report_id: UUID | None = None
     report_status: str | None = None
+    report_published_at: datetime | None = None
+    purchased_at: datetime | None = None
+    access_window_started_at: datetime | None = None
+    access_window_expires_at: datetime | None = None
     last_activity: datetime | None = None
 
 
