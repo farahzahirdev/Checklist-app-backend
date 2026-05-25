@@ -16,6 +16,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
     ChangePasswordRequest,
+    CustomerMfaSupportRequest,
     CustomerProfileResponse,
     EmailPreferencesResponse,
     EmailPreferencesUpdateRequest,
@@ -23,6 +24,8 @@ from app.schemas.auth import (
     ProfileCompletionResponse,
     UpdateProfileRequest,
 )
+from app.schemas.support_ticket import SupportTicketResponse
+from app.services.support_tickets import create_ticket
 from app.utils.i18n import get_language_code
 from app.utils.i18n_messages import translate
 
@@ -36,6 +39,8 @@ def _serialize_profile(user: User, db: Session) -> dict:
     profile_data = {
         "id": user.id,
         "email": user.email,
+        "email_verified": bool(user.email_verified),
+        "email_verification_sent_at": user.email_verification_sent_at.isoformat() if user.email_verification_sent_at else None,
         "full_name": user.full_name,
         "username": user.username,
         "job_title": user.job_title,
@@ -123,6 +128,7 @@ def _build_profile_completion(user: User, db: Session) -> ProfileCompletionRespo
 
     mfa_record = getattr(user, "mfa_totp", None)
     mfa_complete = bool(mfa_record and mfa_record.is_verified)
+    email_verified_complete = bool(user.email_verified)
 
     notification_complete = all(
         value is not None
@@ -148,6 +154,7 @@ def _build_profile_completion(user: User, db: Session) -> ProfileCompletionRespo
     checks: list[ProfileCompletionItem] = [
         ProfileCompletionItem(section="profile", field="personal_details", label="Personal details completion", completed=personal_complete),
         ProfileCompletionItem(section="company", field="organizational_company_details", label="Organizational/company details completion", completed=company_complete),
+        ProfileCompletionItem(section="security", field="email_verified", label="Email verification completion", completed=email_verified_complete),
         ProfileCompletionItem(section="security", field="mfa_setup", label="MFA setup completion", completed=mfa_complete),
         ProfileCompletionItem(section="preferences", field="notification_preferences", label="Notification preference configuration completion", completed=notification_complete),
         ProfileCompletionItem(section="billing", field="billing_details", label="Billing details completion", completed=billing_complete),
@@ -583,3 +590,79 @@ def change_password(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=translate("password_change_failed", lang_code)
         ) from exc
+
+
+@router.post(
+    "/profile/mfa-support-request",
+    response_model=SupportTicketResponse,
+    summary="Create MFA Support Request",
+    description="Creates a support ticket for MFA reset/disable request and notifies admin/auditor recipients by email.",
+)
+def create_mfa_support_request(
+    request: CustomerMfaSupportRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    http_request: Request = None,
+) -> SupportTicketResponse:
+    from app.models.company import Company
+    from app.models.user import UserRole
+    from app.services.notifications import NotificationEvent, NotificationEventType, NotificationService
+
+    lang_code = get_language_code(http_request, db) if http_request else "en"
+
+    if str(current_user.role) != UserRole.customer.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("insufficient_permissions", lang_code))
+
+    company = None
+    if current_user.primary_company_id:
+        company = db.query(Company).filter(Company.id == current_user.primary_company_id).first()
+
+    request_type_label = {
+        "cs": {"reset": "Reset MFA", "disable": "Vypnutí MFA"},
+        "en": {"reset": "MFA reset", "disable": "MFA disable"},
+    }
+    localized_label = request_type_label.get(lang_code, request_type_label["en"]).get(request.request_type, request.request_type)
+    subject = f"MFA request: {localized_label}"
+
+    details_lines = [
+        f"MFA request type: {request.request_type}",
+        f"User ID: {current_user.id}",
+        f"Email: {current_user.email}",
+        f"Full name: {current_user.full_name or '-'}",
+        f"Username: {current_user.username or '-'}",
+        f"Company: {company.name if company else '-'}",
+        f"Company slug: {company.slug if company else '-'}",
+        "",
+        "User message:",
+        request.message.strip(),
+    ]
+    body = "\n".join(details_lines)
+
+    ticket = create_ticket(db, customer=current_user, subject=subject, message=body)
+
+    try:
+        NotificationService(db).notify(
+            NotificationEvent(
+                event_type=NotificationEventType.MFA_SUPPORT_REQUEST,
+                user_id=current_user.id,
+                actor_id=current_user.id,
+                lang_code=lang_code,
+                context={
+                    "support_ticket_id": str(ticket["id"]),
+                    "mfa_request_type": request.request_type,
+                    "mfa_request_type_label": localized_label,
+                    "mfa_request_message": request.message.strip(),
+                    "customer_id": str(current_user.id),
+                    "customer_email": current_user.email,
+                    "customer_name": current_user.full_name or "",
+                    "customer_username": current_user.username or "",
+                    "customer_company_name": company.name if company else "",
+                    "customer_company_slug": company.slug if company else "",
+                },
+            )
+        )
+    except Exception:
+        # Ticket creation is primary action; avoid failing request when notification dispatch fails.
+        pass
+
+    return SupportTicketResponse(**ticket)

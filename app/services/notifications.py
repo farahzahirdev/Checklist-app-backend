@@ -38,6 +38,8 @@ class NotificationEventType(StrEnum):
     PASSWORD_RESET_ISSUED = "password_reset_issued"
     PAYMENT_SUCCESS = "payment_success"
     SIGNUP_WELCOME = "signup_welcome"
+    EMAIL_VERIFICATION_REQUESTED = "email_verification_requested"
+    MFA_SUPPORT_REQUEST = "mfa_support_request"
 
 
 @dataclass
@@ -107,6 +109,16 @@ class NotificationService:
             "template": "signup_welcome.html",
             "subject": {"cs": "Vítejte v AuditReady", "en": "Thanks for signing up to AuditReady"},
             "recipients": ["customer"],
+        },
+        NotificationEventType.EMAIL_VERIFICATION_REQUESTED: {
+            "template": "email_verification_requested.html",
+            "subject": {"cs": "Ověření e-mailu", "en": "Verify your email"},
+            "recipients": ["customer"],
+        },
+        NotificationEventType.MFA_SUPPORT_REQUEST: {
+            "template": "mfa_support_request.html",
+            "subject": {"cs": "Požadavek na MFA podporu", "en": "MFA support request"},
+            "recipients": ["admin"],
         },
     }
 
@@ -340,6 +352,12 @@ class NotificationService:
         return list(recipients)
 
     def _is_user_event_enabled(self, user: User, event_type: NotificationEventType) -> bool:
+        if event_type in {
+            NotificationEventType.EMAIL_VERIFICATION_REQUESTED,
+            NotificationEventType.MFA_SUPPORT_REQUEST,
+        }:
+            return True
+
         if not bool(getattr(user, "email_notifications_enabled", True)):
             return False
 
@@ -474,6 +492,12 @@ class NotificationService:
             if base_url:
                 context.setdefault("production_base_url", base_url)
                 context.setdefault("reset_password_url", f"{base_url}/reset-password?token={context['reset_token']}")
+
+        if event.event_type == NotificationEventType.EMAIL_VERIFICATION_REQUESTED and context.get("verification_token"):
+            base_url = self._resolve_frontend_base_url(context)
+            if base_url:
+                context.setdefault("production_base_url", base_url)
+                context.setdefault("verify_email_url", f"{base_url}/verify-email?token={context['verification_token']}")
 
         return context
 

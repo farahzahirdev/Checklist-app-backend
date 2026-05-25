@@ -49,6 +49,10 @@ class User(Base):
     # Status
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     mfa_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    email_verification_token_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    email_verification_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_verification_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     preferred_language: Mapped[str] = mapped_column(String(5), nullable=False, default="en")
     email_notifications_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     email_pref_reports_alert: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.models.user import UserRole
 from app.schemas.auth import (
     AuthResponse,
+    EmailVerificationConfirmRequest,
     ForgotPasswordRequest,
     LoginRequest,
     MfaChallengeVerifyRequest,
@@ -20,8 +21,10 @@ from app.schemas.auth import (
 from app.schemas.common import MessageResponse
 from app.services.auth import (
     authenticate_user,
+    confirm_email_verification,
     confirm_mfa_enrollment,
     issue_forgot_password_reset,
+    issue_email_verification_request,
     register_user,
     reset_password_with_token,
     serialize_user,
@@ -99,6 +102,45 @@ def forgot_password(request: ForgotPasswordRequest, http_request: Request, db: S
         production_base_url=frontend_base_url,
     )
     return MessageResponse(message=translate("password_reset_email_sent_if_exists", lang_code))
+
+
+@router.post(
+    "/email-verification/request",
+    response_model=MessageResponse,
+    summary="Request Email Verification",
+    description="Requires bearer auth. Sends a bilingual verification email to the authenticated user.",
+)
+def request_email_verification(
+    http_request: Request,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> MessageResponse:
+    lang_code = get_language_code(http_request, db)
+    frontend_base_url = (http_request.headers.get("origin") or str(http_request.base_url)).rstrip("/")
+    issue_email_verification_request(
+        db,
+        user=current_user,
+        lang_code=lang_code,
+        production_base_url=frontend_base_url,
+    )
+    if lang_code == "cs":
+        return MessageResponse(message="Ověřovací e-mail byl odeslán.")
+    return MessageResponse(message="Verification email sent.")
+
+
+@router.post(
+    "/email-verification/confirm",
+    response_model=AuthResponse,
+    summary="Confirm Email Verification",
+    description="Confirms a one-time email verification token.",
+)
+def confirm_email_verification_token(
+    request: EmailVerificationConfirmRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+) -> AuthResponse:
+    lang_code = get_language_code(http_request, db)
+    return confirm_email_verification(db, token=request.token, lang_code=lang_code)
 
 
 @router.post(

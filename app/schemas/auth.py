@@ -1,4 +1,5 @@
 from enum import IntEnum
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -23,6 +24,15 @@ class ResetPasswordWithTokenRequest(BaseModel):
     token: str = Field(min_length=12)
     new_password: str = Field(min_length=8)
     confirm_password: str = Field(min_length=8)
+
+
+class EmailVerificationConfirmRequest(BaseModel):
+    token: str = Field(min_length=12)
+
+
+class CustomerMfaSupportRequest(BaseModel):
+    request_type: Literal["reset", "disable"] = Field(description="Requested MFA support action")
+    message: str = Field(min_length=5, max_length=5000)
 
 
 class RegistrationRequest(BaseModel):
@@ -90,6 +100,7 @@ class AuthUserResponse(BaseModel):
     username: str | None = None
     role: UserRoleCode
     is_active: bool
+    email_verified: bool = False
     mfa_required: bool = True
     preferred_language: str = "en"
     primary_company_id: UUID | None = None
@@ -132,6 +143,8 @@ class CustomerProfileResponse(BaseModel):
 
     id: UUID
     email: EmailStr
+    email_verified: bool = False
+    email_verification_sent_at: str | None = None
     full_name: str | None = None
     username: str | None = None
     job_title: str | None = None

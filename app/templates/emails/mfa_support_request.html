@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if lang == 'cs' %}
+<h2>Nový požadavek na MFA podporu</h2>
+<p>Byl vytvořen zákaznický ticket s požadavkem na MFA.</p>
+<div class="alert">
+    <p><strong>Typ požadavku:</strong> {{ mfa_request_type_label or mfa_request_type }}</p>
+    <p><strong>ID ticketu:</strong> {{ support_ticket_id or '-' }}</p>
+</div>
+<p><strong>Uživatel:</strong></p>
+<ul>
+    <li>ID: {{ customer_id or '-' }}</li>
+    <li>E-mail: {{ customer_email or '-' }}</li>
+    <li>Jméno: {{ customer_name or '-' }}</li>
+    <li>Uživatelské jméno: {{ customer_username or '-' }}</li>
+    <li>Firma: {{ customer_company_name or '-' }}</li>
+    <li>Slug firmy: {{ customer_company_slug or '-' }}</li>
+</ul>
+<p><strong>Zpráva uživatele:</strong></p>
+<p>{{ mfa_request_message or '-' }}</p>
+{% else %}
+<h2>New MFA support request</h2>
+<p>A customer support ticket was created for an MFA request.</p>
+<div class="alert">
+    <p><strong>Request type:</strong> {{ mfa_request_type_label or mfa_request_type }}</p>
+    <p><strong>Ticket ID:</strong> {{ support_ticket_id or '-' }}</p>
+</div>
+<p><strong>User details:</strong></p>
+<ul>
+    <li>ID: {{ customer_id or '-' }}</li>
+    <li>Email: {{ customer_email or '-' }}</li>
+    <li>Name: {{ customer_name or '-' }}</li>
+    <li>Username: {{ customer_username or '-' }}</li>
+    <li>Company: {{ customer_company_name or '-' }}</li>
+    <li>Company slug: {{ customer_company_slug or '-' }}</li>
+</ul>
+<p><strong>User message:</strong></p>
+<p>{{ mfa_request_message or '-' }}</p>
+{% endif %}
+{% endblock %}

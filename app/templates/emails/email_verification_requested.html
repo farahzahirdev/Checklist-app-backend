@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if lang == 'cs' %}
+<h2>Ověření e-mailu</h2>
+<p>{% if customer_name %}Dobrý den, {{ customer_name }},{% else %}Dobrý den,{% endif %}</p>
+<p>Pro dokončení ověření e-mailové adresy klikněte na tlačítko níže.</p>
+<div class="alert">
+    <p><strong>Poznámka:</strong> Ověřovací odkaz je časově omezen.</p>
+</div>
+{% if verify_email_url %}
+<p>
+    <a href="{{ verify_email_url }}" class="button" style="color: #ffffff; text-decoration: none;">Ověřit e-mail</a>
+</p>
+{% else %}
+<p>Přihlaste se do aplikace a požádejte o nové ověření e-mailu.</p>
+<p>
+    <a href="{{ production_base_url }}/login" class="button" style="color: #ffffff; text-decoration: none;">Přihlásit se</a>
+</p>
+{% endif %}
+{% else %}
+<h2>Email Verification</h2>
+<p>{% if customer_name %}Hi {{ customer_name }},{% else %}Hi,{% endif %}</p>
+<p>Please confirm your email address by clicking the button below.</p>
+<div class="alert">
+    <p><strong>Note:</strong> This verification link expires after a limited time.</p>
+</div>
+{% if verify_email_url %}
+<p>
+    <a href="{{ verify_email_url }}" class="button" style="color: #ffffff; text-decoration: none;">Verify Email</a>
+</p>
+{% else %}
+<p>Please sign in and request a new email verification link.</p>
+<p>
+    <a href="{{ production_base_url }}/login" class="button" style="color: #ffffff; text-decoration: none;">Sign In</a>
+</p>
+{% endif %}
+{% endif %}
+{% endblock %}

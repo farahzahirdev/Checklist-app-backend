@@ -93,6 +93,7 @@ def serialize_user(user: User, db: Session | None = None) -> AuthUserResponse:
         username=user.username,
         role=_role_to_code(user.role),
         is_active=bool(user.is_active),
+        email_verified=bool(user.email_verified),
         mfa_required=bool(user.mfa_required),
         preferred_language=(user.preferred_language or "en"),
         primary_company_id=user.primary_company_id,
@@ -110,8 +111,12 @@ def _get_mfa_record(db: Session, user_id: UUID) -> MfaTotp | None:
     return db.scalar(select(MfaTotp).where(MfaTotp.user_id == user_id))
 
 
-def _hash_reset_token(token: str) -> str:
+def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _hash_reset_token(token: str) -> str:
+    return _hash_token(token)
 
 
 def _audit(db: Session, *, actor_user: User | None, action: AuditAction, target_entity: str, target_id: UUID | None = None) -> None:
@@ -558,3 +563,69 @@ def reset_password_with_token(
         )
     )
     db.commit()
+
+
+def issue_email_verification_request(
+    db: Session,
+    *,
+    user: User,
+    lang_code: str = "en",
+    production_base_url: str | None = None,
+) -> None:
+    now = datetime.now(timezone.utc)
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = _hash_token(raw_token)
+
+    user.email_verification_token_hash = token_hash
+    user.email_verification_sent_at = now
+    user.email_verification_expires_at = now + timedelta(hours=24)
+    db.add(user)
+    db.commit()
+
+    try:
+        from app.services.notifications import NotificationEvent, NotificationEventType, NotificationService
+
+        NotificationService(db).notify(
+            NotificationEvent(
+                event_type=NotificationEventType.EMAIL_VERIFICATION_REQUESTED,
+                user_id=user.id,
+                lang_code=lang_code,
+                context={
+                    "verification_token": raw_token,
+                    "production_base_url": production_base_url,
+                },
+            )
+        )
+    except Exception:
+        pass
+
+
+def confirm_email_verification(
+    db: Session,
+    *,
+    token: str,
+    lang_code: str = "en",
+) -> AuthResponse:
+    token_hash = _hash_token(token)
+    now = datetime.now(timezone.utc)
+
+    user = db.scalar(
+        select(User).where(
+            User.email_verification_token_hash == token_hash,
+            User.email_verification_expires_at.is_not(None),
+            User.email_verification_expires_at > now,
+        )
+    )
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=translate("invalid_token", lang_code))
+
+    user.email_verified = True
+    user.email_verification_token_hash = None
+    user.email_verification_expires_at = None
+    db.add(user)
+
+    _audit(db, actor_user=user, action=AuditAction.auth_profile_update, target_entity="user", target_id=user.id)
+    db.commit()
+    db.refresh(user)
+
+    return AuthResponse(user=serialize_user(user, db), mfa_required=False, mfa_enabled=bool(_get_mfa_record(db, user.id)))

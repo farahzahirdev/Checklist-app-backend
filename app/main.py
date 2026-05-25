@@ -35,6 +35,8 @@ from app.schemas.media import MediaResponse, MediaUploadResponse
 from app.schemas.auth import (
 	AuthResponse,
 	AuthUserResponse,
+	CustomerMfaSupportRequest,
+	EmailVerificationConfirmRequest,
 	LoginRequest,
 	MfaChallengeVerifyRequest,
 	MfaVerifyRequest,
@@ -258,7 +260,9 @@ def custom_openapi() -> dict:
 		AuthUserResponse,
 		AuthResponse,
 		LoginRequest,
+		EmailVerificationConfirmRequest,
 		MfaChallengeVerifyRequest,
+		CustomerMfaSupportRequest,
 		RegistrationRequest,
 		RoleAssignment,
 		MfaVerifyRequest,
