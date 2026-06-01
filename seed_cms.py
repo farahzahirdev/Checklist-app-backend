@@ -37,6 +37,51 @@ def _extract_html_fragment(raw_html: str) -> str:
     return html_module.unescape(raw_html.strip())
 
 
+def _normalize_legal_html(raw_html: str) -> str:
+    """Strip Word/MSO-specific markup so legal pages are readable in CMS and frontend."""
+    html = raw_html
+
+    # Remove conditional comments, XML islands, and style/script blocks.
+    html = re.sub(r"<!--\[if[\s\S]*?<!\[endif\]-->", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<xml[\s\S]*?</xml>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<style[\s\S]*?</style>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<script[\s\S]*?</script>", "", html, flags=re.IGNORECASE)
+
+    # Drop Office tags and wrappers.
+    html = re.sub(r"</?o:[^>]+>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"</?w:[^>]+>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"</?st1:[^>]+>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"</?font[^>]*>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"</?span[^>]*>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<div[^>]*>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"</div>", "", html, flags=re.IGNORECASE)
+
+    # Remove noisy attributes and comments.
+    html = re.sub(r"\sclass\s*=\s*\"[^\"]*\"", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"\sstyle\s*=\s*\"[^\"]*\"", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"\salign\s*=\s*\"[^\"]*\"", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"\sxmlns(:[a-z0-9_-]+)?\s*=\s*\"[^\"]*\"", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"\sdir\s*=\s*\"[^\"]*\"", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<\?xml[^>]*>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<!--[^>]*-->", "", html, flags=re.IGNORECASE)
+
+    # Remove Office placeholder tags and simplify line breaks.
+    html = re.sub(r"<o:p>\s*(?:&nbsp;|\u00a0)?\s*</o:p>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<br\s*/?>", "<br>", html, flags=re.IGNORECASE)
+
+    # Flatten any remaining full-document wrappers.
+    html = re.sub(r"<html[^>]*>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"</html>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<head[\s\S]*?</head>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"<body[^>]*>", "", html, flags=re.IGNORECASE)
+    html = re.sub(r"</body>", "", html, flags=re.IGNORECASE)
+
+    # Normalize whitespace between tags.
+    html = re.sub(r">\s+<", "><", html)
+    html = re.sub(r"\n{3,}", "\n\n", html)
+    return html.strip()
+
+
 def _has_visible_text(raw_html: str) -> bool:
     text = re.sub(r"<[^>]+>", " ", raw_html)
     text = html_module.unescape(text)
@@ -60,7 +105,7 @@ def _load_legal_html(filename: str, fallback: str) -> str:
     for file_path in candidate_paths:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
-                fragment = _extract_html_fragment(f.read())
+                fragment = _normalize_legal_html(_extract_html_fragment(f.read()))
                 if _has_visible_text(fragment):
                     return fragment
         except OSError:
