@@ -49,6 +49,13 @@ class SectionType(StrEnum):
     documentation_grid = "documentation-grid"
     bundles = "bundles"
     why_choose = "why-choose"
+    # Product detail page section types
+    product_hero = "product-hero"
+    product_cta = "product-cta"
+    main_benefit = "main-benefit"
+    what_you_get = "what-you-get"
+    who_its_for = "who-its-for"
+    why_choose = "why-choose"
 
 
 class Page(Base):

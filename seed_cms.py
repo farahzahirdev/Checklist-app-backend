@@ -2412,6 +2412,123 @@ PAGES_DATA = {
             ]
         }
     },
+    # ======================================================================
+    # PRODUCT DETAIL PAGES - Enable CMS-based product content editing
+    # ======================================================================
+    "product-audit-readiness-checklist": {
+        "en": {
+            "title": "Audit Readiness Checklist",
+            "meta_description": "Prepare for audits with confidence. Simplify complex compliance requirements.",
+            "status": "published",
+            "content_type": "product_catalog",
+            "sections": [
+                {
+                    "section_type": "product-hero",
+                    "order": 1,
+                    "data": {
+                        "product_title": "Audit Readiness Checklist",
+                        "product_status": "published",
+                        "short_description": "Prepare for audits with confidence",
+                        "tagline": "Simplify complex compliance requirements into clear, actionable steps",
+                        "main_benefits": [
+                            "Identify gaps before the auditor arrives",
+                            "Validate your current security and compliance posture",
+                            "Get a clear path to audit readiness",
+                            "Save time and reduce audit stress"
+                        ],
+                        "features": [
+                            {
+                                "title": "Guided Assessment",
+                                "description": "We break down requirements into clear, structured questions"
+                            },
+                            {
+                                "title": "Evidence Upload",
+                                "description": "Attach documents and screenshots to support your answers"
+                            },
+                            {
+                                "title": "Expert Review",
+                                "description": "Our team reviews your assessment and validates the evidence"
+                            },
+                            {
+                                "title": "Professional Report",
+                                "description": "Get a structured report with gaps, findings, and recommendations"
+                            }
+                        ],
+                        "how_it_works_title": "Simple 5-Step Process",
+                        "how_it_works_description": "Go from uncertainty to audit-ready"
+                    }
+                },
+                {
+                    "section_type": "product-cta",
+                    "order": 2,
+                    "data": {
+                        "primary_cta_text": "Get Access",
+                        "primary_cta_url": "/products",
+                        "secondary_cta_text": "Learn More",
+                        "secondary_cta_url": "/products",
+                        "cta_headline": "Ready to close your gaps and get audit-ready?",
+                        "cta_subheadline": "Start your assessment now and see where you stand."
+                    }
+                }
+            ]
+        },
+        "cs": {
+            "title": "Checklist pro auditní připravenost",
+            "meta_description": "Připravte se na audit s jistotou. Zjednodušte složité požadavky.",
+            "status": "published",
+            "content_type": "product_catalog",
+            "sections": [
+                {
+                    "section_type": "product-hero",
+                    "order": 1,
+                    "data": {
+                        "product_title": "Checklist pro auditní připravenost",
+                        "product_status": "published",
+                        "short_description": "Připravte se na audit s jistotou",
+                        "tagline": "Zjednodušte složité požadavky do jasných a akčních kroků",
+                        "main_benefits": [
+                            "Identifikujte mezery před příchodem auditora",
+                            "Potvrďte svou aktuální bezpečnost a compliance stav",
+                            "Získejte jasnou cestu k auditní připravenosti",
+                            "Ušetřete čas a snižte stres v auditu"
+                        ],
+                        "features": [
+                            {
+                                "title": "Řízené hodnocení",
+                                "description": "Rozšíříme požadavky do jasných, strukturovaných otázek"
+                            },
+                            {
+                                "title": "Nahrání důkazů",
+                                "description": "Připojte dokumenty a snímky obrazovky na podporu svých odpovědí"
+                            },
+                            {
+                                "title": "Odborný přehled",
+                                "description": "Náš tým si přečte vaše hodnocení a ověří důkazy"
+                            },
+                            {
+                                "title": "Profesionální report",
+                                "description": "Získejte strukturovaný report s mezerami, zjištěním a doporučením"
+                            }
+                        ],
+                        "how_it_works_title": "Jednoduchý 5kroků postup",
+                        "how_it_works_description": "Od nejistoty k auditní připravenosti"
+                    }
+                },
+                {
+                    "section_type": "product-cta",
+                    "order": 2,
+                    "data": {
+                        "primary_cta_text": "Získat přístup",
+                        "primary_cta_url": "/products",
+                        "secondary_cta_text": "Více informací",
+                        "secondary_cta_url": "/products",
+                        "cta_headline": "Chcete uzavřít mezery a být audit-ready?",
+                        "cta_subheadline": "Začněte svůj assessment nyní a zjistěte, kde jste."
+                    }
+                }
+            ]
+        }
+    },
 }
 
 # About page is now maintained outside CMS and must not be seeded.
