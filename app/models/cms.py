@@ -55,7 +55,6 @@ class SectionType(StrEnum):
     main_benefit = "main-benefit"
     what_you_get = "what-you-get"
     who_its_for = "who-its-for"
-    why_choose = "why-choose"
 
 
 class Page(Base):
