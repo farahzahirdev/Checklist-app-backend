@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, desc, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import get_settings
 from app.services.company_context import resolve_company_id, user_has_company_access
@@ -28,6 +28,7 @@ from app.models.user import User, UserRole
 from app.utils.i18n import DEFAULT_LANGUAGE_CODE
 from app.utils.audit_logger import AuditLogger
 from app.schemas.assessment import (
+    AssessmentAnswerOptionResponse,
     AssessmentAnswerResponse,
     AssessmentDetailResponse,
     AssessmentQuestionResponse,
@@ -558,6 +559,97 @@ def _section_translation_for_language(
     )
 
 
+_DEFAULT_ANSWER_LABELS: dict[int, str] = {
+    4: "Yes",
+    3: "Partially",
+    2: "No",
+    1: "Don't know",
+}
+
+
+def _guidance_for_score(translation: ChecklistQuestionTranslation | None, score: int) -> str | None:
+    if translation is None:
+        return None
+    guidance_by_score = {
+        4: translation.guidance_score_4,
+        3: translation.guidance_score_3,
+        2: translation.guidance_score_2,
+        1: translation.guidance_score_1,
+    }
+    value = guidance_by_score.get(score)
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def _translation_answer_option_overrides(
+    translation: ChecklistQuestionTranslation | None,
+) -> dict[int, dict[str, str | None]]:
+    if translation is None or not translation.answer_options:
+        return {}
+    overrides: dict[int, dict[str, str | None]] = {}
+    for item in translation.answer_options:
+        if not isinstance(item, dict):
+            continue
+        position = item.get("position")
+        if not isinstance(position, int):
+            continue
+        overrides[position] = {
+            "label": item.get("label"),
+            "description": item.get("description"),
+        }
+    return overrides
+
+
+def _answer_options_for_assessment(
+    question: ChecklistQuestion,
+    translation: ChecklistQuestionTranslation | None,
+) -> list[AssessmentAnswerOptionResponse]:
+    overrides = _translation_answer_option_overrides(translation)
+    db_options = sorted(getattr(question, "answer_options", []) or [], key=lambda option: option.position)
+
+    if db_options:
+        responses: list[AssessmentAnswerOptionResponse] = []
+        for option in db_options:
+            override = overrides.get(option.position, {})
+            override_label = override.get("label")
+            override_description = override.get("description")
+            label = (override_label if override_label else None) or option.label
+            description = (
+                (override_description if override_description else None)
+                or (option.description.strip() if option.description else None)
+                or _guidance_for_score(translation, option.score)
+            )
+            responses.append(
+                AssessmentAnswerOptionResponse(
+                    position=option.position,
+                    label=label,
+                    score=option.score,
+                    choice_code=option.choice_code,
+                    description=description,
+                )
+            )
+        return responses
+
+    # No persisted options — synthesize the standard four choices from translation guidance.
+    synthesized: list[AssessmentAnswerOptionResponse] = []
+    for position, score in enumerate([4, 3, 2, 1], start=1):
+        override = overrides.get(position, {})
+        label = override.get("label") or _DEFAULT_ANSWER_LABELS[score]
+        description = override.get("description") or _guidance_for_score(translation, score)
+        synthesized.append(
+            AssessmentAnswerOptionResponse(
+                position=position,
+                label=label,
+                score=score,
+                choice_code=None,
+                description=description,
+            )
+        )
+    return synthesized
+
+
 def _question_translation_for_language(
     db: Session, question_id: UUID, lang_code: str | None
 ) -> ChecklistQuestionTranslation | None:
@@ -675,6 +767,7 @@ def _to_assessment_question_response(
             }
             for evidence in evidence_files
         ],
+        answer_options=_answer_options_for_assessment(question, translation),
         sub_questions=sub_questions,
     )
 
@@ -698,6 +791,7 @@ def _serialize_assessment_detail(
 
     questions = db.scalars(
         select(ChecklistQuestion)
+        .options(selectinload(ChecklistQuestion.answer_options))
         .where(
             ChecklistQuestion.checklist_id == checklist.id,
             ChecklistQuestion.is_active.is_(True),

@@ -51,6 +51,14 @@ class AssessmentSubmitResponse(BaseModel):
     completion_percent: float
 
 
+class AssessmentAnswerOptionResponse(BaseModel):
+    position: int
+    label: str | None = None
+    score: int
+    choice_code: str | None = None
+    description: str | None = None
+
+
 class AssessmentQuestionResponse(BaseModel):
     id: UUID
     checklist_id: UUID
@@ -78,6 +86,7 @@ class AssessmentQuestionResponse(BaseModel):
     user_note: str | None = None
     evidence_rule: EvidenceRuleResponse
     evidence_files: list[dict] = []
+    answer_options: list[AssessmentAnswerOptionResponse] = []
     sub_questions: list[AssessmentQuestionResponse] = []
 
 
