@@ -13,7 +13,7 @@
 <p>Nové hodnocení bylo odesláno zákazníkem a čeká na kontrolu: <strong>{{ checklist_title }}</strong></p>
 {% endif %}
 <p>
-    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button" style="color: #ffffff; text-decoration: none;">Zobrazit hodnocení</a>
+    <a href="{{ production_base_url }}{% if customer_name %}/assessment?assessment_id={{ assessment_id }}{% else %}/admin/assessments/{{ assessment_id }}{% endif %}" class="button" style="color: #ffffff; text-decoration: none;">Zobrazit hodnocení</a>
 </p>
 {% else %}
 <h2>Assessment Submitted</h2>
@@ -27,7 +27,7 @@
 <p>A new assessment has been submitted by a customer and is awaiting review: <strong>{{ checklist_title }}</strong></p>
 {% endif %}
 <p>
-    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button" style="color: #ffffff; text-decoration: none;">View Assessment</a>
+    <a href="{{ production_base_url }}{% if customer_name %}/assessment?assessment_id={{ assessment_id }}{% else %}/admin/assessments/{{ assessment_id }}{% endif %}" class="button" style="color: #ffffff; text-decoration: none;">View Assessment</a>
 </p>
 {% endif %}
 {% endblock %}

@@ -10,7 +10,7 @@
 </div>
 <p>Přístup k hodnocení je nyní aktivní a můžete pokračovat v práci.</p>
 <p>
-    <a href="{{ production_base_url }}/assessments" class="button" style="color: #ffffff; text-decoration: none;">Přejít na hodnocení</a>
+    <a href="{{ production_base_url }}{% if checklist_id %}/assessment?checklist_id={{ checklist_id }}{% else %}/access{% endif %}" class="button" style="color: #ffffff; text-decoration: none;">Přejít na hodnocení</a>
 </p>
 <p>Děkujeme, že používáte AuditReady.</p>
 {% else %}
@@ -22,7 +22,7 @@
 </div>
 <p>Your assessment access is now active and you can continue your work.</p>
 <p>
-    <a href="{{ production_base_url }}/assessments" class="button" style="color: #ffffff; text-decoration: none;">Go to Assessments</a>
+    <a href="{{ production_base_url }}{% if checklist_id %}/assessment?checklist_id={{ checklist_id }}{% else %}/access{% endif %}" class="button" style="color: #ffffff; text-decoration: none;">Go to Assessments</a>
 </p>
 <p>Thank you for using AuditReady.</p>
 {% endif %}

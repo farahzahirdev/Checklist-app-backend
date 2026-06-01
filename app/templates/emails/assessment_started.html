@@ -11,7 +11,7 @@
 <p>Jakmile hodnocení spustíte, začne běžet časový limit.</p>
 <p>Pokud hodnocení nedokončíte v tomto okně, přístup k hodnocení propadne.</p>
 <p>
-    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button" style="color: #ffffff; text-decoration: none;">Pokračovat v hodnocení</a>
+    <a href="{{ production_base_url }}/assessment?assessment_id={{ assessment_id }}" class="button" style="color: #ffffff; text-decoration: none;">Pokračovat v hodnocení</a>
 </p>
 <p>Pokud máte jakékoli dotazy, neváhejte nás kontaktovat.</p>
 {% else %}
@@ -24,7 +24,7 @@
 <p>Once you start the assessment, the timer begins.</p>
 <p>If the assessment is not completed within this window, your assessment access will be forfeited.</p>
 <p>
-    <a href="{{ production_base_url }}/assessments/{{ assessment_id }}" class="button" style="color: #ffffff; text-decoration: none;">Continue Assessment</a>
+    <a href="{{ production_base_url }}/assessment?assessment_id={{ assessment_id }}" class="button" style="color: #ffffff; text-decoration: none;">Continue Assessment</a>
 </p>
 <p>If you have any questions, please don't hesitate to contact us.</p>
 {% endif %}
