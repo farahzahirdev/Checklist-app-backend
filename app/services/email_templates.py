@@ -46,16 +46,18 @@ class EmailTemplateRenderer:
         if context is None:
             context = {}
 
-        # Determine production_base_url: from context, runtime settings, or static config
-        production_base_url = context.get("production_base_url")
+        # Determine production_base_url for template links: prefer frontend URL.
+        production_base_url = context.get("production_frontend_url") or context.get("production_base_url")
         if production_base_url is None and db is not None:
             try:
                 from app.services.settings_manager import get_runtime_str
-                production_base_url = get_runtime_str(db, "production_base_url", self.settings.production_base_url)
+                production_base_url = get_runtime_str(db, "production_frontend_url", self.settings.production_frontend_url)
+                if not production_base_url:
+                    production_base_url = get_runtime_str(db, "production_base_url", self.settings.production_base_url)
             except Exception:
-                production_base_url = self.settings.production_base_url
+                production_base_url = self.settings.production_frontend_url or self.settings.production_base_url
         if production_base_url is None:
-            production_base_url = self.settings.production_base_url
+            production_base_url = self.settings.production_frontend_url or self.settings.production_base_url
 
         # Add global branding context
         context.update(
@@ -64,6 +66,7 @@ class EmailTemplateRenderer:
                 "from_email": self.settings.email_from_address,
                 "from_name": self.settings.email_from_name,
                 "production_base_url": production_base_url,
+                "production_frontend_url": production_base_url,
                 "support_email": self.settings.email_reply_to or self.settings.email_from_address,
                 "app_year": 2026,  # Update annually or make dynamic
             }

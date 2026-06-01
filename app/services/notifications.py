@@ -428,13 +428,17 @@ class NotificationService:
         return grouped
 
     def _resolve_frontend_base_url(self, context: dict) -> str:
-        base_url = (context.get("production_base_url") or "").strip()
+        base_url = (context.get("production_frontend_url") or "").strip()
+        if not base_url:
+            base_url = (context.get("production_base_url") or "").strip()
         if not base_url:
             try:
                 from app.services.settings_manager import get_runtime_str
-                base_url = get_runtime_str(self.db, "production_base_url", self.settings.production_base_url)
+                base_url = get_runtime_str(self.db, "production_frontend_url", self.settings.production_frontend_url)
+                if not base_url:
+                    base_url = get_runtime_str(self.db, "production_base_url", self.settings.production_base_url)
             except Exception:
-                base_url = self.settings.production_base_url
+                base_url = self.settings.production_frontend_url or self.settings.production_base_url
 
         base_url = (base_url or "").strip()
         if not base_url:
@@ -487,14 +491,17 @@ class NotificationService:
                 context.setdefault("actor_email", actor.email)
                 context.setdefault("actor_name", actor.email.split("@")[0])
 
+        base_url = self._resolve_frontend_base_url(context)
+        if base_url:
+            context.setdefault("production_base_url", base_url)
+            context.setdefault("production_frontend_url", base_url)
+
         if event.event_type == NotificationEventType.PASSWORD_RESET_ISSUED and context.get("reset_token"):
-            base_url = self._resolve_frontend_base_url(context)
             if base_url:
                 context.setdefault("production_base_url", base_url)
                 context.setdefault("reset_password_url", f"{base_url}/reset-password?token={context['reset_token']}")
 
         if event.event_type == NotificationEventType.EMAIL_VERIFICATION_REQUESTED and context.get("verification_token"):
-            base_url = self._resolve_frontend_base_url(context)
             if base_url:
                 context.setdefault("production_base_url", base_url)
                 context.setdefault("verify_email_url", f"{base_url}/verify-email?token={context['verification_token']}")
