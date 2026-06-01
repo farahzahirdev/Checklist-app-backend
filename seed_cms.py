@@ -548,10 +548,7 @@ TERMS_OF_SERVICE_HTML_CS = _load_legal_html(
 
 TERMS_OF_SERVICE_HTML_EN = _load_legal_html(
     "AuditReady_Terms_of_Service_en.html",
-    _format_fallback_html(
-        "Terms of Service",
-        "Terms of Service content will be added here.",
-    ),
+    TERMS_OF_SERVICE_HTML_CS,
 )
 
 # Page content data structure - comprehensive content from all frontend pages
