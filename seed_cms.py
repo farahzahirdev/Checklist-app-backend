@@ -1395,11 +1395,32 @@ PAGES_DATA = {
                     "section_type": "hero",
                     "order": 1,
                     "data": {
-                        "title": "Close Gaps. Save Time.",
-                        "subtitle": "Get Expert-Ready",
+                        "title_line1": "Close Gaps. Save Time.",
+                        "title_line2": "Get Expert-Ready",
                         "accent": "Documentation.",
+                        "subtitle": "Buy individual policy sections with ready-to-use templates, guidelines, and admin instructions - written by security experts, aligned to ISO 27001, NIS2, and best practices.",
                         "description": "Buy individual policy sections with ready-to-use templates, guidelines, and admin instructions - written by security experts, aligned to ISO 27001, NIS2, and best practices.",
                         "kicker": "Documentation blueprints",
+                        "quick_links": [
+                            {
+                                "title": "Audit-ready",
+                                "subtitle": "Aligned to frameworks",
+                                "url": "#audits-checklists",
+                                "icon": "shield"
+                            },
+                            {
+                                "title": "Instant delivery",
+                                "subtitle": "Download and use",
+                                "url": "#documentation",
+                                "icon": "document"
+                            },
+                            {
+                                "title": "Expert written",
+                                "subtitle": "Practical. Clear. Complete.",
+                                "url": "#plans",
+                                "icon": "stack"
+                            }
+                        ],
                         "highlights": [
                             {
                                 "title": "Audit-ready",
@@ -1629,11 +1650,32 @@ PAGES_DATA = {
                     "section_type": "hero",
                     "order": 1,
                     "data": {
-                        "title": "Uzavřete mezery. Ušetřete čas.",
-                        "subtitle": "Získejte dokumentaci",
+                        "title_line1": "Uzavřete mezery. Ušetřete čas.",
+                        "title_line2": "Získejte dokumentaci",
                         "accent": "připravenou pro audit.",
+                        "subtitle": "Kupte jednotlivé části zásad s připravenými šablonami, doporučeními a admin instrukcemi - napsané bezpečnostními experty, sladěné s ISO 27001, NIS2 a best practices.",
                         "description": "Kupte jednotlivé části zásad s připravenými šablonami, doporučeními a admin instrukcemi – napsané bezpečnostními experty, sladěné s ISO 27001, NIS2 a best practices.",
                         "kicker": "Dokumentační šablony",
+                        "quick_links": [
+                            {
+                                "title": "Audit-ready",
+                                "subtitle": "Sladěno s rámci",
+                                "url": "#audits-checklists",
+                                "icon": "shield"
+                            },
+                            {
+                                "title": "Okamžité doručení",
+                                "subtitle": "Stáhněte a použijte",
+                                "url": "#documentation",
+                                "icon": "document"
+                            },
+                            {
+                                "title": "Napsané experty",
+                                "subtitle": "Praktické. Jasné. Kompletní.",
+                                "url": "#plans",
+                                "icon": "stack"
+                            }
+                        ],
                         "highlights": [
                             {
                                 "title": "Audit-ready",
