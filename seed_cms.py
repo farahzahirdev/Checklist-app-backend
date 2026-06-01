@@ -1484,6 +1484,10 @@ PAGES_DATA = {
                     "section_type": "documentation-grid",
                     "order": 3,
                     "data": {
+                        "audits_title": "Audit Readiness Checklists",
+                        "audits_subtitle": "Select an expert-built checklist, complete your assessment, and export an actionable report.",
+                        "documentation_title": "Browse Documentation Sections",
+                        "documentation_subtitle": "Each section includes a policy, user guidelines, and admin guidelines.",
                         "title": "Browse Documentation Sections",
                         "subtitle": "Each section includes a policy, user guidelines, and admin guidelines.",
                         "categories": [
@@ -1739,6 +1743,10 @@ PAGES_DATA = {
                     "section_type": "documentation-grid",
                     "order": 3,
                     "data": {
+                        "audits_title": "Checklisty připravenosti na audit",
+                        "audits_subtitle": "Vyberte checklist vytvořený experty, dokončete hodnocení a exportujte akční report.",
+                        "documentation_title": "Procházet sekce dokumentace",
+                        "documentation_subtitle": "Každá sekce obsahuje zásadu, uživatelské a admin pokyny.",
                         "title": "Procházet sekce dokumentace",
                         "subtitle": "Každá sekce obsahuje zásadu, uživatelské a admin pokyny.",
                         "categories": [
