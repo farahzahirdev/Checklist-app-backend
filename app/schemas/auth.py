@@ -203,6 +203,7 @@ class UpdateProfileRequest(BaseModel):
     company_website: str | None = Field(None, description="Company website")
     company_industry: str | None = Field(None, max_length=255, description="Industry")
     company_country: str | None = Field(None, max_length=255, description="Country")
+    company_region: str | None = Field(None, max_length=100, description="Geographic region (EU, US, APAC, etc.)")
     company_size: str | None = Field(None, max_length=100, description="Company size")
     company_description: str | None = Field(None, description="Company description")
     billing_contact_name: str | None = Field(None, max_length=255, description="Billing contact name")

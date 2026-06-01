@@ -400,6 +400,7 @@ def update_profile(
                     website=request.company_website.strip() if request.company_website else None,
                     industry=request.company_industry.strip() if request.company_industry else None,
                     country=request.company_country.strip() if request.company_country else None,
+                    region=request.company_region.strip() if request.company_region else None,
                     size=request.company_size.strip() if request.company_size else None,
                     description=request.company_description.strip() if request.company_description else None,
                     billing_contact_name=request.billing_contact_name.strip() if request.billing_contact_name else None,
@@ -454,6 +455,8 @@ def update_profile(
                         company.industry = request.company_industry.strip() if request.company_industry else None
                     if request.company_country is not None:
                         company.country = request.company_country.strip() if request.company_country else None
+                    if request.company_region is not None:
+                        company.region = request.company_region.strip() if request.company_region else None
                     if request.company_size is not None:
                         company.size = request.company_size.strip() if request.company_size else None
                     if request.company_description is not None:
