@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20260602_add_section_category'
-down_revision = None
+down_revision = '20260525_0003'
 branch_labels = None
 depends_on = None
 
