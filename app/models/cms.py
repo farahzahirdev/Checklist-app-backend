@@ -57,6 +57,13 @@ class SectionType(StrEnum):
     who_its_for = "who-its-for"
 
 
+class SectionCategory(StrEnum):
+    """Categorizes sections by their position on the page (header/body/footer)"""
+    header = "header"
+    body = "body"
+    footer = "footer"
+
+
 class Page(Base):
     """
     CMS Page model for managing marketing and public pages.
@@ -122,6 +129,9 @@ class PageSection(Base):
     
     # Section type determines how data is rendered
     section_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    
+    # Section category (header/body/footer) for UI organization
+    section_category: Mapped[str] = mapped_column(String(20), nullable=False, default="body")
     
     # Order of sections on the page
     order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

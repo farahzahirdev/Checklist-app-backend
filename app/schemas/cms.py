@@ -17,6 +17,10 @@ class PageSectionBase(BaseModel):
             "documentation-grid, bundles, why-choose, use_cases, steps, contact_info, legal, standard"
         ),
     )
+    section_category: str = Field(
+        default="body",
+        description="Section category for UI organization: header, body, or footer"
+    )
     order: int = Field(default=0, description="Order of section on page")
     data: Optional[dict] = Field(default=None, description="Flexible JSON data for section content")
 
@@ -31,6 +35,7 @@ class PageSectionCreateRequest(PageSectionCreate):
 
 class PageSectionUpdate(BaseModel):
     section_type: Optional[str] = None
+    section_category: Optional[str] = None
     order: Optional[int] = None
     data: Optional[dict] = None
 
