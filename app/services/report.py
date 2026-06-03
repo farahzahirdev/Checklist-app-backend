@@ -130,8 +130,11 @@ def _question_content(db: Session, question_id: UUID) -> tuple[str, str | None]:
     )
     if translation is None:
         return "", None
-    recommendation = translation.recommendation_template or translation.expected_implementation
-    recommendation = sanitize_html(recommendation)
+    # Only use recommendation_template for recommendations, not expected_implementation
+    # Expected implementation should remain as checklist guidance only
+    recommendation = translation.recommendation_template
+    if recommendation:
+        recommendation = sanitize_html(recommendation)
     return translation.question_text, recommendation
 
 
