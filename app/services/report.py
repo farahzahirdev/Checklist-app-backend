@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentStatus, PriorityLevel
 from app.models.assessment_review import AssessmentReview, AnswerReview, SuggestionType, ReviewStatus, ReviewHistory
-from app.models.checklist import ChecklistQuestion, ChecklistQuestionTranslation
+from app.models.checklist import ChecklistQuestion, ChecklistQuestionTranslation, ChecklistSection
 from app.models.report import (
     Report,
     ReportEventType,

@@ -196,50 +196,53 @@
             <!-- PRVNÍ STRANA: Zjednodušené klíčové údaje o zprávě -->
             <section class="report-page page-break-after">
                 <div class="page-shell">
-                    <div class="overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_top_left,_#3b82f6_0%,_#0f2a5a_36%,_#050f24_100%)] px-6 py-10 text-white shadow-[0_18px_50px_-28px_rgba(15,23,42,0.85)] sm:px-8 sm:py-12">
-                        <div class="max-w-3xl">
-                            <p class="page-kicker text-[#93c5fd]">Zpráva o hodnocení shody</p>
-                            <h1 class="mt-3 text-3xl font-semibold tracking-tight sm:text-5xl">{{ checklist_title }}</h1>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 gap-4 rounded-[28px] border border-[#dbe7fb] bg-[#f8fbff] p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
-                        <div class="metric-pill p-4 text-sm text-gray-600">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Typ auditu / režim</div>
-                            <div class="mt-1 text-sm text-gray-800">{{ audit_type or checklist_title }}</div>
-                        </div>
-                        <div class="metric-pill p-4 text-sm text-gray-600">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Kód zprávy</div>
-                            <div class="mt-1 font-mono text-sm text-gray-800">{{ report_id }}</div>
-                        </div>
-                        <div class="metric-pill p-4 text-sm text-gray-600">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Název společnosti</div>
-                            <div class="mt-1 text-sm text-gray-800">{{ company_name or customer_name }}</div>
-                        </div>
-                        <div class="metric-pill p-4 text-sm text-gray-600">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Datum hodnocení</div>
-                            <div class="mt-1 text-sm text-gray-800">{{ assessment_date.strftime('%d. %m. %Y') }}</div>
-                        </div>
-                        <div class="metric-pill p-4 text-sm text-gray-600">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Celkové skóre</div>
-                            <div class="mt-1 text-sm text-gray-800">{{ "%.1f"|format(total_score_percentage) }}%</div>
-                        </div>
-                        <div class="metric-pill p-4 text-sm text-gray-600">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Klasifikace dokumentu</div>
-                            <div class="mt-1 text-sm text-gray-800">Důvěrné</div>
-                        </div>
-                    </div>
-
                     <div class="section-card p-5 sm:p-6">
                         <div class="flex flex-col gap-3 border-b border-[#e3ebf7] pb-5">
                             <div>
-                                <p class="page-kicker text-[#0f2a5a]">Informace o zprávě</p>
-                                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Zpracováno</h2>
+                                <p class="page-kicker text-[#0f2a5a]">Zpráva o hodnocení shody</p>
+                                <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{{ checklist_title }}</h1>
                             </div>
                         </div>
-                        <div class="mt-4">
-                            <p class="text-sm text-gray-600">Tento dokument zpracovala společnost <strong>AuditReady</strong> jako komplexní hodnocení připravenosti organizace v oblasti kybernetické bezpečnosti.</p>
-                            <p class="mt-2 text-sm text-gray-500">Klasifikace dokumentu: Důvěrné - Přístup pouze pro autorizované osoby.</p>
+
+                        <div class="mt-6">
+                            <h3 class="text-base font-semibold text-[#1f2d45]">Identifikační údaje zprávy</h3>
+                            <div class="mt-4 space-y-3">
+                                <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
+                                    <span class="text-sm font-medium text-gray-600">Typ auditu / režim</span>
+                                    <span class="text-sm text-gray-900">{{ audit_type or checklist_title }}</span>
+                                </div>
+                                <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
+                                    <span class="text-sm font-medium text-gray-600">Kód zprávy</span>
+                                    <span class="text-sm font-mono text-gray-900">{{ report_id }}</span>
+                                </div>
+                                <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
+                                    <span class="text-sm font-medium text-gray-600">Název společnosti</span>
+                                    <span class="text-sm text-gray-900">{{ company_name or customer_name }}</span>
+                                </div>
+                                <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
+                                    <span class="text-sm font-medium text-gray-600">Datum hodnocení</span>
+                                    <span class="text-sm text-gray-900">{{ assessment_date.strftime('%d. %m. %Y') }}</span>
+                                </div>
+                                <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
+                                    <span class="text-sm font-medium text-gray-600">Celkové skóre</span>
+                                    <span class="text-sm font-semibold text-gray-900">{{ "%.1f"|format(total_score_percentage) }}%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div class="rounded-lg border border-[#e3ebf7] bg-[#f8fbff] p-4">
+                                <p class="text-xs font-semibold uppercase text-[#6a7d9a]">Klasifikace dokumentu</p>
+                                <p class="mt-2 text-sm font-medium text-[#1f2d45]">Důvěrné</p>
+                                <p class="mt-1 text-xs text-gray-500">Přístup pouze pro autorizované osoby</p>
+                                <p class="mt-1 text-xs text-gray-400 italic">Restricted access only to authorized personnel</p>
+                            </div>
+                            <div class="rounded-lg border border-[#e3ebf7] bg-[#f8fbff] p-4">
+                                <p class="text-xs font-semibold uppercase text-[#6a7d9a]">Zpracováno</p>
+                                <p class="mt-2 text-sm font-medium text-[#1f2d45]">AuditReady</p>
+                                <p class="mt-1 text-xs text-gray-500">Komplexní hodnocení kybernetické bezpečnosti</p>
+                                <p class="mt-1 text-xs text-gray-400 italic">Comprehensive cybersecurity assessment</p>
+                            </div>
                         </div>
                     </div>
                 </div>
