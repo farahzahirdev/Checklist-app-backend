@@ -67,7 +67,6 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
     spider_chart_data = {
         'n': n,
         'grid_levels': [],
-        'axis_lines': [],
         'data_points': []
     }
     
@@ -79,15 +78,8 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
             angle = -1.5708 + (6.2832 * i / n)
             x = 150 + radius * math.cos(angle)
             y = 150 + radius * math.sin(angle)
-            level_points.append(f"{x},{y}")
+            level_points.append(f"{x} {y}")
         spider_chart_data['grid_levels'].append(level_points)
-    
-    # Calculate axis lines
-    for i in range(n):
-        angle = -1.5708 + (6.2832 * i / n)
-        x2 = 150 + 95 * math.cos(angle)
-        y2 = 150 + 95 * math.sin(angle)
-        spider_chart_data['axis_lines'].append(f"{x2},{y2}")
     
     # Calculate data points
     for i, section in enumerate(section_scores[:n]):
@@ -95,7 +87,7 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
         radius = 95 * (section.get('percentage', 0) / 100)
         x = 150 + radius * math.cos(angle)
         y = 150 + radius * math.sin(angle)
-        spider_chart_data['data_points'].append(f"{x},{y}")
+        spider_chart_data['data_points'].append(f"{x} {y}")
     
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     if not os.path.exists(template_dir):
@@ -188,7 +180,6 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
         spider_chart_data = {
             'n': n,
             'grid_levels': [],
-            'axis_lines': [],
             'data_points': []
         }
         
@@ -200,15 +191,8 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
                 angle = -1.5708 + (6.2832 * i / n)
                 x = 150 + radius * math.cos(angle)
                 y = 150 + radius * math.sin(angle)
-                level_points.append(f"{x},{y}")
+                level_points.append(f"{x} {y}")
             spider_chart_data['grid_levels'].append(level_points)
-        
-        # Calculate axis lines
-        for i in range(n):
-            angle = -1.5708 + (6.2832 * i / n)
-            x2 = 150 + 95 * math.cos(angle)
-            y2 = 150 + 95 * math.sin(angle)
-            spider_chart_data['axis_lines'].append(f"{x2},{y2}")
         
         # Calculate data points
         for i, section in enumerate(section_scores[:n]):
@@ -216,7 +200,7 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
             radius = 95 * (section.get('percentage', 0) / 100)
             x = 150 + radius * math.cos(angle)
             y = 150 + radius * math.sin(angle)
-            spider_chart_data['data_points'].append(f"{x},{y}")
+            spider_chart_data['data_points'].append(f"{x} {y}")
         
         html_content = template.render(
             report_id=report_data.report_id,
