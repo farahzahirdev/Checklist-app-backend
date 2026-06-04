@@ -80,7 +80,7 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
             angle = -1.5708 + (6.2832 * i / n)
             x = 150 + radius * math.cos(angle)
             y = 150 + radius * math.sin(angle)
-            level_points.append(f"{x},{y}")
+            level_points.append(f"{x} {y}")
         spider_chart_data['grid_levels'].append(level_points)
     
     # Calculate axis lines
@@ -212,7 +212,7 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
                 angle = -1.5708 + (6.2832 * i / n)
                 x = 150 + radius * math.cos(angle)
                 y = 150 + radius * math.sin(angle)
-                level_points.append(f"{x},{y}")
+                level_points.append(f"{x} {y}")
             spider_chart_data['grid_levels'].append(level_points)
         
         # Calculate axis lines

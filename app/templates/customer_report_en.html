@@ -353,8 +353,8 @@
                                         <svg viewBox="0 0 300 300" class="spider-chart-svg">
                                             <!-- Background grid levels -->
                                             {% for level in spider_chart_data.grid_levels %}
-                                            <polygon 
-                                                points="{{ level|join(' ') }}"
+                                            <path 
+                                                d="M {{ level|join(' L ') }} Z"
                                                 fill="none" 
                                                 stroke="#e2e8f0" 
                                                 stroke-width="1"
