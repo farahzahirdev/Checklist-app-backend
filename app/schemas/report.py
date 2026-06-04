@@ -146,6 +146,7 @@ class CustomerReportDataResponse(BaseModel):
     company_country: str | None = None
     company_description: str | None = None
     checklist_title: str
+    checklist_type_name: str | None = None
     assessment_date: datetime
     report_status: ReportStatus
     

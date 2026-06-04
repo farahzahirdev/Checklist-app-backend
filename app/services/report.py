@@ -865,6 +865,9 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
     if checklist is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Checklist not found")
     
+    # Get checklist type for audit type/regime
+    checklist_type_name = checklist.checklist_type.name if checklist.checklist_type else None
+    
     # Get checklist translation
     checklist_translation = _latest_checklist_translation(db, checklist.id)
     checklist_title = checklist_translation.title if checklist_translation else f"Checklist v{checklist.version}"
@@ -902,6 +905,7 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
         company_country=company.country if company else None,
         company_description=company.description if company else None,
         checklist_title=checklist_title,
+        checklist_type_name=checklist_type_name,
         assessment_date=assessment.submitted_at or assessment.created_at,
         report_status=report.status,
         overall_score=overall_score,
@@ -1013,33 +1017,50 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
 
 
 def _calculate_domain_data(db: Session, assessment: Assessment) -> list[dict]:
-    from app.models.checklist import ChecklistQuestion
+    from app.models.checklist import ChecklistSection, ChecklistSectionTranslation, ChecklistQuestion
 
-    questions = db.scalars(
-        select(ChecklistQuestion)
-        .where(
-            ChecklistQuestion.checklist_id == assessment.checklist_id,
-            ChecklistQuestion.is_active.is_(True),
-        )
+    sections = db.scalars(
+        select(ChecklistSection)
+        .where(ChecklistSection.checklist_id == assessment.checklist_id)
+        .order_by(ChecklistSection.display_order)
     ).all()
 
     domain_map: dict[str, dict[str, Any]] = {}
-    for question in questions:
-        domain = question.report_domain or "General"
-        domain_item = domain_map.setdefault(
-            domain,
-            {
-                "domain": domain,
-                "title": domain,
-                "score": 0,
-                "max_score": 0,
-                "question_count": 0,
-            },
-        )
-        domain_item["question_count"] += 1
-        domain_item["max_score"] += 4
+    section_question_map: dict[str, list[ChecklistQuestion]] = {}
 
-    question_ids = [q.id for q in questions]
+    for section in sections:
+        # Get section translation
+        translation = _latest_section_translation(db, section.id)
+        section_title = sanitize_text(translation.title) if translation else section.section_code
+
+        domain_map[section.section_code] = {
+            "domain": section.section_code,
+            "title": section_title,
+            "section_code": section.section_code,
+            "section_title": section_title,
+            "score": 0,
+            "max_score": 0,
+            "question_count": 0,
+        }
+
+        # Get questions in this section
+        questions = db.scalars(
+            select(ChecklistQuestion)
+            .where(
+                ChecklistQuestion.section_id == section.id,
+                ChecklistQuestion.is_active.is_(True)
+            )
+        ).all()
+
+        section_question_map[section.section_code] = questions
+
+        for question in questions:
+            domain_map[section.section_code]["question_count"] += 1
+            domain_map[section.section_code]["max_score"] += 4
+
+    # Get all question IDs for this assessment
+    all_questions = [q for questions in section_question_map.values() for q in questions]
+    question_ids = [q.id for q in all_questions]
     answers = db.scalars(
         select(AssessmentAnswer)
         .where(
@@ -1049,25 +1070,28 @@ def _calculate_domain_data(db: Session, assessment: Assessment) -> list[dict]:
     ).all()
     answer_map = {a.question_id: a for a in answers}
 
-    for question in questions:
-        domain = question.report_domain or "General"
-        answer = answer_map.get(question.id)
-        if answer and answer.answer_score is not None:
-            domain_map[domain]["score"] += int(answer.answer_score)
+    # Calculate scores for each section
+    for section_code, questions in section_question_map.items():
+        for question in questions:
+            answer = answer_map.get(question.id)
+            if answer and answer.answer_score is not None:
+                domain_map[section_code]["score"] += int(answer.answer_score)
 
     domain_data = []
-    for domain, data in domain_map.items():
+    for section_code, data in domain_map.items():
         max_score = data["max_score"]
         domain_data.append({
-            "domain": domain,
+            "domain": data["domain"],
             "title": data["title"],
+            "section_code": data["section_code"],
+            "section_title": data["section_title"],
             "score": data["score"],
             "max_score": max_score,
             "percentage": round((data["score"] / max_score * 100), 1) if max_score > 0 else 0,
             "question_count": data["question_count"],
         })
 
-    return sorted(domain_data, key=lambda x: x["domain"])
+    return sorted(domain_data, key=lambda x: x["section_code"])
 
 
 def _calculate_question_distribution(db: Session, assessment: Assessment) -> tuple[list[dict], int, int]:
@@ -1208,10 +1232,25 @@ def _get_customer_findings(db: Session, report_id: UUID) -> list[dict]:
     
     customer_findings = []
     for finding in findings:
+        # Get question to fetch section information
+        question = db.get(ChecklistQuestion, finding.question_id)
+        section_code = None
+        section_title = None
+        if question:
+            section = db.get(ChecklistSection, question.section_id)
+            if section:
+                section_code = section.section_code
+                # Get section translation
+                translation = _latest_section_translation(db, section.id)
+                section_title = sanitize_text(translation.title) if translation else section.section_code
+        
         customer_findings.append({
             "question_text": finding.finding_text,
             "answer": "No" if finding.priority == PriorityLevel.high else "Don't Know",
             "priority": finding.priority.value,
+            "report_domain": section_code or "General",
+            "section_code": section_code,
+            "section_title": section_title,
             "recommendation": sanitize_html(finding.recommendation_text) or "Review and improve this area"
         })
     
@@ -1228,9 +1267,19 @@ def _get_section_summaries_for_customer(db: Session, report_id: UUID) -> list[di
     
     customer_summaries = []
     for summary in summaries:
+        # Get section information
+        section = db.get(ChecklistSection, summary.section_id)
+        section_code = section.section_code if section else "General"
+        section_title = None
+        if section:
+            translation = _latest_section_translation(db, section.id)
+            section_title = sanitize_text(translation.title) if translation else section.section_code
+        
         customer_summaries.append({
             "section_id": str(summary.section_id),
             "chapter_code": summary.chapter_code or "General",
+            "section_code": section_code,
+            "section_title": section_title,
             "summary_text": summary.summary_text
         })
     

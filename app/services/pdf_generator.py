@@ -63,9 +63,15 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
     if not os.path.exists(template_dir):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Report template not found")
 
+    # Select template based on language
+    template_name = f'customer_report_{lang_code}.html'
     env = Environment(loader=FileSystemLoader(template_dir))
     try:
-        template = env.get_template('customer_report.html')
+        # Try language-specific template first, fall back to English
+        try:
+            template = env.get_template(template_name)
+        except:
+            template = env.get_template('customer_report_en.html')
         html_content = template.render(
             report_id=report_data.report_id,
             report_uuid=report_data.report_uuid,
@@ -79,6 +85,8 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
             company_country=report_data.company_country,
             company_description=report_data.company_description,
             checklist_title=report_data.checklist_title,
+            checklist_type_name=report_data.checklist_type_name,
+            audit_type=report_data.checklist_type_name or report_data.checklist_title,
             assessment_date=report_data.assessment_date,
             report_status=report_data.report_status,
             overall_score=report_data.overall_score,
@@ -123,9 +131,15 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
 
 def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UUID | None = None, lang_code: str = "en") -> str:
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
+    # Select template based on language
+    template_name = f'customer_report_{lang_code}.html'
     env = Environment(loader=FileSystemLoader(template_dir))
     try:
-        template = env.get_template('customer_report.html')
+        # Try language-specific template first, fall back to English
+        try:
+            template = env.get_template(template_name)
+        except:
+            template = env.get_template('customer_report_en.html')
         report_data = get_customer_report_data(db, report_id=report_id, company_id=company_id, lang_code=lang_code)
         section_scores = [score.model_dump(mode='json') for score in report_data.section_scores]
         html_content = template.render(
@@ -141,6 +155,8 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
             company_country=report_data.company_country,
             company_description=report_data.company_description,
             checklist_title=report_data.checklist_title,
+            checklist_type_name=report_data.checklist_type_name,
+            audit_type=report_data.checklist_type_name or report_data.checklist_title,
             assessment_date=report_data.assessment_date,
             report_status=report_data.report_status,
             overall_score=report_data.overall_score,
