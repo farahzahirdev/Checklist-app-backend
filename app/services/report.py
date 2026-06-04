@@ -933,6 +933,7 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
 def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]:
     """Calculate scores by section for radar chart"""
     from app.models.checklist import ChecklistSection, ChecklistSectionTranslation
+    from app.models.assessment import AssessmentEvidenceFile
     
     sections = db.scalars(
         select(ChecklistSection)
@@ -992,6 +993,16 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
                 "percentage": round((question_score / 4 * 100), 1) if 4 > 0 else 0,
             })
         
+        # Get evidence count for this section
+        evidence_count = db.scalars(
+            select(func.count(AssessmentEvidenceFile.id))
+            .where(
+                AssessmentEvidenceFile.assessment_id == assessment.id,
+                AssessmentEvidenceFile.question_id.in_(question_ids),
+                AssessmentEvidenceFile.deleted_at.is_(None)
+            )
+        ).first() or 0
+        
         # Get section translation
         translation = _latest_section_translation(db, section.id)
         section_title = sanitize_text(translation.title) if translation else section.section_code
@@ -1011,6 +1022,7 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
             "question_count": len(questions),
             "answered_question_count": answered_count,
             "question_scores": question_scores,
+            "evidence_count": evidence_count,
         })
     
     return section_scores

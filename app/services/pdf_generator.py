@@ -64,6 +64,7 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
     # Pre-calculate spider chart data
     import math
     n = len(section_scores) if section_scores else 3
+    
     spider_chart_data = {
         'n': n,
         'grid_levels': [],
@@ -103,7 +104,22 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
     # Calculate data points
     for i, section in enumerate(section_scores[:n]):
         angle = -1.5708 + (6.2832 * i / n)
-        radius = 95 * (section.get('percentage', 0) / 100)
+        # Handle both dict and object access
+        if isinstance(section, dict):
+            percentage = section.get('percentage', 0)
+        else:
+            percentage = getattr(section, 'percentage', 0)
+        
+        # Ensure percentage is numeric and reasonable
+        try:
+            percentage = float(percentage) if percentage is not None else 0.0
+        except (ValueError, TypeError):
+            percentage = 0.0
+        
+        # Clamp percentage to 0-100 range
+        percentage = max(0.0, min(100.0, percentage))
+        
+        radius = 95 * (percentage / 100)
         x = 150 + radius * math.cos(angle)
         y = 150 + radius * math.sin(angle)
         spider_chart_data['data_points'].append(f"{x},{y}")
@@ -235,7 +251,22 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
         # Calculate data points
         for i, section in enumerate(section_scores[:n]):
             angle = -1.5708 + (6.2832 * i / n)
-            radius = 95 * (section.get('percentage', 0) / 100)
+            # Handle both dict and object access
+            if isinstance(section, dict):
+                percentage = section.get('percentage', 0)
+            else:
+                percentage = getattr(section, 'percentage', 0)
+            
+            # Ensure percentage is numeric and reasonable
+            try:
+                percentage = float(percentage) if percentage is not None else 0.0
+            except (ValueError, TypeError):
+                percentage = 0.0
+            
+            # Clamp percentage to 0-100 range
+            percentage = max(0.0, min(100.0, percentage))
+            
+            radius = 95 * (percentage / 100)
             x = 150 + radius * math.cos(angle)
             y = 150 + radius * math.sin(angle)
             spider_chart_data['data_points'].append(f"{x},{y}")

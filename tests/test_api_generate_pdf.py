@@ -35,10 +35,10 @@ def make_fake_report():
         standard_covered_all=True,
         question_score_distribution=[],
         section_scores=[
-            {"section_name": "Governance", "percentage": 82},
-            {"section_name": "Operations", "percentage": 68},
-            {"section_name": "Access Control", "percentage": 74},
-            {"section_name": "Incident Response", "percentage": 61},
+            {"section_name": "Governance", "section_title": "Governance", "section_code": "GOV", "percentage": 82, "evidence_count": 5, "question_count": 12, "answered_question_count": 11},
+            {"section_name": "Operations", "section_title": "Operations", "section_code": "OPS", "percentage": 68, "evidence_count": 3, "question_count": 10, "answered_question_count": 9},
+            {"section_name": "Access Control", "section_title": "Access Control", "section_code": "ACC", "percentage": 74, "evidence_count": 7, "question_count": 15, "answered_question_count": 14},
+            {"section_name": "Incident Response", "section_title": "Incident Response", "section_code": "INC", "percentage": 61, "evidence_count": 2, "question_count": 8, "answered_question_count": 7},
         ],
         chapter_data=[
             {"chapter_code": "CH-01", "title": "Chapter 1", "percentage": 75, "score": 7, "max_score": 10, "findings_count": 2},
@@ -46,12 +46,14 @@ def make_fake_report():
         ],
         domain_data=[],
         findings=[
-            {"priority": "high", "question_text": "Critical missing control", "recommendation": "Implement control X"},
-            {"priority": "medium", "question_text": "Process gap in review cadence", "recommendation": "Add monthly review checkpoints"},
+            {"priority": "high", "question_text": "Critical missing control", "recommendation": "Implement control X", "section_code": "GOV", "section_title": "Governance"},
+            {"priority": "medium", "question_text": "Process gap in review cadence", "recommendation": "Add monthly review checkpoints", "section_code": "OPS", "section_title": "Operations"},
         ],
         section_summaries=[
-            {"chapter_code": "CH-01", "summary_text": "Summary for chapter 1"},
-            {"chapter_code": "CH-02", "summary_text": "Summary for chapter 2"},
+            {"section_code": "GOV", "summary_text": "Governance framework is well established with clear policies and regular reviews."},
+            {"section_code": "OPS", "summary_text": "Operational controls need improvement in documentation and monitoring."},
+            {"section_code": "ACC", "summary_text": "Access control measures are partially implemented but lack regular review cycles."},
+            {"section_code": "INC", "summary_text": "Incident response procedures exist but require testing and team training."},
         ],
         public_suggestions=[
             {"suggestion_text": "Do this next"},

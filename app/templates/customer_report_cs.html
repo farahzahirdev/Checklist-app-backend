@@ -238,21 +238,16 @@
                                 <span class="text-sm text-gray-500">4</span>
                             </div>
                             <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
-                                <span class="text-sm font-medium text-gray-700">3. Výsledky podle kapitol</span>
+                                <span class="text-sm font-medium text-gray-700">3. Přehled výsledků podle kapitol</span>
                                 <span class="text-sm text-gray-500">5</span>
                             </div>
+                            {% for section in section_scores %}
+                            {% set section_page_num = 6 + loop.index %}
                             <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
-                                <span class="text-sm font-medium text-gray-700">4. Podrobná zjištění</span>
-                                <span class="text-sm text-gray-500">6</span>
+                                <span class="text-sm font-medium text-gray-700">{{ 4 + loop.index }}. {{ section.section_title }}</span>
+                                <span class="text-sm text-gray-500">{{ section_page_num }}</span>
                             </div>
-                            <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
-                                <span class="text-sm font-medium text-gray-700">5. Doporučení</span>
-                                <span class="text-sm text-gray-500">7</span>
-                            </div>
-                            <div class="flex items-center justify-between pb-2">
-                                <span class="text-sm font-medium text-gray-700">6. Příloha</span>
-                                <span class="text-sm text-gray-500">8</span>
-                            </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -528,7 +523,110 @@
                 </div>
             </section>
 
-            <!-- Další strany by pokračovaly s podrobnými zjištěními atd. -->
+            <!-- PODROBNÉ STRÁNKY SEKCÍ -->
+            {% for section in section_scores %}
+            {% set section_findings = findings|selectattr('section_code', 'equalto', section.section_code)|list %}
+            {% set section_summary = section_summaries|selectattr('section_code', 'equalto', section.section_code)|first %}
+            {% set section_findings_high = section_findings|selectattr('priority', 'equalto', 'high')|list %}
+            {% set section_findings_medium = section_findings|selectattr('priority', 'equalto', 'medium')|list %}
+            {% set high_priorities_count = section_findings_high|length + section_findings_medium|length %}
+            
+            <section class="report-page page-break-after{% if loop.last %} report-page-last{% endif %}">
+                <div class="page-shell">
+                    <div class="section-card p-5 sm:p-6">
+                        <div class="flex flex-col gap-3 border-b border-[#e3ebf7] pb-5">
+                            <div>
+                                <p class="page-kicker text-[#0f2a5a]">Podrobnosti sekce</p>
+                                <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{{ section.section_title }}</h1>
+                                <p class="mt-1 text-sm text-gray-500">{{ section.section_code }}</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 grid grid-cols-2 gap-4">
+                            <div class="rounded-lg border border-[#e3ebf7] bg-[#f8fbff] p-4">
+                                <p class="text-xs font-semibold uppercase text-[#6a7d9a]">Skóre zralosti</p>
+                                <p class="mt-2 text-2xl font-bold text-[#2563eb]">{{ "%.1f"|format(section.percentage) }}%</p>
+                                <div class="mt-1 h-2 w-full rounded-full bg-gray-200">
+                                    <div class="h-2 rounded-full bg-[#2563eb]" style="width: {{ section.percentage }}%"></div>
+                                </div>
+                            </div>
+                            <div class="rounded-lg border border-[#e3ebf7] bg-[#f8fbff] p-4">
+                                <p class="text-xs font-semibold uppercase text-[#6a7d9a]">Vysoké priority</p>
+                                <p class="mt-2 text-2xl font-bold {% if high_priorities_count > 0 %}text-[#dc2626]{% else %}text-[#16a34a]{% endif %}">
+                                    {% if high_priorities_count > 0 %}{{ high_priorities_count }}{% else %}Žádné{% endif %}
+                                </p>
+                                <p class="mt-1 text-xs text-gray-600">
+                                    {% if high_priorities_count > 0 %}Položky vyžadující pozornost{% else %}Žádné kritické problémy{% endif %}
+                                </p>
+                            </div>
+                            <div class="rounded-lg border border-[#e3ebf7] bg-[#f8fbff] p-4">
+                                <p class="text-xs font-semibold uppercase text-[#6a7d9a]">Důkazní soubory</p>
+                                <p class="mt-2 text-2xl font-bold text-[#2563eb]">{{ section.evidence_count }}</p>
+                                <p class="mt-1 text-xs text-gray-600">Nahrané podpůrné dokumenty</p>
+                            </div>
+                            <div class="rounded-lg border border-[#e3ebf7] bg-[#f8fbff] p-4">
+                                <p class="text-xs font-semibold uppercase text-[#6a7d9a]">Otázky</p>
+                                <p class="mt-2 text-2xl font-bold text-[#2563eb]">{{ section.answered_question_count }}/{{ section.question_count }}</p>
+                                <p class="mt-1 text-xs text-gray-600">Zodpovězené otázky</p>
+                            </div>
+                        </div>
+
+                        <!-- Shrnutí sekce -->
+                        <div class="mt-6">
+                            <h3 class="text-base font-semibold text-[#1f2d45]">Shrnutí sekce</h3>
+                            <div class="mt-3 rounded-lg border border-[#e3ebf7] bg-white p-4">
+                                {% if section_summary and section_summary.summary_text %}
+                                <p class="text-sm text-gray-700 leading-relaxed">{{ section_summary.summary_text }}</p>
+                                {% else %}
+                                <p class="text-sm text-gray-500 italic">Žádné shrnutí sekce od auditora.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Tabulka zjištění -->
+                        {% if section_findings %}
+                        <div class="mt-6">
+                            <h3 class="text-base font-semibold text-[#1f2d45]">Zjištění a doporučení</h3>
+                            <div class="mt-3 overflow-x-auto">
+                                <table class="w-full border-collapse text-sm">
+                                    <thead>
+                                        <tr class="bg-[#f8fbff]">
+                                            <th class="border border-[#e3ebf7] px-3 py-2 text-left font-semibold text-[#1f2d45]">Priorita</th>
+                                            <th class="border border-[#e3ebf7] px-3 py-2 text-left font-semibold text-[#1f2d45]">Zjištění</th>
+                                            <th class="border border-[#e3ebf7] px-3 py-2 text-left font-semibold text-[#1f2d45]">Doporučení</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for finding in section_findings %}
+                                        <tr class="hover:bg-[#f8fbff]">
+                                            <td class="border border-[#e3ebf7] px-3 py-2">
+                                                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium
+                                                    {% if finding.priority == 'high' %}bg-[#fee2e2] text-[#991b1b]
+                                                    {% elif finding.priority == 'medium' %}bg-[#fef3c7] text-[#92400e]
+                                                    {% else %}bg-[#dbeafe] text-[#1e40af]{% endif %}">
+                                                    {{ finding.priority|capitalize }}
+                                                </span>
+                                            </td>
+                                            <td class="border border-[#e3ebf7] px-3 py-2 text-gray-700">{{ finding.question_text }}</td>
+                                            <td class="border border-[#e3ebf7] px-3 py-2 text-gray-600">{{ finding.recommendation }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="mt-6">
+                            <h3 class="text-base font-semibold text-[#1f2d45]">Zjištění a doporučení</h3>
+                            <div class="mt-3 rounded-lg border border-[#e3ebf7] bg-[#f8fbff] p-4">
+                                <p class="text-sm text-gray-600">Žádná zjištění pro tuto sekci. Všechny požadavky jsou adekvátně implementovány.</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+            {% endfor %}
         </main>
     </div>
 
