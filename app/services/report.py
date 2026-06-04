@@ -925,7 +925,7 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
         findings=findings,
         section_summaries=section_summaries,
         public_suggestions=public_suggestions,
-        management_summary=report.management_summary,
+        management_summary=report.management_summary if hasattr(report, 'management_summary') else None,
         generated_at=report.created_at,
         approved_at=report.approved_at,
         published_at=report.final_pdf_published_at,

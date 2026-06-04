@@ -162,6 +162,9 @@ class CustomerReportDataResponse(BaseModel):
     
     # Section scores for radar chart
     section_scores: list[ReportSectionScoreItem] = Field(description="List of section score summaries with per-question percentages")
+    spider_chart_data: dict | None = None
+    chart_type: str | None = None
+    bar_chart_data: dict | None = None
     
     # Chapter overview
     chapter_data: list[dict] = Field(description="List of {chapter_code, title, score, findings_count, recommendations}")
@@ -174,6 +177,7 @@ class CustomerReportDataResponse(BaseModel):
     
     # Admin summaries
     section_summaries: list[dict] = Field(description="Admin-written section summaries")
+    management_summary: str | None = None
     
     # Public suggestions
     public_suggestions: list[CustomerReportSuggestionItem] = Field(
