@@ -350,66 +350,54 @@
                                 <div>
                                     <h3 class="text-base font-semibold text-[#1f2d45]">Výkon sekcí</h3>
                                     <div class="mt-3 flex justify-center">
-                                        {% set n = spider_chart_data.n %}
                                         <svg viewBox="0 0 300 300" class="spider-chart-svg">
-                                            <!-- Background grid (concentric webs) -->
-                                            {% for radius in [23.75, 47.5, 71.25, 95] %}
-                                                {% set level_points = [] %}
-                                                {% for i in range(n) %}
-                                                    {% set angle = -1.5708 + (6.2832 * i / n) %}
-                                                    {% set x = 150 + radius * (angle|cos) %}
-                                                    {% set y = 150 + radius * (angle|sin) %}
-                                                    {% set _ = level_points.append(x ~ ' ' ~ y) %}
-                                                {% endfor %}
-                                                <polygon 
-                                                    points="{{ level_points|join(' L ') }} Z"
-                                                    fill="none" 
-                                                    stroke="#e2e8f0" 
-                                                    stroke-width="1"
-                                                />
+                                            <!-- Background grid levels -->
+                                            {% for level in spider_chart_data.grid_levels %}
+                                            <polygon 
+                                                points="{{ level|join(' ') }}"
+                                                fill="none" 
+                                                stroke="#e2e8f0" 
+                                                stroke-width="1"
+                                            />
                                             {% endfor %}
                                             
-                                            <!-- Axis lines from center -->
-                                            {% for i in range(n) %}
-                                                {% set angle = -1.5708 + (6.2832 * i / n) %}
-                                                {% set x2 = 150 + 95 * (angle|cos) %}
-                                                {% set y2 = 150 + 95 * (angle|sin) %}
-                                                <line 
-                                                    x1="150" y1="150" x2="{{ x2 }}" y2="{{ y2 }}" 
-                                                    stroke="#e8edf5" 
-                                                    stroke-width="1.2"
-                                                />
+                                            <!-- Axis lines -->
+                                            {% for line in spider_chart_data.axis_lines %}
+                                            {% set x2, y2 = line.split(',') %}
+                                            <line 
+                                                x1="150" y1="150" x2="{{ x2 }}" y2="{{ y2 }}" 
+                                                stroke="#e8edf5" 
+                                                stroke-width="1.2"
+                                            />
                                             {% endfor %}
                                             
                                             <!-- Section labels (using numbers) -->
-                                            {% for i in range(n) %}
-                                                {% set angle = -1.5708 + (6.2832 * i / n) %}
-                                                {% set tx = 150 + 113 * (angle|cos) %}
-                                                {% set ty = 150 + 113 * (angle|sin) %}
-                                                <text
-                                                    x="{{ tx }}" y="{{ ty }}"
-                                                    text-anchor="middle"
-                                                    dominant-baseline="middle"
-                                                    fill="#64748b"
-                                                    font-size="{{ '8px' if n > 6 else '9px' }}"
-                                                    font-weight="500"
-                                                >
-                                                    § {{ i + 1 }}
-                                                </text>
+                                            {% for label in spider_chart_data.labels %}
+                                            {% set x, y = label.position.split(',') %}
+                                            <text
+                                                x="{{ x }}" y="{{ y }}"
+                                                text-anchor="middle"
+                                                dominant-baseline="middle"
+                                                fill="#64748b"
+                                                font-size="{{ '8px' if spider_chart_data.n > 6 else '9px' }}"
+                                                font-weight="500"
+                                            >
+                                                § {{ label.number }}
+                                            </text>
                                             {% endfor %}
                                             
                                             <!-- Data polygon -->
                                             <polygon 
-                                                points="{{ spider_chart_data.data_points|join(' L ') }} Z"
+                                                points="{{ spider_chart_data.data_points|join(' ') }}"
                                                 fill="rgba(37,99,235,0.14)" 
                                                 stroke="#2563eb" 
                                                 stroke-width="2.5"
                                                 stroke-linejoin="round"
                                             />
                                             
-                                            <!-- Data points (circles at vertices) -->
+                                            <!-- Data points -->
                                             {% for point in spider_chart_data.data_points %}
-                                            {% set x, y = point.split(' ') %}
+                                            {% set x, y = point.split(',') %}
                                             <circle 
                                                 cx="{{ x }}" cy="{{ y }}" r="4" 
                                                 fill="#fff" 
