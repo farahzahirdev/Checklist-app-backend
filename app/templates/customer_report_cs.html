@@ -79,6 +79,15 @@
             box-shadow: 0 10px 30px -24px rgba(15, 23, 42, 0.35);
         }
 
+        /* Print-friendly styles */
+        @media print {
+            .section-card {
+                box-shadow: none;
+                border: 1px solid #d9d9d9;
+                border-radius: 4px;
+            }
+        }
+
         .metric-pill {
             border-radius: 18px;
             background: white;
@@ -200,18 +209,14 @@
                             </div>
                         </div>
 
-                        <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div class="rounded-lg border border-[#e3ebf7] bg-[#f8fbff] p-4">
-                                <p class="text-xs font-semibold uppercase text-[#6a7d9a]">Klasifikace dokumentu</p>
-                                <p class="mt-2 text-sm font-medium text-[#1f2d45]">Důvěrné</p>
-                                <p class="mt-1 text-xs text-gray-500">Přístup pouze pro autorizované osoby</p>
-                                <p class="mt-1 text-xs text-gray-400 italic">Restricted access only to authorized personnel</p>
+                        <div class="mt-6 border-t border-gray-200 pt-4">
+                            <div class="flex justify-between py-2">
+                                <span class="text-sm font-medium text-gray-600">Klasifikace dokumentu</span>
+                                <span class="text-sm text-gray-900">Důvěrné</span>
                             </div>
-                            <div class="rounded-lg border border-[#e3ebf7] bg-[#f8fbff] p-4">
-                                <p class="text-xs font-semibold uppercase text-[#6a7d9a]">Zpracováno</p>
-                                <p class="mt-2 text-sm font-medium text-[#1f2d45]">AuditReady</p>
-                                <p class="mt-1 text-xs text-gray-500">Komplexní hodnocení kybernetické bezpečnosti</p>
-                                <p class="mt-1 text-xs text-gray-400 italic">Comprehensive cybersecurity assessment</p>
+                            <div class="flex justify-between py-2">
+                                <span class="text-sm font-medium text-gray-600">Zpracoval</span>
+                                <span class="text-sm text-gray-900">AuditReady</span>
                             </div>
                         </div>
                     </div>
@@ -229,23 +234,18 @@
                             </div>
                         </div>
                         <div class="mt-6 space-y-3">
-                            <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
+                            <div class="flex items-center border-b border-dashed border-gray-200 pb-2">
                                 <span class="text-sm font-medium text-gray-700">1. Cíl auditu a metoda hodnocení</span>
-                                <span class="text-sm text-gray-500">3</span>
                             </div>
-                            <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
+                            <div class="flex items-center border-b border-dashed border-gray-200 pb-2">
                                 <span class="text-sm font-medium text-gray-700">2. Shrnutí pro vedení</span>
-                                <span class="text-sm text-gray-500">4</span>
                             </div>
-                            <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
+                            <div class="flex items-center border-b border-dashed border-gray-200 pb-2">
                                 <span class="text-sm font-medium text-gray-700">3. Přehled výsledků podle kapitol</span>
-                                <span class="text-sm text-gray-500">5</span>
                             </div>
                             {% for section in section_scores %}
-                            {% set section_page_num = 6 + loop.index %}
-                            <div class="flex items-center justify-between border-b border-dashed border-gray-200 pb-2">
+                            <div class="flex items-center border-b border-dashed border-gray-200 pb-2">
                                 <span class="text-sm font-medium text-gray-700">{{ 4 + loop.index }}. {{ section.section_title }}</span>
-                                <span class="text-sm text-gray-500">{{ section_page_num }}</span>
                             </div>
                             {% endfor %}
                         </div>
@@ -325,17 +325,12 @@
                         <div class="mt-6 space-y-6">
                             <!-- Text shrnutí pro vedení -->
                             <div>
-                                <h3 class="text-base font-semibold text-[#1f2d45]">Exekutivní shrnutí</h3>
+                                <h3 class="text-base font-semibold text-[#1f2d45]">Shrnutí pro vedení</h3>
                                 <p class="mt-2 text-sm leading-relaxed text-gray-600">
-                                    {% if section_summaries %}
-                                        {% set general_summary = section_summaries|selectattr('summary_text')|first %}
-                                        {% if general_summary and general_summary.summary_text %}
-                                            {{ general_summary.summary_text }}
-                                        {% else %}
-                                            Toto hodnocení poskytuje komplexní přehled o bezpečnostní postoj organizace. Celkové skóre {{ "%.1f"|format(total_score_percentage) }}% naznačuje {{ "silný bezpečnostní postoj s malými oblastmi pro zlepšení" if total_score_percentage >= 80 else "střední úroveň připravenosti vyžadující pozornost několika oblastem" if total_score_percentage >= 60 else "významné bezpečnostní mezery vyžadující okamžitou pozornost" }}.
-                                        {% endif %}
+                                    {% if management_summary %}
+                                        {{ management_summary }}
                                     {% else %}
-                                        Toto hodnocení poskytuje komplexní přehled o bezpečnostní postoj organizace. Celkové skóre {{ "%.1f"|format(total_score_percentage) }}% naznačuje {{ "silný bezpečnostní postoj s malými oblastmi pro zlepšení" if total_score_percentage >= 80 else "střední úroveň připravenosti vyžadující pozornost několika oblastem" if total_score_percentage >= 60 else "významné bezpečnostní mezery vyžadující okamžitou pozornost" }}.
+                                        <em class="text-gray-500">Žádné shrnutí pro vedení.</em>
                                     {% endif %}
                                 </p>
                             </div>
@@ -345,7 +340,8 @@
                                 <div>
                                     <h3 class="text-base font-semibold text-[#1f2d45]">Výkon sekcí</h3>
                                     <div class="mt-3 flex justify-center">
-                                        <svg viewBox="0 0 300 300" class="spider-chart-svg">
+                                        {% if chart_type == "radar" %}
+                                        <svg viewBox="0 0 400 400" class="spider-chart-svg" style="max-width: 350px;">
                                             <!-- Background grid levels -->
                                             {% for level in spider_chart_data.grid_levels %}
                                             <path 
@@ -360,7 +356,7 @@
                                             {% for line in spider_chart_data.axis_lines %}
                                             {% set x2, y2 = line.split(',') %}
                                             <line 
-                                                x1="150" y1="150" x2="{{ x2 }}" y2="{{ y2 }}" 
+                                                x1="200" y1="200" x2="{{ x2 }}" y2="{{ y2 }}" 
                                                 stroke="#e8edf5" 
                                                 stroke-width="1.2"
                                             />
@@ -374,7 +370,7 @@
                                                 text-anchor="middle"
                                                 dominant-baseline="middle"
                                                 fill="#64748b"
-                                                font-size="{{ '8px' if spider_chart_data.n > 6 else '9px' }}"
+                                                font-size="{{ '10px' if spider_chart_data.n > 6 else '11px' }}"
                                                 font-weight="500"
                                             >
                                                 § {{ label.number }}
@@ -401,6 +397,22 @@
                                             />
                                             {% endfor %}
                                         </svg>
+                                        {% else %}
+                                        <!-- Horizontal Bar Chart for < 3 sections -->
+                                        <div class="w-full max-w-md">
+                                            {% for section in bar_chart_data.sections %}
+                                            <div class="mb-3">
+                                                <div class="flex justify-between text-sm mb-1">
+                                                    <span class="font-medium text-gray-700">{{ section.title }}</span>
+                                                    <span class="text-gray-900">{{ "%.1f"|format(section.percentage) }}%</span>
+                                                </div>
+                                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                                    <div class="bg-[#2563eb] h-3 rounded-full" style="width: {{ section.percentage }}%"></div>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 <div>
@@ -483,8 +495,7 @@
                                     <tr class="hover:bg-[#f8fbff]">
                                         <td class="border border-[#e3ebf7] px-3 py-2 text-center text-gray-700">{{ loop.index }}</td>
                                         <td class="border border-[#e3ebf7] px-3 py-2">
-                                            <div class="font-medium text-gray-900">{{ section.section_title }}</div>
-                                            <div class="text-xs text-gray-500">{{ section.section_code }}</div>
+                                            <div class="font-medium text-gray-900">§{{ loop.index }} {{ section.section_title }}</div>
                                         </td>
                                         <td class="border border-[#e3ebf7] px-3 py-2 text-center">
                                             <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium
@@ -563,11 +574,6 @@
                                 <p class="text-xs font-semibold uppercase text-[#6a7d9a]">Důkazní soubory</p>
                                 <p class="mt-2 text-2xl font-bold text-[#2563eb]">{{ section.evidence_count }}</p>
                                 <p class="mt-1 text-xs text-gray-600">Nahrané podpůrné dokumenty</p>
-                            </div>
-                            <div class="rounded-lg border border-[#e3ebf7] bg-[#f8fbff] p-4">
-                                <p class="text-xs font-semibold uppercase text-[#6a7d9a]">Otázky</p>
-                                <p class="mt-2 text-2xl font-bold text-[#2563eb]">{{ section.answered_question_count }}/{{ section.question_count }}</p>
-                                <p class="mt-1 text-xs text-gray-600">Zodpovězené otázky</p>
                             </div>
                         </div>
 

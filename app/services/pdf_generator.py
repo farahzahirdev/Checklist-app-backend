@@ -61,9 +61,24 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
 
     section_scores = [score.model_dump(mode='json') for score in report_data.section_scores]
     
-    # Pre-calculate spider chart data
+    # Pre-calculate chart data
     import math
     n = len(section_scores) if section_scores else 3
+    chart_type = "radar" if n >= 3 else "bar"
+    
+    spider_chart_data = {
+        'n': n,
+        'grid_levels': [],
+        'axis_lines': [],
+        'labels': [],
+        'data_points': []
+    }
+    
+    # Calculate bar chart data if needed
+    bar_chart_data = {
+        'sections': [],
+        'max_percentage': 100
+    }
     
     spider_chart_data = {
         'n': n,
@@ -75,27 +90,27 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
     
     # Calculate grid levels (25%, 50%, 75%, 100%)
     for level in [25, 50, 75, 100]:
-        radius = 95 * (level / 100)
+        radius = 120 * (level / 100)
         level_points = []
         for i in range(n):
             angle = -1.5708 + (6.2832 * i / n)
-            x = 150 + radius * math.cos(angle)
-            y = 150 + radius * math.sin(angle)
+            x = 200 + radius * math.cos(angle)
+            y = 200 + radius * math.sin(angle)
             level_points.append(f"{x} {y}")
         spider_chart_data['grid_levels'].append(level_points)
     
     # Calculate axis lines
     for i in range(n):
         angle = -1.5708 + (6.2832 * i / n)
-        x = 150 + 95 * math.cos(angle)
-        y = 150 + 95 * math.sin(angle)
+        x = 200 + 120 * math.cos(angle)
+        y = 200 + 120 * math.sin(angle)
         spider_chart_data['axis_lines'].append(f"{x},{y}")
     
     # Calculate labels
     for i in range(n):
         angle = -1.5708 + (6.2832 * i / n)
-        x = 150 + 113 * math.cos(angle)
-        y = 150 + 113 * math.sin(angle)
+        x = 200 + 140 * math.cos(angle)
+        y = 200 + 140 * math.sin(angle)
         spider_chart_data['labels'].append({
             'number': i + 1,
             'position': f"{x},{y}"
@@ -119,10 +134,42 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
         # Clamp percentage to 0-100 range
         percentage = max(0.0, min(100.0, percentage))
         
-        radius = 95 * (percentage / 100)
-        x = 150 + radius * math.cos(angle)
-        y = 150 + radius * math.sin(angle)
+        radius = 120 * (percentage / 100)
+        x = 200 + radius * math.cos(angle)
+        y = 200 + radius * math.sin(angle)
         spider_chart_data['data_points'].append(f"{x},{y}")
+    
+    # Calculate bar chart data for when sections < 3
+    if chart_type == "bar":
+        for section in section_scores:
+            percentage = section.get('percentage', 0) if isinstance(section, dict) else getattr(section, 'percentage', 0)
+            try:
+                percentage = float(percentage) if percentage is not None else 0.0
+            except (ValueError, TypeError):
+                percentage = 0.0
+            percentage = max(0.0, min(100.0, percentage))
+            
+            bar_chart_data['sections'].append({
+                'title': section.get('section_title', 'Unknown') if isinstance(section, dict) else getattr(section, 'section_title', 'Unknown'),
+                'percentage': percentage,
+                'width': percentage * 2.5  # Scale for display (max 250px width)
+            })
+    
+    # Calculate bar chart data for when sections < 3
+    if chart_type == "bar":
+        for section in section_scores:
+            percentage = section.get('percentage', 0) if isinstance(section, dict) else getattr(section, 'percentage', 0)
+            try:
+                percentage = float(percentage) if percentage is not None else 0.0
+            except (ValueError, TypeError):
+                percentage = 0.0
+            percentage = max(0.0, min(100.0, percentage))
+            
+            bar_chart_data['sections'].append({
+                'title': section.get('section_title', 'Unknown') if isinstance(section, dict) else getattr(section, 'section_title', 'Unknown'),
+                'percentage': percentage,
+                'width': percentage * 2.5  # Scale for display (max 250px width)
+            })
     
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     if not os.path.exists(template_dir):
@@ -164,11 +211,14 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
             question_score_distribution=report_data.question_score_distribution,
             section_scores=section_scores,
             spider_chart_data=spider_chart_data,
+            chart_type=chart_type,
+            bar_chart_data=bar_chart_data,
             chapter_data=report_data.chapter_data,
             domain_data=report_data.domain_data,
             findings=report_data.findings,
             section_summaries=report_data.section_summaries,
             public_suggestions=report_data.public_suggestions,
+            management_summary=report_data.management_summary,
             generated_at=report_data.generated_at,
             approved_at=report_data.approved_at,
             published_at=report_data.published_at,
@@ -209,9 +259,11 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
         report_data = get_customer_report_data(db, report_id=report_id, company_id=company_id, lang_code=lang_code)
         section_scores = [score.model_dump(mode='json') for score in report_data.section_scores]
         
-        # Pre-calculate spider chart data
+        # Pre-calculate chart data
         import math
         n = len(section_scores) if section_scores else 3
+        chart_type = "radar" if n >= 3 else "bar"
+        
         spider_chart_data = {
             'n': n,
             'grid_levels': [],
@@ -220,29 +272,35 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
             'data_points': []
         }
         
+        # Calculate bar chart data if needed
+        bar_chart_data = {
+            'sections': [],
+            'max_percentage': 100
+        }
+        
         # Calculate grid levels (25%, 50%, 75%, 100%)
         for level in [25, 50, 75, 100]:
-            radius = 95 * (level / 100)
+            radius = 120 * (level / 100)
             level_points = []
             for i in range(n):
                 angle = -1.5708 + (6.2832 * i / n)
-                x = 150 + radius * math.cos(angle)
-                y = 150 + radius * math.sin(angle)
+                x = 200 + radius * math.cos(angle)
+                y = 200 + radius * math.sin(angle)
                 level_points.append(f"{x} {y}")
             spider_chart_data['grid_levels'].append(level_points)
         
         # Calculate axis lines
         for i in range(n):
             angle = -1.5708 + (6.2832 * i / n)
-            x = 150 + 95 * math.cos(angle)
-            y = 150 + 95 * math.sin(angle)
+            x = 200 + 120 * math.cos(angle)
+            y = 200 + 120 * math.sin(angle)
             spider_chart_data['axis_lines'].append(f"{x},{y}")
         
         # Calculate labels
         for i in range(n):
             angle = -1.5708 + (6.2832 * i / n)
-            x = 150 + 113 * math.cos(angle)
-            y = 150 + 113 * math.sin(angle)
+            x = 200 + 140 * math.cos(angle)
+            y = 200 + 140 * math.sin(angle)
             spider_chart_data['labels'].append({
                 'number': i + 1,
                 'position': f"{x},{y}"
@@ -266,10 +324,26 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
             # Clamp percentage to 0-100 range
             percentage = max(0.0, min(100.0, percentage))
             
-            radius = 95 * (percentage / 100)
-            x = 150 + radius * math.cos(angle)
-            y = 150 + radius * math.sin(angle)
+            radius = 120 * (percentage / 100)
+            x = 200 + radius * math.cos(angle)
+            y = 200 + radius * math.sin(angle)
             spider_chart_data['data_points'].append(f"{x},{y}")
+        
+        # Calculate bar chart data for when sections < 3
+        if chart_type == "bar":
+            for section in section_scores:
+                percentage = section.get('percentage', 0) if isinstance(section, dict) else getattr(section, 'percentage', 0)
+                try:
+                    percentage = float(percentage) if percentage is not None else 0.0
+                except (ValueError, TypeError):
+                    percentage = 0.0
+                percentage = max(0.0, min(100.0, percentage))
+                
+                bar_chart_data['sections'].append({
+                    'title': section.get('section_title', 'Unknown') if isinstance(section, dict) else getattr(section, 'section_title', 'Unknown'),
+                    'percentage': percentage,
+                    'width': percentage * 2.5  # Scale for display (max 250px width)
+                })
         
         html_content = template.render(
             report_id=report_data.report_id,
@@ -298,11 +372,14 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
             question_score_distribution=report_data.question_score_distribution,
             section_scores=section_scores,
             spider_chart_data=spider_chart_data,
+            chart_type=chart_type,
+            bar_chart_data=bar_chart_data,
             chapter_data=report_data.chapter_data,
             domain_data=report_data.domain_data,
             findings=report_data.findings,
             section_summaries=report_data.section_summaries,
             public_suggestions=report_data.public_suggestions,
+            management_summary=report_data.management_summary,
             generated_at=report_data.generated_at,
             approved_at=report_data.approved_at,
             published_at=report_data.published_at,

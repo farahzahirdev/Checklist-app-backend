@@ -917,16 +917,20 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
         standard_covered_all=standard_covered_all,
         question_score_distribution=question_score_distribution,
         section_scores=section_scores,
+        spider_chart_data=None,  # Will be calculated in PDF generator
+        chart_type=None,  # Will be calculated in PDF generator
+        bar_chart_data=None,  # Will be calculated in PDF generator
         chapter_data=chapter_data,
         domain_data=domain_data,
         findings=findings,
         section_summaries=section_summaries,
         public_suggestions=public_suggestions,
-        auditor_note=auditor_note,
-        generated_at=report.draft_generated_at or report.created_at,
+        management_summary=report.management_summary,
+        generated_at=report.created_at,
         approved_at=report.approved_at,
         published_at=report.final_pdf_published_at,
     )
+   
 
 
 # Helper functions for customer report data
@@ -1256,6 +1260,11 @@ def _get_customer_findings(db: Session, report_id: UUID) -> list[dict]:
                 translation = _latest_section_translation(db, section.id)
                 section_title = sanitize_text(translation.title) if translation else section.section_code
         
+        # Handle case where recommendation is same as finding text
+        recommendation = sanitize_html(finding.recommendation_text) if finding.recommendation_text else None
+        if not recommendation or recommendation == sanitize_html(finding.finding_text):
+            recommendation = "Review and improve this control implementation"
+        
         customer_findings.append({
             "question_text": finding.finding_text,
             "answer": "No" if finding.priority == PriorityLevel.high else "Don't Know",
@@ -1263,7 +1272,7 @@ def _get_customer_findings(db: Session, report_id: UUID) -> list[dict]:
             "report_domain": section_code or "General",
             "section_code": section_code,
             "section_title": section_title,
-            "recommendation": sanitize_html(finding.recommendation_text) or "Review and improve this area"
+            "recommendation": recommendation
         })
     
     return customer_findings

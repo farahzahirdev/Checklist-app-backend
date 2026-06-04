@@ -58,6 +58,7 @@ class Report(Base):
     final_pdf_storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     final_pdf_password_encrypted: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     final_pdf_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    management_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     draft_deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     final_deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
