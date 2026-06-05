@@ -131,20 +131,24 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
     
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     if not os.path.exists(template_dir):
+        logger.error(f"Template directory not found: {template_dir}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Report template not found")
 
     # Select template based on language
     template_name = f'customer_report_{lang_code}.html'
-    print(f"Attempting to load template: {template_name}")
+    logger.info(f"Attempting to load template: {template_name}")
     env = Environment(loader=FileSystemLoader(template_dir))
     try:
         # Try language-specific template first, fall back to English
         try:
             template = env.get_template(template_name)
-            print(f"Successfully loaded template: {template_name}")
+            logger.info(f"Successfully loaded template: {template_name}")
         except TemplateNotFound:
-            print(f"Template {template_name} not found, falling back to English template")
+            logger.warning(f"Template {template_name} not found, falling back to English template")
             template = env.get_template('customer_report_en.html')
+
+    try:
+        logger.info("Starting template rendering...")
         html_content = template.render(
             report_id=report_data.report_id,
             report_uuid=report_data.report_uuid,
@@ -183,8 +187,21 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
             approved_at=report_data.approved_at,
             published_at=report_data.published_at,
         )
+        logger.info("Template rendering completed successfully")
+    except Exception as e:
+        logger.error(f"Template rendering failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Template rendering failed: {str(e)}")
 
+    try:
+        logger.info("Starting PDF generation with Playwright...")
         pdf_bytes = asyncio.run(_generate_pdf_with_playwright(html_content))
+        logger.info("PDF generation completed successfully")
+    except Exception as e:
+        logger.error(f"PDF generation with Playwright failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"PDF generation failed: {str(e)}")
+
+    try:
+        logger.info("Checking for PDF password encryption...")
         report = db.get(Report, report_id)
         if report and report.final_pdf_password_encrypted:
             PdfReader, PdfWriter = _load_pypdf()
