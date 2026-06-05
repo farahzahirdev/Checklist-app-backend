@@ -43,7 +43,7 @@ def admin_dashboard(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminDashboardResponse:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, _admin)
     return get_admin_dashboard(db, company_id=company_id, lang_code=lang_code)
 
 
@@ -59,7 +59,7 @@ def admin_awaiting_review(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> list[AdminAwaitingReviewItemResponse]:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, _admin)
     return get_admin_awaiting_review(db, company_id=company_id, lang_code=lang_code)
 
 
@@ -74,7 +74,7 @@ def admin_activity(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> list[AdminActivityItemResponse]:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, _admin)
     return get_admin_activity_feed(db, lang_code=lang_code)
 
 
@@ -90,7 +90,7 @@ def admin_distribution(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminAssessmentDistributionResponse:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, _admin)
     return get_admin_assessment_distribution(db, company_id=company_id, lang_code=lang_code)
 
 
@@ -105,7 +105,7 @@ def admin_retention(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminRetentionStatusResponse:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, _admin)
     return get_admin_retention_status(db, lang_code=lang_code)
 
 
@@ -120,7 +120,7 @@ def admin_system_health(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AdminSystemHealthResponse:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, _admin)
     return get_admin_system_health(db, lang_code=lang_code)
 
 
@@ -136,7 +136,7 @@ def auditor_dashboard(
     _auditor=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> AuditorDashboardResponse:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, _auditor)
     return get_auditor_dashboard(db, company_id=company_id, lang_code=lang_code)
 
 
@@ -151,7 +151,7 @@ def customer_dashboard(
     customer=Depends(require_roles(UserRole.customer)),
     db: Session = Depends(get_db),
 ) -> CustomerDashboardResponse:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, customer)
     return get_customer_dashboard(db, user_id=customer.id, lang_code=lang_code)
 
 
@@ -166,6 +166,6 @@ def customer_dashboard_enhanced(
     customer=Depends(require_roles(UserRole.customer)),
     db: Session = Depends(get_db),
 ) -> CustomerAssessmentDashboardResponse:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, customer)
     from app.services.customer_assessments import get_customer_dashboard_enhanced
     return get_customer_dashboard_enhanced(db, user_id=customer.id, lang_code=lang_code)

@@ -45,7 +45,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     description="Creates a new customer account. Email, password, and company/organization name are required; industry, size, and region are optional.",
 )
 def register(request: RegistrationRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     try:
         return register_user(
             db,
@@ -78,7 +78,7 @@ def register(request: RegistrationRequest, http_request: Request, db: Session = 
     ),
 )
 def login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     try:
         return authenticate_user(db, email=request.email, password=request.password, lang_code=lang_code)
     except HTTPException as exc:
@@ -93,7 +93,7 @@ def login(request: LoginRequest, http_request: Request, db: Session = Depends(ge
     description="Issues a password reset token and sends an email if the account exists.",
 )
 def forgot_password(request: ForgotPasswordRequest, http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     frontend_base_url = (http_request.headers.get("origin") or str(http_request.base_url)).rstrip("/")
     issue_forgot_password_reset(
         db,
@@ -115,7 +115,7 @@ def request_email_verification(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> MessageResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     frontend_base_url = (http_request.headers.get("origin") or str(http_request.base_url)).rstrip("/")
     issue_email_verification_request(
         db,
@@ -139,7 +139,7 @@ def confirm_email_verification_token(
     http_request: Request,
     db: Session = Depends(get_db),
 ) -> AuthResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     return confirm_email_verification(db, token=request.token, lang_code=lang_code)
 
 
@@ -150,7 +150,7 @@ def confirm_email_verification_token(
     description="Resets account password using a valid password-reset token.",
 )
 def reset_password(request: ResetPasswordWithTokenRequest, http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     reset_password_with_token(
         db,
         token=request.token,
@@ -168,7 +168,7 @@ def reset_password(request: ResetPasswordWithTokenRequest, http_request: Request
     description="Verifies login-time challenge_token plus TOTP code and returns the final bearer access token.",
 )
 def verify_login_mfa_challenge(request: MfaChallengeVerifyRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     try:
         return verify_mfa_challenge(db, challenge_token=request.challenge_token, code=request.code, lang_code=lang_code)
     except HTTPException as exc:
@@ -194,7 +194,7 @@ def me(http_request: Request, db: Session = Depends(get_db), current_user=Depend
     description="Stateless logout acknowledgement. Client should delete the stored bearer token.",
 )
 def logout(http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     return MessageResponse(message=translate("logged_out", lang_code))
 
 
@@ -205,7 +205,7 @@ def logout(http_request: Request, db: Session = Depends(get_db)) -> MessageRespo
     description="Requires bearer auth. Generates a new TOTP shared secret and otpauth URI to enroll an authenticator app.",
 )
 def setup_mfa(http_request: Request, current_user=Depends(get_current_user), db: Session = Depends(get_db)) -> MfaSetupDetailsResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     return start_mfa_enrollment(db, user=current_user, lang_code=lang_code)
 
 
@@ -216,7 +216,7 @@ def setup_mfa(http_request: Request, current_user=Depends(get_current_user), db:
     description="Requires bearer auth. Confirms a TOTP code to activate MFA on the authenticated account.",
 )
 def verify_mfa(request: MfaVerifyRequest, http_request: Request, current_user=Depends(get_current_user), db: Session = Depends(get_db)) -> AuthResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     return confirm_mfa_enrollment(db, user=current_user, code=request.code, lang_code=lang_code)
 
 
@@ -233,5 +233,5 @@ def assign_role(
     current_user=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> AuthResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     return update_user_role(db, actor_user=current_user, user_id=user_id, role_code=request.role, lang_code=lang_code)

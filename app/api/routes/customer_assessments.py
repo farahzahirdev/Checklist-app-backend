@@ -57,7 +57,7 @@ def list_customer_assessments(
     db: Session = Depends(get_db),
 ) -> CustomerAssessmentListResponse:
     """Get customer's assessments with filtering and sorting."""
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     
     return get_customer_assessments(
         db=db,
@@ -85,7 +85,7 @@ def get_customer_assessment_dashboard(
     db: Session = Depends(get_db),
 ) -> CustomerAssessmentDashboardResponse:
     """Get enhanced customer dashboard."""
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     
     return get_customer_dashboard_enhanced(
         db=db,
@@ -107,7 +107,7 @@ def get_assessment_details(
     db: Session = Depends(get_db),
 ) -> AssessmentDetail:
     """Get detailed assessment information."""
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     
     try:
         return get_assessment_detail(
@@ -133,7 +133,7 @@ def get_assessment_progress_endpoint(
     db: Session = Depends(get_db),
 ) -> AssessmentProgress:
     """Get assessment progress details."""
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     
     try:
         return get_assessment_progress(
@@ -211,7 +211,7 @@ def get_assessment_analytics_endpoint(
     db: Session = Depends(get_db),
 ) -> AssessmentAnalytics:
     """Get assessment analytics."""
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     
     return get_assessment_analytics(
         db=db,
@@ -236,7 +236,7 @@ def compare_assessments(
     # This is a placeholder implementation
     # In a real implementation, this would fetch the assessments and perform comparison analysis
     
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     
     # Fetch assessment summaries
     assessments = []

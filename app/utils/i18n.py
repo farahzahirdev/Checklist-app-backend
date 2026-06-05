@@ -5,7 +5,22 @@ from app.models.user import User
 
 DEFAULT_LANGUAGE_CODE = "cs"
 
-def get_language_code(request: Request, db: Session) -> str:
+def get_language_code(request: Request, db: Session, current_user: User | None = None) -> str:
+    # First priority: user's preferred_language if valid
+    if current_user and hasattr(current_user, 'preferred_language') and current_user.preferred_language:
+        lang_code = current_user.preferred_language.lower()
+        # Normalize Czech aliases
+        if lang_code == "cz":
+            lang_code = "cs"
+        
+        # Check if the user's preferred language is valid
+        if lang_code:
+            lang = db.scalar(
+                db.query(Language).filter(Language.code == lang_code, Language.is_active == True)
+            )
+            if lang:
+                return lang.code
+    
     # Explicit query parameter wins: ?lang=cs or ?lang=en
     lang_code = request.query_params.get("lang")
     if lang_code:

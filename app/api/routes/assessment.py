@@ -51,7 +51,7 @@ def start_assessment_route(
 ) -> AssessmentSessionResponse:
     from app.models.user import UserRole
     from app.services.company_context import resolve_company_id
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     # Require customers to have a company set up before starting assessments
     if current_user.role != UserRole.admin:
         resolved_company_id = resolve_company_id(current_user, request.company_id)
@@ -76,7 +76,7 @@ def get_current_assessment_route(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentSessionResponse:
-    lang_code = get_language_code(http_request, db) if http_request else None
+    lang_code = get_language_code(http_request, db, current_user) if http_request else None
     return get_current_assessment(db, user=current_user, checklist_id=checklist_id, company_id=company_id, lang_code=lang_code)
 
 
@@ -96,7 +96,7 @@ def get_current_assessment_detail_route(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentDetailResponse:
-    lang_code = get_language_code(http_request, db) if http_request else None
+    lang_code = get_language_code(http_request, db, current_user) if http_request else None
     return get_current_assessment_detail(db, user=current_user, checklist_id=checklist_id, company_id=company_id, lang_code=lang_code)
 
 
@@ -116,7 +116,7 @@ def get_assessment_detail_by_id_route(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentDetailResponse:
-    lang_code = get_language_code(http_request, db) if http_request else None
+    lang_code = get_language_code(http_request, db, current_user) if http_request else None
     return get_assessment_detail_by_id(
         db, user=current_user, assessment_id=assessment_id, company_id=company_id, lang_code=lang_code
     )
@@ -139,7 +139,7 @@ def get_assessment_answers_route(
 ) -> list[AssessmentAnswerResponse]:
     from app.models.assessment import AssessmentAnswer
     
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     
     # Verify assessment belongs to user and is active
     assessment = db.scalar(
@@ -245,7 +245,7 @@ def save_answer_route(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentAnswerResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     return upsert_assessment_answer(
         db,
         user=current_user,
@@ -276,7 +276,7 @@ def upsert_answer_route(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentAnswerResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     return upsert_assessment_answer(
         db,
         user=current_user,
@@ -304,7 +304,7 @@ def save_bulk_answers_route(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[AssessmentAnswerResponse]:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     
     results = []
     for request in requests:
@@ -342,7 +342,7 @@ def submit_assessment_route(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> AssessmentSubmitResponse:
-    lang_code = get_language_code(http_request, db)
+    lang_code = get_language_code(http_request, db, current_user)
     return submit_assessment(db, user=current_user, assessment_id=assessment_id, company_id=company_id, lang_code=lang_code)
 
 @router.post(
@@ -358,7 +358,7 @@ def upload_evidence_file(
     db: Session = Depends(get_db),
 ):
     # Get language code for error messages
-    lang_code = get_language_code(http_request, db) if http_request else "en"
+    lang_code = get_language_code(http_request, db, current_user) if http_request else "en"
     
     # Validate extension
     if not allowed_file(file.filename):

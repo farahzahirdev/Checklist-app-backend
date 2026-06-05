@@ -37,7 +37,7 @@ def setup_payment_intent(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> PaymentSetupResponse:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     payment, client_secret = create_payment_intent_for_user(
         db,
         user_id=current_user.id,
@@ -69,7 +69,7 @@ def get_user_payment_status(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> PaymentState:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     if user_id != current_user.id and current_user.role != UserRole.admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("forbidden", lang_code))
 
@@ -128,7 +128,7 @@ def create_checkout_session(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     url = create_checkout_session_for_user(
         user_id=current_user.id,
         success_url=success_url,
@@ -205,7 +205,7 @@ def admin_update_payment_status(
     _admin=Depends(require_roles(UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> PaymentState:
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, _admin)
     return admin_set_payment_status(
         db,
         user_id=user_id,

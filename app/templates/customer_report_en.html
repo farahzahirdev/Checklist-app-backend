@@ -344,12 +344,12 @@
 <body>
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 1: COVER / IDENTIFIKACE ZPRÁVY
+     PAGE 1: COVER / REPORT IDENTIFICATION
      ══════════════════════════════════════════════════════════════ -->
 <div class="page">
 
     <div class="cover-hero">
-        <p class="cover-kicker">Zpráva o hodnocení souladu</p>
+        <p class="cover-kicker">Compliance Assessment Report</p>
         <h1 class="cover-title">{{ checklist_title }}</h1>
         <div class="cover-meta">
             <div class="cover-meta-icon">
@@ -357,23 +357,23 @@
             </div>
             <div>
                 <div class="cover-meta-text">{{ audit_type or checklist_title }}</div>
-                <div class="cover-meta-sub">Rámec: {{ framework_name or audit_type or checklist_title }}</div>
+                <div class="cover-meta-sub">Framework: {{ framework_name or audit_type or checklist_title }}</div>
             </div>
         </div>
-        <div class="cover-prepared">Připraveno: <strong>AuditReady</strong></div>
+        <div class="cover-prepared">Prepared by: <strong>AuditReady</strong></div>
     </div>
 
     <div class="cover-details">
         <div class="cover-detail-row">
-            <span class="cover-detail-label">Typ auditu / Režim</span>
+            <span class="cover-detail-label">Audit Type / Regime</span>
             <span class="cover-detail-value normal">{{ audit_type or checklist_title }}</span>
         </div>
         <div class="cover-detail-row">
-            <span class="cover-detail-label">Kód zprávy</span>
+            <span class="cover-detail-label">Report Code</span>
             <span class="cover-detail-value">{{ report_id }}</span>
         </div>
         <div class="cover-detail-row">
-            <span class="cover-detail-label">Název společnosti</span>
+            <span class="cover-detail-label">Company Name</span>
             <span class="cover-detail-value normal">{{ company_name or customer_name }}</span>
         </div>
         <div class="cover-detail-row">
@@ -385,11 +385,11 @@
             <span class="cover-detail-value score">{{ "%.1f"|format(total_score_percentage) }}%</span>
         </div>
         <div class="cover-detail-row">
-            <span class="cover-detail-label">Klasifikace dokumentu</span>
-            <span class="cover-detail-value normal">Důvěrné</span>
+            <span class="cover-detail-label">Document Classification</span>
+            <span class="cover-detail-value normal">Confidential</span>
         </div>
         <div class="cover-detail-row">
-            <span class="cover-detail-label">Připraveno</span>
+            <span class="cover-detail-label">Prepared by</span>
             <span class="cover-detail-value normal">AuditReady</span>
         </div>
     </div>
@@ -450,13 +450,13 @@
 
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 3: CÍL AUDITU A METODA HODNOCENÍ
+     PAGE 3: AUDIT OBJECTIVE AND ASSESSMENT METHOD
      ══════════════════════════════════════════════════════════════ -->
 <div class="page">
     <div class="page-header">
         <p class="page-header-kicker">Audit Overview</p>
         <h2 class="page-header-title">2 &nbsp; Audit Objective and Assessment Method</h2>
-        <p class="page-header-subtitle">Tato strana popisuje účel auditu, způsob hodnocení a klíčové provozní údaje dokončené kontroly.</p>
+        <p class="page-header-subtitle">This page describes the audit objective, assessment method, and key operational data of the completed review.</p>
     </div>
 
     <h3 class="section-heading">2.1 &nbsp; Basic Audit Information</h3>
@@ -492,12 +492,12 @@
             <tbody>
                 <tr>
                     <td><span class="badge badge-green">4</span></td>
-                    <td><strong>Plně implementováno</strong> (ANO)</td>
+                    <td><strong>Fully implemented</strong> (YES)</td>
                     <td>The requirement is fully implemented, consistently applied in practice, and supported by appropriate and sufficient evidence.</td>
                 </tr>
                 <tr>
                     <td><span class="badge badge-amber">3</span></td>
-                    <td><strong>Částečně implementováno</strong> (ČÁSTEČNĚ)</td>
+                    <td><strong>Partially implemented</strong> (PARTIALLY)</td>
                     <td>The requirement is implemented to a limited extent. There are gaps in implementation, consistency, or supporting evidence.</td>
                 </tr>
                 <tr>
@@ -507,7 +507,7 @@
                 </tr>
                 <tr>
                     <td><span class="badge badge-red">1</span></td>
-                    <td><strong>Neimplementováno</strong> (NE)</td>
+                    <td><strong>Not implemented</strong> (NO)</td>
                     <td>The requirement is not implemented at all. No relevant measures or evidence are available.</td>
                 </tr>
             </tbody>
@@ -523,7 +523,7 @@
 
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 4: MANAŽERSKÉ SHRNUTÍ
+     PAGE 4: EXECUTIVE SUMMARY
      ══════════════════════════════════════════════════════════════ -->
 <div class="page">
     <div class="page-header">
@@ -581,7 +581,7 @@
             </div>
             {% endif %}
             <div style="display:flex;gap:16px;margin-top:10px;font-size:9.5px;color:var(--slate-500);">
-                <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:2px;background:var(--blue-500);"></span> Aktuální skóre (%)</span>
+                <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:2px;background:var(--blue-500);"></span> Current score (%)</span>
             </div>
         </div>
 
@@ -634,7 +634,7 @@
 
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 5: PŘEHLED VÝSLEDKŮ PO KAPITOLÁCH
+     PAGE 5: RESULTS OVERVIEW BY CHAPTER
      ══════════════════════════════════════════════════════════════ -->
 <div class="page">
     <div class="page-header">
@@ -651,7 +651,7 @@
                     <th style="width:34%;">Chapter / Section</th>
                     <th style="width:13%; text-align:center;">Maturity Score</th>
                     <th style="width:13%; text-align:center;">High Priorities</th>
-                    <th>Summary administrátora</th>
+                    <th>Administrator summary</th>
                 </tr>
             </thead>
             <tbody>
@@ -682,7 +682,7 @@
                         {% if section_summary and section_summary.summary_text %}
                         {{ section_summary.summary_text[:110] }}{% if section_summary.summary_text|length > 110 %}…{% endif %}
                         {% else %}
-                        <em>Summary není k dispozici</em>
+                        <em>Summary not available</em>
                         {% endif %}
                     </td>
                 </tr>
@@ -692,8 +692,8 @@
     </div>
 
     <div style="margin-top:12px; background:var(--slate-50); border-radius:8px; padding:10px 12px; font-size:10px; color:var(--slate-500); border:1px solid var(--slate-200);">
-        <strong>Note:</strong> High Priorities zahrnují zjištění s kritickou (vysokou) i střední prioritou vyžadující pozornost.
-        Rating barevně: <span class="badge badge-green" style="margin:0 4px;">≥ 80 %</span> low risk &nbsp;
+        <strong>Note:</strong> High Priorities include findings with critical (high) and medium priority requiring attention.
+        Color rating: <span class="badge badge-green" style="margin:0 4px;">≥ 80 %</span> low risk &nbsp;
         <span class="badge badge-amber" style="margin:0 4px;">60–79 %</span> medium risk &nbsp;
         <span class="badge badge-red" style="margin:0 4px;">&lt; 60 %</span> high risk
     </div>
@@ -774,7 +774,7 @@
             <thead>
                 <tr>
                     <th>Priority</th>
-                    <th>Findings / Požadavek</th>
+                    <th>Findings / Requirement</th>
                 </tr>
             </thead>
             <tbody>

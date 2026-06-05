@@ -131,7 +131,7 @@ def get_profile(
     Returns:
         CustomerProfileResponse with user and company context
     """
-    lang_code = get_language_code(http_request, db) if http_request else "en"
+    lang_code = get_language_code(http_request, db, current_user) if http_request else "en"
     
     try:
         profile_data = _serialize_profile(current_user, db)
@@ -227,7 +227,7 @@ def update_profile(
     """
     from app.models.company import Company
     
-    lang_code = get_language_code(http_request, db) if http_request else "en"
+    lang_code = get_language_code(http_request, db, current_user) if http_request else "en"
     
     try:
         # Update user profile fields if provided
@@ -453,7 +453,7 @@ def change_password(
     Returns:
         Success message
     """
-    lang_code = get_language_code(http_request, db) if http_request else "en"
+    lang_code = get_language_code(http_request, db, current_user) if http_request else "en"
     
     try:
         # Verify current password
@@ -542,7 +542,7 @@ def create_mfa_support_request(
     from app.models.user import UserRole
     from app.services.notifications import NotificationEvent, NotificationEventType, NotificationService
 
-    lang_code = get_language_code(http_request, db) if http_request else "en"
+    lang_code = get_language_code(http_request, db, current_user) if http_request else "en"
 
     if str(current_user.role) != UserRole.customer.value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("insufficient_permissions", lang_code))

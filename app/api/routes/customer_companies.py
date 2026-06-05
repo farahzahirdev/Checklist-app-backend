@@ -46,7 +46,7 @@ def list_my_companies(
     limit: int = Query(100, ge=1, le=1000),
 ) -> dict:
     """List primary company for the current user (single-tenant)."""
-    lang = get_language_code(request, db)
+    lang = get_language_code(request, db, current_user)
 
     companies = []
     if current_user.primary_company_id:
@@ -65,7 +65,7 @@ def create_company(
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> Company:
     """Create a new company and assign current user as owner."""
-    lang = get_language_code(request, db)
+    lang = get_language_code(request, db, current_user)
 
     existing = db.query(Company).filter(Company.slug == payload.slug.lower()).first()
     if existing:
@@ -113,7 +113,7 @@ def get_company_detail(
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> dict:
     """Get primary company details for the current user (single-tenant)."""
-    lang = get_language_code(request, db)
+    lang = get_language_code(request, db, current_user)
 
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
@@ -139,7 +139,7 @@ def update_company_customer(
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> Company:
     """Update primary company details (single-tenant)."""
-    lang = get_language_code(request, db)
+    lang = get_language_code(request, db, current_user)
 
     company = db.query(Company).filter(Company.id == company_id).first()
     if not company:
@@ -184,7 +184,7 @@ def list_company_users_customer(
     limit: int = Query(100, ge=1, le=1000),
 ) -> dict:
     """List users in a company if requesting user is assigned."""
-    lang = get_language_code(request, db)
+    lang = get_language_code(request, db, current_user)
 
     assignment = _user_assignment(db, current_user.id, company_id)
     if not assignment and current_user.role != "admin":
@@ -210,7 +210,7 @@ def select_primary_company(
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> Company:
     """Set the user's primary company (for default tenant-scoped actions)."""
-    lang = get_language_code(request, db)
+    lang = get_language_code(request, db, current_user)
 
     assignment = _user_assignment(db, current_user.id, company_id)
     if not assignment:
@@ -235,7 +235,7 @@ def leave_company(
     db: Annotated[Session, Depends(get_db)] = None,
 ) -> None:
     """Allow current user to leave a company (deactivate their assignment). Owners cannot leave without transferring ownership."""
-    lang = get_language_code(request, db)
+    lang = get_language_code(request, db, current_user)
 
     assignment = db.query(UserCompanyAssignment).filter(
         UserCompanyAssignment.user_id == current_user.id,
