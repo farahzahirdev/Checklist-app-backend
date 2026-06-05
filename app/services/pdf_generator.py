@@ -229,7 +229,7 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     # Select template based on language
     template_name = f'customer_report_{lang_code}.html'
-    print(f"Attempting to load template: {template_name}")
+    logger.info(f"Attempting to load template: {template_name}")
     env = Environment(loader=FileSystemLoader(template_dir))
     try:
         # Try language-specific template first, fall back to English

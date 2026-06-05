@@ -562,7 +562,9 @@
                     </filter>
                 </defs>
                 {% for level in spider_chart_data.grid_levels %}
-                <path d="M {{ level|join(' L ') }} Z" fill="none" stroke="{% if loop.index == 3 %'#cbd5e1'{% else %}'#e2e8f0'{% endif %}" stroke-width="{% if loop.index == 3 %'1.5'{% else %'1'{% endif %}"/>
+                {% set stroke_color = '#cbd5e1' if loop.index == 3 else '#e2e8f0' %}
+                {% set stroke_width = '1.5' if loop.index == 3 else '1' %}
+                <path d="M {{ level|join(' L ') }} Z" fill="none" stroke="{{ stroke_color }}" stroke-width="{{ stroke_width }}"/>
                 {% endfor %}
                 <!-- Axis lines -->
                 {% for line in spider_chart_data.axis_lines %}
