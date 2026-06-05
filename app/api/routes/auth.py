@@ -44,10 +44,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     summary="Register User",
     description="Creates a new customer account. Email, password, and company/organization name are required; industry, size, and region are optional.",
 )
-def register(request: RegistrationRequest, http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user),
+def register(request: RegistrationRequest, http_request: Request, db: Session = Depends(get_db),
 ) -> AuthResponse:
     
-    lang_code = get_language_code(http_request, db, current_user)
+    lang_code = 'cs'
     try:
         return register_user(
             db,
@@ -79,9 +79,9 @@ def register(request: RegistrationRequest, http_request: Request, db: Session = 
         "If MFA is not enabled, this endpoint returns access_token directly."
     ),
 )
-def login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user),
+def login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db),
 ) -> AuthResponse:
-    lang_code = get_language_code(http_request, db, current_user)
+    lang_code = 'cs'
     try:
         return authenticate_user(db, email=request.email, password=request.password, lang_code=lang_code)
     except HTTPException as exc:
@@ -95,8 +95,8 @@ def login(request: LoginRequest, http_request: Request, db: Session = Depends(ge
     summary="Request Password Reset",
     description="Issues a password reset token and sends an email if the account exists.",
 )
-def forgot_password(request: ForgotPasswordRequest, http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> MessageResponse:
-    lang_code = get_language_code(http_request, db, current_user)
+def forgot_password(request: ForgotPasswordRequest, http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
+    lang_code = 'cs'
     frontend_base_url = (http_request.headers.get("origin") or str(http_request.base_url)).rstrip("/")
     issue_forgot_password_reset(
         db,
@@ -141,10 +141,9 @@ def confirm_email_verification_token(
     request: EmailVerificationConfirmRequest,
     http_request: Request,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
 
 ) -> AuthResponse:
-    lang_code = get_language_code(http_request, db, current_user)
+    lang_code = 'cs'
     return confirm_email_verification(db, token=request.token, lang_code=lang_code)
 
 
@@ -154,8 +153,8 @@ def confirm_email_verification_token(
     summary="Reset Password With Token",
     description="Resets account password using a valid password-reset token.",
 )
-def reset_password(request: ResetPasswordWithTokenRequest, http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> MessageResponse:
-    lang_code = get_language_code(http_request, db, current_user)
+def reset_password(request: ResetPasswordWithTokenRequest, http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
+    lang_code = 'cs'
     reset_password_with_token(
         db,
         token=request.token,
@@ -172,8 +171,8 @@ def reset_password(request: ResetPasswordWithTokenRequest, http_request: Request
     summary="Verify MFA Login Challenge",
     description="Verifies login-time challenge_token plus TOTP code and returns the final bearer access token.",
 )
-def verify_login_mfa_challenge(request: MfaChallengeVerifyRequest, http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> AuthResponse:
-    lang_code = get_language_code(http_request, db, current_user)
+def verify_login_mfa_challenge(request: MfaChallengeVerifyRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+    lang_code = 'cs'
     try:
         return verify_mfa_challenge(db, challenge_token=request.challenge_token, code=request.code, lang_code=lang_code)
     except HTTPException as exc:
