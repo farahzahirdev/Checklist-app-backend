@@ -146,6 +146,9 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
         except TemplateNotFound:
             logger.warning(f"Template {template_name} not found, falling back to English template")
             template = env.get_template('customer_report_en.html')
+    except Exception as e:
+        logger.error(f"Failed to load template: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to load template: {str(e)}")
 
     try:
         logger.info("Starting template rendering...")
