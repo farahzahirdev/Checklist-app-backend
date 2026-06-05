@@ -1,6 +1,7 @@
 from fastapi import Request
 from sqlalchemy.orm import Session
 from app.models.reference import Language
+from app.models.user import User
 
 DEFAULT_LANGUAGE_CODE = "cs"
 

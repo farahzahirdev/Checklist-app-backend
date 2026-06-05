@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import HTTPException, status
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound, TemplateNotFound
 from sqlalchemy.orm import Session
 from playwright.async_api import async_playwright
 
@@ -177,12 +177,15 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
 
     # Select template based on language
     template_name = f'customer_report_{lang_code}.html'
+    print(f"Attempting to load template: {template_name}")
     env = Environment(loader=FileSystemLoader(template_dir))
     try:
         # Try language-specific template first, fall back to English
         try:
             template = env.get_template(template_name)
-        except:
+            print(f"Successfully loaded template: {template_name}")
+        except TemplateNotFound:
+            print(f"Template {template_name} not found, falling back to English template")
             template = env.get_template('customer_report_en.html')
         html_content = template.render(
             report_id=report_data.report_id,
@@ -249,12 +252,15 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     # Select template based on language
     template_name = f'customer_report_{lang_code}.html'
+    print(f"Attempting to load template: {template_name}")
     env = Environment(loader=FileSystemLoader(template_dir))
     try:
         # Try language-specific template first, fall back to English
         try:
             template = env.get_template(template_name)
-        except:
+            print(f"Successfully loaded template: {template_name}")
+        except TemplateNotFound:
+            print(f"Template {template_name} not found, falling back to English template")
             template = env.get_template('customer_report_en.html')
         report_data = get_customer_report_data(db, report_id=report_id, company_id=company_id, lang_code=lang_code)
         section_scores = [score.model_dump(mode='json') for score in report_data.section_scores]

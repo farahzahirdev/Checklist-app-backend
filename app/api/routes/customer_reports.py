@@ -44,7 +44,7 @@ def list_customer_reports(
             detail="Only customers can access their reports"
         )
     
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
     if not user_has_company_access(db, user=current_user, company_id=resolved_company_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only customers can access their reports")
@@ -98,7 +98,7 @@ def get_customer_report_by_assessment(
             detail="Only customers can access their reports"
         )
     
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
     
     # Verify the assessment belongs to the customer
@@ -143,7 +143,7 @@ def get_customer_report(
             detail="Only customers can access their reports"
         )
     
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
     
     # Get the report
@@ -188,7 +188,7 @@ def download_customer_report_pdf(
             detail="Only customers can download their reports"
         )
     
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
     
     # Get the report
@@ -245,7 +245,7 @@ def get_customer_report_data_endpoint(
             detail="Only customers can access their reports"
         )
     
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
     
     # Get the report
@@ -290,7 +290,7 @@ def get_customer_report_pdf_password(
             detail="Only customers can access their reports",
         )
 
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
 
     from app.services.report import get_report
@@ -323,7 +323,7 @@ def preview_customer_report_html(
             detail="Only customers can access their reports"
         )
     
-    lang_code = get_language_code(request, db)
+    lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
     
     # Get the report
