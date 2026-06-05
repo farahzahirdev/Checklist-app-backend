@@ -44,7 +44,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
     summary="Register User",
     description="Creates a new customer account. Email, password, and company/organization name are required; industry, size, and region are optional.",
 )
-def register(request: RegistrationRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+def register(request: RegistrationRequest, http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user),
+) -> AuthResponse:
+    
     lang_code = get_language_code(http_request, db, current_user)
     try:
         return register_user(
@@ -77,7 +79,8 @@ def register(request: RegistrationRequest, http_request: Request, db: Session = 
         "If MFA is not enabled, this endpoint returns access_token directly."
     ),
 )
-def login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+def login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user),
+) -> AuthResponse:
     lang_code = get_language_code(http_request, db, current_user)
     try:
         return authenticate_user(db, email=request.email, password=request.password, lang_code=lang_code)
@@ -92,7 +95,7 @@ def login(request: LoginRequest, http_request: Request, db: Session = Depends(ge
     summary="Request Password Reset",
     description="Issues a password reset token and sends an email if the account exists.",
 )
-def forgot_password(request: ForgotPasswordRequest, http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
+def forgot_password(request: ForgotPasswordRequest, http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> MessageResponse:
     lang_code = get_language_code(http_request, db, current_user)
     frontend_base_url = (http_request.headers.get("origin") or str(http_request.base_url)).rstrip("/")
     issue_forgot_password_reset(
@@ -138,6 +141,8 @@ def confirm_email_verification_token(
     request: EmailVerificationConfirmRequest,
     http_request: Request,
     db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+
 ) -> AuthResponse:
     lang_code = get_language_code(http_request, db, current_user)
     return confirm_email_verification(db, token=request.token, lang_code=lang_code)
@@ -149,7 +154,7 @@ def confirm_email_verification_token(
     summary="Reset Password With Token",
     description="Resets account password using a valid password-reset token.",
 )
-def reset_password(request: ResetPasswordWithTokenRequest, http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
+def reset_password(request: ResetPasswordWithTokenRequest, http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> MessageResponse:
     lang_code = get_language_code(http_request, db, current_user)
     reset_password_with_token(
         db,
@@ -167,7 +172,7 @@ def reset_password(request: ResetPasswordWithTokenRequest, http_request: Request
     summary="Verify MFA Login Challenge",
     description="Verifies login-time challenge_token plus TOTP code and returns the final bearer access token.",
 )
-def verify_login_mfa_challenge(request: MfaChallengeVerifyRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+def verify_login_mfa_challenge(request: MfaChallengeVerifyRequest, http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> AuthResponse:
     lang_code = get_language_code(http_request, db, current_user)
     try:
         return verify_mfa_challenge(db, challenge_token=request.challenge_token, code=request.code, lang_code=lang_code)
@@ -193,7 +198,7 @@ def me(http_request: Request, db: Session = Depends(get_db), current_user=Depend
     summary="Logout",
     description="Stateless logout acknowledgement. Client should delete the stored bearer token.",
 )
-def logout(http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
+def logout(http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> MessageResponse:
     lang_code = get_language_code(http_request, db, current_user)
     return MessageResponse(message=translate("logged_out", lang_code))
 
