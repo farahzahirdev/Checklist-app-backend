@@ -15,6 +15,7 @@ class ReportSummaryItem(BaseModel):
     section_title: str | None = None
     chapter_code: str | None = None
     summary_text: str | None = None
+    recommendation_text: str | None = None
     score: int | None = None
     max_score: int | None = None
     percentage: float | None = None
@@ -92,6 +93,7 @@ class UpsertReportSummaryRequest(BaseModel):
     section_id: UUID | None = None
     chapter_code: str | None = Field(default=None, max_length=120)
     summary_text: str = Field(min_length=10, max_length=5000)
+    recommendation_text: str | None = Field(default=None, max_length=5000)
 
 
 class ReportQuestionScoreItem(BaseModel):
@@ -176,7 +178,7 @@ class CustomerReportDataResponse(BaseModel):
     findings: list[dict] = Field(description="List of {question_text, answer, priority, recommendation}")
     
     # Admin summaries
-    section_summaries: list[dict] = Field(description="Admin-written section summaries")
+    section_summaries: list[dict] = Field(description="Admin-written section summaries with recommendations")
     management_summary: str | None = None
     
     # Public suggestions

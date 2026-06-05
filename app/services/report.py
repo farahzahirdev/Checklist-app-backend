@@ -689,12 +689,14 @@ def upsert_report_summary(
             section_id=payload.section_id,
             chapter_code=payload.chapter_code,
             summary_text=payload.summary_text,
+            recommendation_text=payload.recommendation_text,
             created_by=actor.id,
             updated_by=actor.id,
         )
         db.add(summary)
     else:
         summary.summary_text = payload.summary_text
+        summary.recommendation_text = payload.recommendation_text
         summary.updated_by = actor.id
 
     _create_review_event(
@@ -959,6 +961,13 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
         
         if not questions:
             continue
+        
+        # Get section translation and domain first
+        translation = _latest_section_translation(db, section.id)
+        section_title = sanitize_text(translation.title) if translation else section.section_code
+        # Use section_code as the domain instead of question.report_domain
+        # This ensures the radar chart shows actual checklist sections (e.g., § 3, § 4, § 5)
+        section_domain = section.section_code or "General"
             
         # Get answers for these questions
         question_ids = [q.id for q in questions]
@@ -991,7 +1000,7 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
                 "question_id": question.id,
                 "question_code": question.question_code,
                 "question_title": question_title,
-                "report_domain": question.report_domain,
+                "report_domain": section_domain,  # Use section_domain instead of question.report_domain
                 "score": question_score,
                 "max_score": 4,
                 "percentage": round((question_score / 4 * 100), 1) if 4 > 0 else 0,
@@ -1006,11 +1015,6 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
                 AssessmentEvidenceFile.deleted_at.is_(None)
             )
         ).first() or 0
-        
-        # Get section translation
-        translation = _latest_section_translation(db, section.id)
-        section_title = sanitize_text(translation.title) if translation else section.section_code
-        section_domain = next((q.report_domain for q in questions if q.report_domain), None)
         
         percentage = (total_score / max_score * 100) if max_score > 0 else 0
         
@@ -1260,6 +1264,10 @@ def _get_customer_findings(db: Session, report_id: UUID) -> list[dict]:
                 translation = _latest_section_translation(db, section.id)
                 section_title = sanitize_text(translation.title) if translation else section.section_code
         
+        # Use section_code as domain, fallback to section_title, then to "General"
+        # This ensures we display the actual checklist section/domain (e.g., § 3, § 4, § 5)
+        domain = section_code or section_title or "General"
+        
         # Handle case where recommendation is same as finding text
         recommendation = sanitize_html(finding.recommendation_text) if finding.recommendation_text else None
         if not recommendation or recommendation == sanitize_html(finding.finding_text):
@@ -1269,7 +1277,7 @@ def _get_customer_findings(db: Session, report_id: UUID) -> list[dict]:
             "question_text": finding.finding_text,
             "answer": "No" if finding.priority == PriorityLevel.high else "Don't Know",
             "priority": finding.priority.value,
-            "report_domain": section_code or "General",
+            "report_domain": domain,
             "section_code": section_code,
             "section_title": section_title,
             "recommendation": recommendation
@@ -1301,7 +1309,8 @@ def _get_section_summaries_for_customer(db: Session, report_id: UUID) -> list[di
             "chapter_code": summary.chapter_code or "General",
             "section_code": section_code,
             "section_title": section_title,
-            "summary_text": summary.summary_text
+            "summary_text": summary.summary_text,
+            "recommendation_text": summary.recommendation_text
         })
     
     return customer_summaries

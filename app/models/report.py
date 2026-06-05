@@ -81,6 +81,7 @@ class ReportSectionSummary(Base):
     )
     chapter_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
     summary_text: Mapped[str] = mapped_column(Text, nullable=False)
+    recommendation_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     updated_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
