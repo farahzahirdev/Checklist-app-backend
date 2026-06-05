@@ -434,7 +434,7 @@
         </div>
         {% for section in section_scores %}
         <div class="toc-item">
-            <span class="toc-num">{{ 5 + loop.index0 }}</span>
+            <span class="toc-num">4{{ ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'][loop.index0] }}</span>
             <span class="toc-title">§ {{ loop.index + 2 }} – {{ section.section_title }}</span>
             <span class="toc-dots"></span>
         </div>
@@ -546,41 +546,45 @@
     <div class="chart-legend-grid">
         <!-- Spider chart SVG -->
         <div>
-            {% if chart_type == "radar" %}
-            <svg viewBox="0 0 340 300" style="width:100%; max-width:300px; display:block;">
+            <svg viewBox="0 0 380 340" style="width:100%; max-width:340px; display:block;">
+                <!-- Background grid -->
+                <defs>
+                    <linearGradient id="radarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.2" />
+                        <stop offset="100%" style="stop-color:#2563eb;stop-opacity:0.3" />
+                    </linearGradient>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                        <feMerge>
+                            <feMergeNode in="coloredBlur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
                 {% for level in spider_chart_data.grid_levels %}
-                <path d="M {{ level|join(' L ') }} Z" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+                <path d="M {{ level|join(' L ') }} Z" fill="none" stroke="{% if loop.index == 3 %'#cbd5e1'{% else %}'#e2e8f0'{% endif %}" stroke-width="{% if loop.index == 3 %'1.5'{% else %'1'{% endif %}"/>
                 {% endfor %}
+                <!-- Axis lines -->
                 {% for line in spider_chart_data.axis_lines %}
                 {% set x2, y2 = line.split(',') %}
-                <line x1="170" y1="150" x2="{{ x2 }}" y2="{{ y2 }}" stroke="#e8edf5" stroke-width="1.2"/>
+                <line x1="190" y1="170" x2="{{ x2 }}" y2="{{ y2 }}" stroke="#e8edf5" stroke-width="1"/>
                 {% endfor %}
+                <!-- Section labels -->
                 {% for label in spider_chart_data.labels %}
                 {% set x, y = label.position.split(',') %}
-                <text x="{{ x }}" y="{{ y }}" text-anchor="middle" dominant-baseline="middle" fill="#64748b" font-size="10" font-weight="600" font-family="Inter,Arial,sans-serif">§ {{ label.number }}</text>
+                <text x="{{ x }}" y="{{ y }}" text-anchor="middle" dominant-baseline="middle" fill="#475569" font-size="11" font-weight="700" font-family="Inter,Arial,sans-serif">§ {{ label.number }}</text>
                 {% endfor %}
-                <polygon points="{{ spider_chart_data.data_points|join(' ') }}" fill="rgba(37,99,235,0.13)" stroke="#2563eb" stroke-width="2" stroke-linejoin="round"/>
+                <!-- Data polygon -->
+                <polygon points="{{ spider_chart_data.data_points|join(' ') }}" fill="url(#radarGradient)" stroke="#2563eb" stroke-width="2.5" stroke-linejoin="round" filter="url(#glow)"/>
+                <!-- Data points -->
                 {% for point in spider_chart_data.data_points %}
                 {% set x, y = point.split(',') %}
-                <circle cx="{{ x }}" cy="{{ y }}" r="3.5" fill="#fff" stroke="#2563eb" stroke-width="2"/>
+                <circle cx="{{ x }}" cy="{{ y }}" r="4.5" fill="#fff" stroke="#2563eb" stroke-width="2.5"/>
                 {% endfor %}
+                <!-- Center point -->
+                <circle cx="190" cy="170" r="3" fill="#2563eb"/>
             </svg>
-            {% else %}
-            <div style="width:100%;">
-                {% for section in bar_chart_data.sections %}
-                <div style="margin-bottom:10px;">
-                    <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px;">
-                        <span style="font-weight:600;color:var(--slate-700);">{{ section.title }}</span>
-                        <span style="color:var(--slate-900);">{{ "%.1f"|format(section.percentage) }}%</span>
-                    </div>
-                    <div style="height:6px;background:var(--slate-200);border-radius:3px;">
-                        <div style="height:6px;background:var(--blue-500);border-radius:3px;width:{{ section.percentage }}%;"></div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-            <div style="display:flex;gap:16px;margin-top:10px;font-size:9.5px;color:var(--slate-500);">
+            <div style="display:flex;gap:16px;margin-top:12px;font-size:9.5px;color:var(--slate-500);">
                 <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:2px;background:var(--blue-500);"></span> Aktuální skóre (%)</span>
             </div>
         </div>

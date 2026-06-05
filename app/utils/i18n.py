@@ -1,14 +1,17 @@
+import logging
 from fastapi import Request
 from sqlalchemy.orm import Session
 from app.models.reference import Language
 from app.models.user import User
 
+logger = logging.getLogger(__name__)
 DEFAULT_LANGUAGE_CODE = "cs"
 
 def get_language_code(request: Request, db: Session, current_user: User | None = None) -> str:
     # First priority: user's preferred_language if valid
     if current_user and hasattr(current_user, 'preferred_language') and current_user.preferred_language:
         lang_code = current_user.preferred_language.lower()
+        logger.info(f"User preferred_language: {current_user.preferred_language}, normalized: {lang_code}")
         # Normalize Czech aliases
         if lang_code == "cz":
             lang_code = "cs"
@@ -18,18 +21,24 @@ def get_language_code(request: Request, db: Session, current_user: User | None =
             lang = db.scalar(
                 db.query(Language).filter(Language.code == lang_code, Language.is_active == True)
             )
+            logger.info(f"Database query for language '{lang_code}': found={lang is not None}")
             if lang:
+                logger.info(f"Returning user's preferred language: {lang.code}")
                 return lang.code
+            else:
+                logger.info(f"User's preferred language '{lang_code}' not found or not active in database")
     
     # Explicit query parameter wins: ?lang=cs or ?lang=en
     lang_code = request.query_params.get("lang")
     if lang_code:
+        logger.info(f"Using query parameter language: {lang_code}")
         lang_code = lang_code.split(",")[0].split("-")[0].lower()
 
     # Fallback to Accept-Language header
     if not lang_code:
         accept_language = request.headers.get("accept-language")
         if accept_language:
+            logger.info(f"Using Accept-Language header: {accept_language}")
             lang_code = accept_language.split(",")[0].split("-")[0].lower()
 
     # Normalize Czech aliases
@@ -40,9 +49,13 @@ def get_language_code(request: Request, db: Session, current_user: User | None =
         lang = db.scalar(
             db.query(Language).filter(Language.code == lang_code, Language.is_active == True)
         )
+        logger.info(f"Database query for fallback language '{lang_code}': found={lang is not None}")
         if lang:
+            logger.info(f"Returning fallback language: {lang.code}")
             return lang.code
 
     # Fallback to default
     lang = db.scalar(db.query(Language).filter(Language.is_default == True, Language.is_active == True))
-    return lang.code if lang else DEFAULT_LANGUAGE_CODE
+    result = lang.code if lang else DEFAULT_LANGUAGE_CODE
+    logger.info(f"Returning default language: {result}")
+    return result
