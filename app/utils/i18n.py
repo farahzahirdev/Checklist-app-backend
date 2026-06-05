@@ -15,7 +15,12 @@ def get_language_code(request: Request, db: Session, current_user: User | None =
         # Normalize Czech aliases
         if lang_code == "cz":
             lang_code = "cs"
-        
+
+        # Special case: allow "cs" even if not in database (we have Czech templates)
+        if lang_code == "cs":
+            logger.info(f"Returning Czech language (cs) based on user preference - templates available")
+            return "cs"
+
         # Check if the user's preferred language is valid
         if lang_code:
             lang = db.scalar(
@@ -27,12 +32,19 @@ def get_language_code(request: Request, db: Session, current_user: User | None =
                 return lang.code
             else:
                 logger.info(f"User's preferred language '{lang_code}' not found or not active in database")
-    
+
     # Explicit query parameter wins: ?lang=cs or ?lang=en
     lang_code = request.query_params.get("lang")
     if lang_code:
         logger.info(f"Using query parameter language: {lang_code}")
         lang_code = lang_code.split(",")[0].split("-")[0].lower()
+        # Normalize Czech aliases
+        if lang_code == "cz":
+            lang_code = "cs"
+        # Special case: allow "cs" even if not in database
+        if lang_code == "cs":
+            logger.info(f"Returning Czech language (cs) based on query parameter")
+            return "cs"
 
     # Fallback to Accept-Language header
     if not lang_code:
@@ -40,10 +52,13 @@ def get_language_code(request: Request, db: Session, current_user: User | None =
         if accept_language:
             logger.info(f"Using Accept-Language header: {accept_language}")
             lang_code = accept_language.split(",")[0].split("-")[0].lower()
-
-    # Normalize Czech aliases
-    if lang_code == "cz":
-        lang_code = "cs"
+            # Normalize Czech aliases
+            if lang_code == "cz":
+                lang_code = "cs"
+            # Special case: allow "cs" even if not in database
+            if lang_code == "cs":
+                logger.info(f"Returning Czech language (cs) based on Accept-Language header")
+                return "cs"
 
     if lang_code:
         lang = db.scalar(
