@@ -589,17 +589,26 @@
                             </div>
                         </div>
 
+                        <!-- Section Recommendation -->
+                        {% if section_summary and section_summary.recommendation_text %}
+                        <div class="mt-6">
+                            <h3 class="text-base font-semibold text-[#1f2d45]">Section Recommendation</h3>
+                            <div class="mt-3 rounded-lg border border-[#dbeafe] bg-[#eff6ff] p-4">
+                                <p class="text-sm text-gray-700 leading-relaxed">{{ section_summary.recommendation_text }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+
                         <!-- Findings Table -->
                         {% if section_findings %}
                         <div class="mt-6">
-                            <h3 class="text-base font-semibold text-[#1f2d45]">Findings &amp; Recommendations</h3>
+                            <h3 class="text-base font-semibold text-[#1f2d45]">Findings</h3>
                             <div class="mt-3 overflow-x-auto">
                                 <table class="w-full border-collapse text-sm">
                                     <thead>
                                         <tr class="bg-[#f8fbff]">
                                             <th class="border border-[#e3ebf7] px-3 py-2 text-left font-semibold text-[#1f2d45]">Priority</th>
                                             <th class="border border-[#e3ebf7] px-3 py-2 text-left font-semibold text-[#1f2d45]">Finding</th>
-                                            <th class="border border-[#e3ebf7] px-3 py-2 text-left font-semibold text-[#1f2d45]">Recommendation</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -614,7 +623,6 @@
                                                 </span>
                                             </td>
                                             <td class="border border-[#e3ebf7] px-3 py-2 text-gray-700">{{ finding.question_text }}</td>
-                                            <td class="border border-[#e3ebf7] px-3 py-2 text-gray-600">{{ finding.recommendation }}</td>
                                         </tr>
                                         {% endfor %}
                                     </tbody>
@@ -623,7 +631,7 @@
                         </div>
                         {% else %}
                         <div class="mt-6">
-                            <h3 class="text-base font-semibold text-[#1f2d45]">Findings &amp; Recommendations</h3>
+                            <h3 class="text-base font-semibold text-[#1f2d45]">Findings</h3>
                             <div class="mt-3 rounded-lg border border-[#e3ebf7] bg-[#f8fbff] p-4">
                                 <p class="text-sm text-gray-600">No findings for this section. All requirements are adequately implemented.</p>
                             </div>
