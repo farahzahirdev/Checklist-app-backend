@@ -545,7 +545,7 @@
     <h3 class="section-heading">Přehled výkonnosti sekcí</h3>
     <div class="chart-legend-grid">
 
-        <!-- Pure SVG Spider Chart -->
+        <!-- Pure SVG Spider Chart (with mirroring for < 5 sections) -->
         <div style="width:100%; max-width:380px;">
             <svg viewBox="0 0 380 340" xmlns="http://www.w3.org/2000/svg"
                  role="img"
@@ -598,6 +598,7 @@
 
                 <!-- Axis labels (section number + short title) -->
                 {% for label in spider_chart_data.labels %}
+                {% if not label.hidden %}
                 {% set lx = label.x %}
                 {% set ly = label.y %}
 
@@ -614,6 +615,7 @@
                       text-anchor="middle"
                       font-size="7.5" fill="#475569"
                       font-family="Arial, sans-serif">{{ label.text[:14] }}{% if label.text|length > 14 %}…{% endif %}</text>
+                {% endif %}
                 {% endfor %}
 
             </svg>

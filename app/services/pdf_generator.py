@@ -66,13 +66,25 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
 
     section_scores = [score.model_dump(mode='json') for score in report_data.section_scores]
 
-    # Pre-calculate SVG spider chart data (same as generate_report_html_preview)
+    # Pre-calculate SVG chart data (same as generate_report_html_preview)
     import math
-    n = len(section_scores) if section_scores else 3
-    chart_type = "radar"  # Always use spider/radar chart
-
+    actual_n = len(section_scores) if section_scores else 3
+    
+    # Use mirroring/padding approach to ensure at least 5 axes
+    # For 1-2 sections: mirror to create 5 axes
+    # For 3-4 sections: pad with dummy sections to reach 5 axes
+    # For 5+ sections: use as-is
+    if actual_n < 5:
+        n = 5  # Always aim for at least 5 axes
+        chart_type = "radar_mirrored" if actual_n < 3 else "radar_padded"
+    else:
+        n = actual_n
+        chart_type = "radar"
+        
     spider_chart_data = {
+        'chart_type': chart_type,
         'n': n,
+        'actual_n': actual_n,  # Keep track of actual section count
         'grid_levels': [],
         'axis_lines': [],
         'labels': [],
@@ -99,41 +111,144 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
         spider_chart_data['axis_lines'].append(f"{x},{y}")
 
     # Calculate labels with position and text
-    for i, section in enumerate(section_scores[:n]):
+    for i in range(n):
         angle = -1.5708 + (6.2832 * i / n)
         x = 190 + 140 * math.cos(angle)
         y = 170 + 140 * math.sin(angle)
         
-        # Handle both dict and object access
-        if isinstance(section, dict):
-            section_title = section.get('section_title', 'Unknown')
-        else:
-            section_title = getattr(section, 'section_title', 'Unknown')
+        # For mirrored sections, use the corresponding original section
+        if chart_type == "radar_mirrored":
+            # Mirror: cycle through actual sections
+            section_index = i % actual_n
+            section = section_scores[section_index]
             
-        spider_chart_data['labels'].append({
-            'number': i + 1,
-            'x': x,
-            'y': y,
-            'text': section_title
-        })
+            # Handle both dict and object access
+            if isinstance(section, dict):
+                section_title = section.get('section_title', 'Unknown')
+            else:
+                section_title = getattr(section, 'section_title', 'Unknown')
+                
+            # Only show label for the first occurrence
+            if i < actual_n:
+                spider_chart_data['labels'].append({
+                    'number': i + 1,
+                    'x': x,
+                    'y': y,
+                    'text': section_title,
+                    'hidden': False
+                })
+            else:
+                # Mirrored axis - hide label
+                spider_chart_data['labels'].append({
+                    'number': '',
+                    'x': x,
+                    'y': y,
+                    'text': '',
+                    'hidden': True
+                })
+        elif chart_type == "radar_padded":
+            # Only add labels for actual sections, not dummy axes
+            if i < actual_n:
+                section = section_scores[i]
+                # Handle both dict and object access
+                if isinstance(section, dict):
+                    section_title = section.get('section_title', 'Unknown')
+                else:
+                    section_title = getattr(section, 'section_title', 'Unknown')
+                    
+                spider_chart_data['labels'].append({
+                    'number': i + 1,
+                    'x': x,
+                    'y': y,
+                    'text': section_title,
+                    'hidden': False
+                })
+            else:
+                # Dummy axis - no label
+                spider_chart_data['labels'].append({
+                    'number': '',
+                    'x': x,
+                    'y': y,
+                    'text': '',
+                    'hidden': True
+                })
+        else:
+            # Normal radar - show all labels
+            section = section_scores[i]
+            # Handle both dict and object access
+            if isinstance(section, dict):
+                section_title = section.get('section_title', 'Unknown')
+            else:
+                section_title = getattr(section, 'section_title', 'Unknown')
+                
+            spider_chart_data['labels'].append({
+                'number': i + 1,
+                'x': x,
+                'y': y,
+                'text': section_title,
+                'hidden': False
+            })
 
     # Calculate data points and polygon
-    for i, section in enumerate(section_scores[:n]):
+    for i in range(n):
         angle = -1.5708 + (6.2832 * i / n)
-        # Handle both dict and object access
-        if isinstance(section, dict):
-            percentage = section.get('percentage', 0)
+        
+        # For mirrored sections, use the corresponding original section data
+        if chart_type == "radar_mirrored":
+            section_index = i % actual_n
+            section = section_scores[section_index]
+            # Handle both dict and object access
+            if isinstance(section, dict):
+                percentage = section.get('percentage', 0)
+            else:
+                percentage = getattr(section, 'percentage', 0)
+
+            # Ensure percentage is numeric and reasonable
+            try:
+                percentage = float(percentage) if percentage is not None else 0.0
+            except (ValueError, TypeError):
+                percentage = 0.0
+
+            # Clamp percentage to 0-100 range
+            percentage = max(0.0, min(100.0, percentage))
+        elif chart_type == "radar_padded":
+            # Use actual data for real sections, 0 for dummy axes
+            if i < actual_n:
+                section = section_scores[i]
+                # Handle both dict and object access
+                if isinstance(section, dict):
+                    percentage = section.get('percentage', 0)
+                else:
+                    percentage = getattr(section, 'percentage', 0)
+
+                # Ensure percentage is numeric and reasonable
+                try:
+                    percentage = float(percentage) if percentage is not None else 0.0
+                except (ValueError, TypeError):
+                    percentage = 0.0
+
+                # Clamp percentage to 0-100 range
+                percentage = max(0.0, min(100.0, percentage))
+            else:
+                # Dummy axis - no data
+                percentage = 0.0
         else:
-            percentage = getattr(section, 'percentage', 0)
+            # Normal radar - use all sections
+            section = section_scores[i]
+            # Handle both dict and object access
+            if isinstance(section, dict):
+                percentage = section.get('percentage', 0)
+            else:
+                percentage = getattr(section, 'percentage', 0)
 
-        # Ensure percentage is numeric and reasonable
-        try:
-            percentage = float(percentage) if percentage is not None else 0.0
-        except (ValueError, TypeError):
-            percentage = 0.0
+            # Ensure percentage is numeric and reasonable
+            try:
+                percentage = float(percentage) if percentage is not None else 0.0
+            except (ValueError, TypeError):
+                percentage = 0.0
 
-        # Clamp percentage to 0-100 range
-        percentage = max(0.0, min(100.0, percentage))
+            # Clamp percentage to 0-100 range
+            percentage = max(0.0, min(100.0, percentage))
 
         radius = 120 * (percentage / 100)
         x = 190 + radius * math.cos(angle)
@@ -258,15 +373,28 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
 
         # Pre-calculate chart data
         import math
-        n = len(section_scores) if section_scores else 3
-        chart_type = "radar"  # Always use spider/radar chart
-
+        actual_n = len(section_scores) if section_scores else 3
+        
+        # Use mirroring/padding approach to ensure at least 5 axes
+        # For 1-2 sections: mirror to create 5 axes
+        # For 3-4 sections: pad with dummy sections to reach 5 axes
+        # For 5+ sections: use as-is
+        if actual_n < 5:
+            n = 5  # Always aim for at least 5 axes
+            chart_type = "radar_mirrored" if actual_n < 3 else "radar_padded"
+        else:
+            n = actual_n
+            chart_type = "radar"
+            
         spider_chart_data = {
+            'chart_type': chart_type,
             'n': n,
+            'actual_n': actual_n,  # Keep track of actual section count
             'grid_levels': [],
             'axis_lines': [],
             'labels': [],
-            'data_points': []
+            'data_points': [],
+            'data_polygon': ''
         }
 
         # Calculate grid levels (25%, 50%, 75%, 100%)
@@ -292,33 +420,148 @@ def generate_report_html_preview(db: Session, *, report_id: UUID, company_id: UU
             angle = -1.5708 + (6.2832 * i / n)
             x = 190 + 140 * math.cos(angle)
             y = 170 + 140 * math.sin(angle)
-            spider_chart_data['labels'].append({
-                'number': i + 1,
-                'position': f"{x},{y}"
-            })
+            
+            # For mirrored sections, use the corresponding original section
+            if chart_type == "radar_mirrored":
+                # Mirror: cycle through actual sections
+                section_index = i % actual_n
+                section = section_scores[section_index]
+                
+                # Handle both dict and object access
+                if isinstance(section, dict):
+                    section_title = section.get('section_title', 'Unknown')
+                else:
+                    section_title = getattr(section, 'section_title', 'Unknown')
+                    
+                # Only show label for the first occurrence
+                if i < actual_n:
+                    spider_chart_data['labels'].append({
+                        'number': i + 1,
+                        'x': x,
+                        'y': y,
+                        'text': section_title,
+                        'hidden': False
+                    })
+                else:
+                    # Mirrored axis - hide label
+                    spider_chart_data['labels'].append({
+                        'number': '',
+                        'x': x,
+                        'y': y,
+                        'text': '',
+                        'hidden': True
+                    })
+            elif chart_type == "radar_padded":
+                # Only add labels for actual sections, not dummy axes
+                if i < actual_n:
+                    section = section_scores[i]
+                    # Handle both dict and object access
+                    if isinstance(section, dict):
+                        section_title = section.get('section_title', 'Unknown')
+                    else:
+                        section_title = getattr(section, 'section_title', 'Unknown')
+                        
+                    spider_chart_data['labels'].append({
+                        'number': i + 1,
+                        'x': x,
+                        'y': y,
+                        'text': section_title,
+                        'hidden': False
+                    })
+                else:
+                    # Dummy axis - no label
+                    spider_chart_data['labels'].append({
+                        'number': '',
+                        'x': x,
+                        'y': y,
+                        'text': '',
+                        'hidden': True
+                    })
+            else:
+                # Normal radar - show all labels
+                section = section_scores[i]
+                # Handle both dict and object access
+                if isinstance(section, dict):
+                    section_title = section.get('section_title', 'Unknown')
+                else:
+                    section_title = getattr(section, 'section_title', 'Unknown')
+                    
+                spider_chart_data['labels'].append({
+                    'number': i + 1,
+                    'x': x,
+                    'y': y,
+                    'text': section_title,
+                    'hidden': False
+                })
 
         # Calculate data points
-        for i, section in enumerate(section_scores[:n]):
+        for i in range(n):
             angle = -1.5708 + (6.2832 * i / n)
-            # Handle both dict and object access
-            if isinstance(section, dict):
-                percentage = section.get('percentage', 0)
+            
+            # For mirrored sections, use the corresponding original section data
+            if chart_type == "radar_mirrored":
+                section_index = i % actual_n
+                section = section_scores[section_index]
+                # Handle both dict and object access
+                if isinstance(section, dict):
+                    percentage = section.get('percentage', 0)
+                else:
+                    percentage = getattr(section, 'percentage', 0)
+
+                # Ensure percentage is numeric and reasonable
+                try:
+                    percentage = float(percentage) if percentage is not None else 0.0
+                except (ValueError, TypeError):
+                    percentage = 0.0
+
+                # Clamp percentage to 0-100 range
+                percentage = max(0.0, min(100.0, percentage))
+            elif chart_type == "radar_padded":
+                # Use actual data for real sections, 0 for dummy axes
+                if i < actual_n:
+                    section = section_scores[i]
+                    # Handle both dict and object access
+                    if isinstance(section, dict):
+                        percentage = section.get('percentage', 0)
+                    else:
+                        percentage = getattr(section, 'percentage', 0)
+
+                    # Ensure percentage is numeric and reasonable
+                    try:
+                        percentage = float(percentage) if percentage is not None else 0.0
+                    except (ValueError, TypeError):
+                        percentage = 0.0
+
+                    # Clamp percentage to 0-100 range
+                    percentage = max(0.0, min(100.0, percentage))
+                else:
+                    # Dummy axis - no data
+                    percentage = 0.0
             else:
-                percentage = getattr(section, 'percentage', 0)
+                # Normal radar - use all sections
+                section = section_scores[i]
+                # Handle both dict and object access
+                if isinstance(section, dict):
+                    percentage = section.get('percentage', 0)
+                else:
+                    percentage = getattr(section, 'percentage', 0)
 
-            # Ensure percentage is numeric and reasonable
-            try:
-                percentage = float(percentage) if percentage is not None else 0.0
-            except (ValueError, TypeError):
-                percentage = 0.0
+                # Ensure percentage is numeric and reasonable
+                try:
+                    percentage = float(percentage) if percentage is not None else 0.0
+                except (ValueError, TypeError):
+                    percentage = 0.0
 
-            # Clamp percentage to 0-100 range
-            percentage = max(0.0, min(100.0, percentage))
+                # Clamp percentage to 0-100 range
+                percentage = max(0.0, min(100.0, percentage))
 
             radius = 120 * (percentage / 100)
             x = 190 + radius * math.cos(angle)
             y = 170 + radius * math.sin(angle)
             spider_chart_data['data_points'].append(f"{x},{y}")
+        
+        # Calculate data polygon (same as data points joined with space)
+        spider_chart_data['data_polygon'] = ' '.join(spider_chart_data['data_points'])
 
         html_content = template.render(
             report_id=report_data.report_id,
