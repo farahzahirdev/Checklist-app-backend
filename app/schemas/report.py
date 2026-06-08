@@ -115,6 +115,7 @@ class ReportSectionScoreItem(BaseModel):
     section_id: UUID
     section_code: str
     section_title: str
+    section_number: int | None = None
     report_domain: str | None = None
     score: int
     max_score: int

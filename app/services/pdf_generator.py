@@ -65,10 +65,12 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
 
     section_scores = [score.model_dump(mode='json') for score in report_data.section_scores]
 
-    # Prepare Chart.js radar chart data
+    # Prepare SVG-based spider chart data (works better with PDF generation)
+    import math
+    n = len(section_scores) if section_scores else 3
     chart_type = "radar"  # Always use spider/radar chart
 
-    # Extract labels and data for Chart.js
+    # Extract labels and data for spider chart
     chart_labels = []
     chart_data = []
     
@@ -95,10 +97,57 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
         chart_labels.append(f"§{section_number}")
         chart_data.append(percentage)
 
+    # Calculate SVG spider chart coordinates
     spider_chart_data = {
+        'n': n,
         'labels': chart_labels,
         'data': chart_data
     }
+    
+    # Calculate grid levels (25%, 50%, 75%, 100%)
+    grid_levels = []
+    for level in [25, 50, 75, 100]:
+        radius = 120 * (level / 100)
+        level_points = []
+        for i in range(n):
+            angle = -1.5708 + (6.2832 * i / n)
+            x = 190 + radius * math.cos(angle)
+            y = 170 + radius * math.sin(angle)
+            level_points.append(f"{x} {y}")
+        grid_levels.append(level_points)
+    
+    # Calculate axis lines
+    axis_lines = []
+    for i in range(n):
+        angle = -1.5708 + (6.2832 * i / n)
+        x = 190 + 120 * math.cos(angle)
+        y = 170 + 120 * math.sin(angle)
+        axis_lines.append(f"{x},{y}")
+    
+    # Calculate label positions
+    label_positions = []
+    for i in range(n):
+        angle = -1.5708 + (6.2832 * i / n)
+        x = 190 + 140 * math.cos(angle)
+        y = 170 + 140 * math.sin(angle)
+        label_positions.append({
+            'number': i + 1,
+            'position': f"{x},{y}"
+        })
+    
+    # Calculate data points
+    data_points = []
+    for i, percentage in enumerate(chart_data[:n]):
+        angle = -1.5708 + (6.2832 * i / n)
+        radius = 120 * (percentage / 100)
+        x = 190 + radius * math.cos(angle)
+        y = 170 + radius * math.sin(angle)
+        data_points.append(f"{x},{y}")
+    
+    spider_chart_data['grid_levels'] = grid_levels
+    spider_chart_data['axis_lines'] = axis_lines
+    spider_chart_data['label_positions'] = label_positions
+    spider_chart_data['data_points'] = data_points
     
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     if not os.path.exists(template_dir):
