@@ -7,6 +7,14 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class ProductDocumentationFile(BaseModel):
+    id: str
+    url: str
+    filename: str
+    file_type: Literal["pdf", "docx"]
+    uploaded_at: datetime
+
+
 ProductKind = Literal["checklist", "documentation", "module"]
 ProductStatus = Literal["draft", "published", "coming_soon", "archived"]
 
@@ -111,6 +119,7 @@ class ProductBaseResponse(BaseModel):
     display_order: int
     is_featured: bool
     brochure_pdf_url: str | None = None
+    documentation_files: list[ProductDocumentationFile] = []
     hero_image_url: str | None = None
     external_url: str | None = None
     cta_label: str | None = None

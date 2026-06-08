@@ -7,8 +7,10 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.checklist import Checklist, ChecklistStatus, ChecklistTranslation, ChecklistType
-from app.models.reference import Language
+from app.models.media import Media
 from app.models.product_catalog import Product, ProductCategory, ProductKind, ProductStatus
+from app.models.product_media import ProductMedia
+from app.models.reference import Language
 from app.schemas.product_catalog import (
     AdminProductResponse,
     ProductBaseResponse,
@@ -18,6 +20,7 @@ from app.schemas.product_catalog import (
     ProductChecklistTypeLinkResponse,
     ProductDetailResponse,
     ProductPricingInfo,
+    ProductDocumentationFile,
     PublicProductCatalogResponse,
 )
 from app.services.stripe_products import get_stripe_price_for_checklist
@@ -218,6 +221,31 @@ def _pricing_for_product(db: Session, product: Product) -> ProductPricingInfo | 
     )
 
 
+def _build_documentation_files(db: Session, product: Product) -> list[ProductDocumentationFile]:
+    """Build documentation files list from product media relationships."""
+    if not product.media_files:
+        return []
+    
+    documentation_files = []
+    for product_media in sorted(product.media_files, key=lambda pm: pm.display_order):
+        media = product_media.media
+        if media and media.media_type.value == "document":
+            # Determine file type from mime type
+            file_type = "docx" if "docx" in media.mime_type.lower() else "pdf"
+            
+            documentation_files.append(
+                ProductDocumentationFile(
+                    id=str(product_media.id),
+                    url=f"/media/{media.id}/direct",  # This should match the media serving endpoint
+                    filename=media.original_filename,
+                    file_type=file_type,  # type: ignore[arg-type]
+                    uploaded_at=product_media.uploaded_at,
+                )
+            )
+    
+    return documentation_files
+
+
 def to_admin_product_response(db: Session, product: Product) -> AdminProductResponse:
     category = _category_response(product.category) if product.category is not None else None
     return AdminProductResponse(
@@ -235,6 +263,7 @@ def to_admin_product_response(db: Session, product: Product) -> AdminProductResp
         display_order=product.display_order,
         is_featured=product.is_featured,
         brochure_pdf_url=product.brochure_pdf_url,
+        documentation_files=_build_documentation_files(db, product),
         hero_image_url=product.hero_image_url,
         external_url=product.external_url,
         cta_label=product.cta_label,
@@ -263,6 +292,7 @@ def to_public_product_response(db: Session, product: Product) -> ProductBaseResp
         display_order=product.display_order,
         is_featured=product.is_featured,
         brochure_pdf_url=product.brochure_pdf_url,
+        documentation_files=_build_documentation_files(db, product),
         hero_image_url=product.hero_image_url,
         external_url=product.external_url,
         cta_label=product.cta_label,
@@ -282,7 +312,12 @@ def list_admin_products(
     status: str | None = None,
 ) -> tuple[int, list[AdminProductResponse]]:
     ensure_default_product_categories(db)
-    query = select(Product).options(joinedload(Product.category), joinedload(Product.checklist), joinedload(Product.checklist_type))
+    query = select(Product).options(
+        joinedload(Product.category), 
+        joinedload(Product.checklist), 
+        joinedload(Product.checklist_type),
+        joinedload(Product.media_files).joinedload(ProductMedia.media)
+    )
     count_query = select(func.count(Product.id))
 
     if category_code:
@@ -480,12 +515,30 @@ def update_product(db: Session, product: Product, *, payload) -> Product:
 
 def get_product_by_id(db: Session, product_id: uuid.UUID) -> Product | None:
     ensure_default_product_categories(db)
-    return db.scalar(select(Product).where(Product.id == product_id).options(joinedload(Product.category), joinedload(Product.checklist), joinedload(Product.checklist_type)))
+    return db.scalar(
+        select(Product)
+        .where(Product.id == product_id)
+        .options(
+            joinedload(Product.category), 
+            joinedload(Product.checklist), 
+            joinedload(Product.checklist_type),
+            joinedload(Product.media_files).joinedload(ProductMedia.media)
+        )
+    )
 
 
 def get_product_by_slug(db: Session, slug: str) -> Product | None:
     ensure_default_product_categories(db)
-    return db.scalar(select(Product).where(Product.slug == slug).options(joinedload(Product.category), joinedload(Product.checklist), joinedload(Product.checklist_type)))
+    return db.scalar(
+        select(Product)
+        .where(Product.slug == slug)
+        .options(
+            joinedload(Product.category), 
+            joinedload(Product.checklist), 
+            joinedload(Product.checklist_type),
+            joinedload(Product.media_files).joinedload(ProductMedia.media)
+        )
+    )
 
 
 def list_public_catalog(db: Session) -> PublicProductCatalogResponse:

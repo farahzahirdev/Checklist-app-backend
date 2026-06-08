@@ -13,6 +13,7 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.checklist import Checklist, ChecklistType
+    from app.models.product_media import ProductMedia
 
 
 class ProductStatus(StrEnum):
@@ -97,3 +98,6 @@ class Product(Base):
     )
     checklist: Mapped["Checklist | None"] = relationship("Checklist")
     checklist_type: Mapped["ChecklistType | None"] = relationship("ChecklistType")
+    media_files: Mapped[list["ProductMedia"]] = relationship(
+        "ProductMedia", back_populates="product", cascade="all, delete-orphan"
+    )
