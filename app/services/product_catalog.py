@@ -332,7 +332,7 @@ def list_admin_products(
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
 
-    products = db.scalars(query.order_by(Product.display_order.asc(), Product.created_at.desc()).offset(skip).limit(limit)).all()
+    products = db.execute(query.order_by(Product.display_order.asc(), Product.created_at.desc()).offset(skip).limit(limit)).unique().scalars().all()
     total = db.scalar(count_query) or 0
     return total, [to_admin_product_response(db, product) for product in products]
 
