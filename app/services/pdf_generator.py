@@ -35,16 +35,8 @@ async def _generate_pdf_with_playwright(html_content: str) -> bytes:
         try:
             await page.set_content(html_content, wait_until="domcontentloaded", timeout=60000)
             await page.emulate_media(media="print")
-            # Wait longer for Chart.js to render
-            await asyncio.sleep(4)
-            
-            # Wait for the chart to be rendered (check if canvas exists and has content)
-            try:
-                await page.wait_for_selector('#spiderChart', timeout=10000)
-                await asyncio.sleep(2)  # Additional wait for chart animation
-            except:
-                # Chart selector might not exist, continue anyway
-                pass
+            # SVG renders immediately, no need to wait for Chart.js
+            await asyncio.sleep(1)
 
             footer_html = """
             <div style="width:100%;font-size:10px;padding:0 12px;color:#6b7280;display:flex;justify-content:space-between;font-family:Arial, sans-serif;">
@@ -74,22 +66,64 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
 
     section_scores = [score.model_dump(mode='json') for score in report_data.section_scores]
 
-    # Prepare Chart.js radar chart data
+    # Pre-calculate SVG spider chart data (same as generate_report_html_preview)
     import math
     n = len(section_scores) if section_scores else 3
     chart_type = "radar"  # Always use spider/radar chart
 
-    # Extract labels (using section titles for domain scope) and data for spider chart
-    chart_labels = []
-    chart_data = []
-    
-    for section in section_scores:
+    spider_chart_data = {
+        'n': n,
+        'grid_levels': [],
+        'axis_lines': [],
+        'labels': [],
+        'data_points': [],
+        'data_polygon': ''
+    }
+
+    # Calculate grid levels (25%, 50%, 75%, 100%)
+    for level in [25, 50, 75, 100]:
+        radius = 120 * (level / 100)
+        level_points = []
+        for i in range(n):
+            angle = -1.5708 + (6.2832 * i / n)
+            x = 190 + radius * math.cos(angle)
+            y = 170 + radius * math.sin(angle)
+            level_points.append(f"{x} {y}")
+        spider_chart_data['grid_levels'].append(level_points)
+
+    # Calculate axis lines
+    for i in range(n):
+        angle = -1.5708 + (6.2832 * i / n)
+        x = 190 + 120 * math.cos(angle)
+        y = 170 + 120 * math.sin(angle)
+        spider_chart_data['axis_lines'].append(f"{x},{y}")
+
+    # Calculate labels with position and text
+    for i, section in enumerate(section_scores[:n]):
+        angle = -1.5708 + (6.2832 * i / n)
+        x = 190 + 140 * math.cos(angle)
+        y = 170 + 140 * math.sin(angle)
+        
         # Handle both dict and object access
         if isinstance(section, dict):
             section_title = section.get('section_title', 'Unknown')
-            percentage = section.get('percentage', 0)
         else:
             section_title = getattr(section, 'section_title', 'Unknown')
+            
+        spider_chart_data['labels'].append({
+            'number': i + 1,
+            'x': x,
+            'y': y,
+            'text': section_title
+        })
+
+    # Calculate data points and polygon
+    for i, section in enumerate(section_scores[:n]):
+        angle = -1.5708 + (6.2832 * i / n)
+        # Handle both dict and object access
+        if isinstance(section, dict):
+            percentage = section.get('percentage', 0)
+        else:
             percentage = getattr(section, 'percentage', 0)
 
         # Ensure percentage is numeric and reasonable
@@ -100,15 +134,14 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
 
         # Clamp percentage to 0-100 range
         percentage = max(0.0, min(100.0, percentage))
-        
-        # Use section title for chart labels (domain scope)
-        chart_labels.append(section_title)
-        chart_data.append(percentage)
 
-    spider_chart_data = {
-        'labels': chart_labels,
-        'data': chart_data
-    }
+        radius = 120 * (percentage / 100)
+        x = 190 + radius * math.cos(angle)
+        y = 170 + radius * math.sin(angle)
+        spider_chart_data['data_points'].append(f"{x},{y}")
+    
+    # Calculate data polygon (same as data points joined with space)
+    spider_chart_data['data_polygon'] = ' '.join(spider_chart_data['data_points'])
     
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     if not os.path.exists(template_dir):
