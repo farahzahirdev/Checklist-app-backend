@@ -26,7 +26,7 @@ from app.services.assessment import (
     upsert_assessment_answer,
 )
 from app.utils.i18n import get_language_code
-from app.utils.file_upload import allowed_file, validate_file_type, get_file_size, compute_sha256, basic_malware_scan, encrypt_file_data
+from app.utils.file_upload import allowed_file, validate_file_type, get_file_size, compute_sha256, basic_malware_scan, encrypt_file_data, decrypt_file_data
 from app.models.assessment import Assessment, AssessmentEvidenceFile, MalwareScanStatus
 from app.models.media import Media, MediaType
 import shutil
@@ -454,3 +454,137 @@ def upload_evidence_file(
         "encryption_status": media.encryption_status,
         "filename": evidence.media.original_filename
     }
+
+
+@router.get(
+    "/{assessment_id}/evidence/{evidence_id}/download",
+    summary="Download evidence file with decryption",
+)
+def download_evidence_file(
+    assessment_id: UUID,
+    evidence_id: UUID,
+    http_request: Request = None,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Download evidence file with proper decryption for encrypted files."""
+    from fastapi.responses import Response
+    import os
+    
+    # Get evidence record
+    evidence = db.query(AssessmentEvidenceFile).filter(
+        AssessmentEvidenceFile.id == evidence_id,
+        AssessmentEvidenceFile.assessment_id == assessment_id
+    ).first()
+    
+    if not evidence:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+    
+    # Get media record
+    media = db.get(Media, evidence.media_id)
+    if not media:
+        raise HTTPException(status_code=404, detail="Media file not found")
+    
+    # Check file path storage
+    file_path = media.file_path
+    
+    # Handle different storage methods
+    if file_path.startswith("base64:"):
+        # Base64 storage - not supported for download yet
+        raise HTTPException(
+            status_code=503,
+            detail="File download not available for base64-stored files. Please contact administrator."
+        )
+    elif file_path and os.path.exists(file_path):
+        # Local file storage with encryption
+        try:
+            with open(file_path, "rb") as f:
+                encrypted_data = f.read()
+            
+            # Decrypt if needed
+            decrypted_data = decrypt_file_data(encrypted_data, media.encryption_status)
+            
+            return Response(
+                content=decrypted_data,
+                media_type=media.mime_type,
+                headers={
+                    "Content-Disposition": f"attachment; filename={media.original_filename}",
+                    "Cache-Control": "no-cache"
+                }
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
+    else:
+        # S3 or other storage - would need to implement S3 download with decryption
+        # For now, return error
+        raise HTTPException(
+            status_code=503,
+            detail="File download not available for cloud storage. Please contact administrator."
+        )
+
+
+@router.get(
+    "/{assessment_id}/evidence/{evidence_id}/view",
+    summary="View evidence file with decryption (inline)",
+)
+def view_evidence_file(
+    assessment_id: UUID,
+    evidence_id: UUID,
+    http_request: Request = None,
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """View evidence file inline with proper decryption for encrypted files."""
+    from fastapi.responses import Response
+    import os
+    
+    # Get evidence record
+    evidence = db.query(AssessmentEvidenceFile).filter(
+        AssessmentEvidenceFile.id == evidence_id,
+        AssessmentEvidenceFile.assessment_id == assessment_id
+    ).first()
+    
+    if not evidence:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+    
+    # Get media record
+    media = db.get(Media, evidence.media_id)
+    if not media:
+        raise HTTPException(status_code=404, detail="Media file not found")
+    
+    # Check file path storage
+    file_path = media.file_path
+    
+    # Handle different storage methods
+    if file_path.startswith("base64:"):
+        # Base64 storage - not supported for view yet
+        raise HTTPException(
+            status_code=503,
+            detail="File view not available for base64-stored files. Please contact administrator."
+        )
+    elif file_path and os.path.exists(file_path):
+        # Local file storage with encryption
+        try:
+            with open(file_path, "rb") as f:
+                encrypted_data = f.read()
+            
+            # Decrypt if needed
+            decrypted_data = decrypt_file_data(encrypted_data, media.encryption_status)
+            
+            return Response(
+                content=decrypted_data,
+                media_type=media.mime_type,
+                headers={
+                    "Content-Disposition": f"inline; filename={media.original_filename}",
+                    "Cache-Control": "no-cache"
+                }
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
+    else:
+        # S3 or other storage - would need to implement S3 download with decryption
+        # For now, return error
+        raise HTTPException(
+            status_code=503,
+            detail="File view not available for cloud storage. Please contact administrator."
+        )

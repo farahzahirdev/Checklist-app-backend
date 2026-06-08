@@ -109,7 +109,8 @@ class Page(Base):
     created_by: Mapped["User"] = relationship("User", foreign_keys=[created_by_id])
     updated_by: Mapped["User"] = relationship("User", foreign_keys=[updated_by_id])
     sections: Mapped[list["PageSection"]] = relationship(
-        "PageSection", back_populates="page", cascade="all, delete-orphan"
+        "PageSection", back_populates="page", cascade="all, delete-orphan",
+        order_by="PageSection.order"
     )
 
 

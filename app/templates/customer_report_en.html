@@ -560,7 +560,7 @@
                 <polygon points="{{ ring }}"
                          fill="none"
                          stroke="#e2e8f0"
-                         stroke-width="1"/>
+                         stroke-width="{{ '2' if loop.last else '1' }}"/>
                 {% endfor %}
 
                 <!-- Axis spokes -->
@@ -705,6 +705,10 @@
                 {% set section_findings_medium = findings|selectattr('priority', 'equalto', 'medium')|selectattr('section_code', 'equalto', section.section_code)|list %}
                 {% set high_count = section_findings_high|length + section_findings_medium|length %}
                 {% set section_summary = section_summaries|selectattr('section_code', 'equalto', section.section_code)|first %}
+                {# Fallback: try matching by section_id if section_code doesn't work #}
+                {% if not section_summary %}
+                {% set section_summary = section_summaries|selectattr('section_id', 'equalto', section.section_id)|first %}
+                {% endif %}
                 <tr>
                     <td style="text-align:center; font-weight:600; color:var(--slate-400);">{{ loop.index }}</td>
                     <td>
@@ -757,6 +761,10 @@
 {% for section in section_scores %}
 {% set section_findings = findings|selectattr('section_code', 'equalto', section.section_code)|list %}
 {% set section_summary  = section_summaries|selectattr('section_code', 'equalto', section.section_code)|first %}
+{# Fallback: try matching by section_id if section_code doesn't work #}
+{% if not section_summary %}
+{% set section_summary  = section_summaries|selectattr('section_id', 'equalto', section.section_id)|first %}
+{% endif %}
 {% set section_findings_high   = section_findings|selectattr('priority', 'equalto', 'high')|list %}
 {% set section_findings_medium = section_findings|selectattr('priority', 'equalto', 'medium')|list %}
 {% set high_count = section_findings_high|length + section_findings_medium|length %}
