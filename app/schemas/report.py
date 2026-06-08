@@ -13,6 +13,7 @@ class ReportSummaryItem(BaseModel):
     section_id: UUID | None = None
     section_code: str | None = None
     section_title: str | None = None
+    section_number: int | None = None
     chapter_code: str | None = None
     summary_text: str | None = None
     recommendation_text: str | None = None

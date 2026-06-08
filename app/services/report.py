@@ -834,6 +834,7 @@ def _build_report_section_overviews(db: Session, report: Report) -> list[ReportS
                 section_id=section_id,
                 section_code=section_code,
                 section_title=section_score.get("section_title"),
+                section_number=section_score.get("section_number"),
                 chapter_code=summary_row.chapter_code if summary_row else section_code,
                 summary_text=summary_row.summary_text if summary_row else None,
                 score=section_score.get("score"),
