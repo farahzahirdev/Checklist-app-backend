@@ -65,54 +65,22 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
 
     section_scores = [score.model_dump(mode='json') for score in report_data.section_scores]
 
-    # Pre-calculate chart data
-    import math
-    n = len(section_scores) if section_scores else 3
+    # Prepare Chart.js radar chart data
     chart_type = "radar"  # Always use spider/radar chart
 
-    spider_chart_data = {
-        'n': n,
-        'grid_levels': [],
-        'axis_lines': [],
-        'labels': [],
-        'data_points': []
-    }
-
-    # Calculate grid levels (25%, 50%, 75%, 100%)
-    for level in [25, 50, 75, 100]:
-        radius = 120 * (level / 100)
-        level_points = []
-        for i in range(n):
-            angle = -1.5708 + (6.2832 * i / n)
-            x = 190 + radius * math.cos(angle)
-            y = 170 + radius * math.sin(angle)
-            level_points.append(f"{x} {y}")
-        spider_chart_data['grid_levels'].append(level_points)
-
-    # Calculate axis lines
-    for i in range(n):
-        angle = -1.5708 + (6.2832 * i / n)
-        x = 190 + 120 * math.cos(angle)
-        y = 170 + 120 * math.sin(angle)
-        spider_chart_data['axis_lines'].append(f"{x},{y}")
-
-    # Calculate labels
-    for i in range(n):
-        angle = -1.5708 + (6.2832 * i / n)
-        x = 190 + 140 * math.cos(angle)
-        y = 170 + 140 * math.sin(angle)
-        spider_chart_data['labels'].append({
-            'number': i + 1,
-            'position': f"{x},{y}"
-        })
-
-    # Calculate data points
-    for i, section in enumerate(section_scores[:n]):
-        angle = -1.5708 + (6.2832 * i / n)
+    # Extract labels and data for Chart.js
+    chart_labels = []
+    chart_data = []
+    
+    for section in section_scores:
         # Handle both dict and object access
         if isinstance(section, dict):
+            section_number = section.get('section_number', 1)
+            section_title = section.get('section_title', 'Unknown')
             percentage = section.get('percentage', 0)
         else:
+            section_number = getattr(section, 'section_number', 1)
+            section_title = getattr(section, 'section_title', 'Unknown')
             percentage = getattr(section, 'percentage', 0)
 
         # Ensure percentage is numeric and reasonable
@@ -123,11 +91,14 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
 
         # Clamp percentage to 0-100 range
         percentage = max(0.0, min(100.0, percentage))
+        
+        chart_labels.append(f"§{section_number}")
+        chart_data.append(percentage)
 
-        radius = 120 * (percentage / 100)
-        x = 190 + radius * math.cos(angle)
-        y = 170 + radius * math.sin(angle)
-        spider_chart_data['data_points'].append(f"{x},{y}")
+    spider_chart_data = {
+        'labels': chart_labels,
+        'data': chart_data
+    }
     
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     if not os.path.exists(template_dir):

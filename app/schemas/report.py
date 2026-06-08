@@ -96,6 +96,10 @@ class UpsertReportSummaryRequest(BaseModel):
     recommendation_text: str | None = Field(default=None, max_length=5000)
 
 
+class UpdateManagementSummaryRequest(BaseModel):
+    management_summary: str = Field(min_length=10, max_length=10000)
+
+
 class ReportQuestionScoreItem(BaseModel):
     question_id: UUID
     question_code: str

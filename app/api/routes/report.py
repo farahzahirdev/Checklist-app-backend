@@ -16,6 +16,7 @@ from app.schemas.report import (
     ReportSummaryItem,
     ReviewActionRequest,
     UpsertReportSummaryRequest,
+    UpdateManagementSummaryRequest,
 )
 from app.services.report import (
     approve_report,
@@ -28,6 +29,7 @@ from app.services.report import (
     request_changes,
     start_review,
     upsert_report_summary,
+    update_management_summary,
 )
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -249,6 +251,29 @@ def approve_report_route(
 ) -> ReportResponse:
     lang_code = get_language_code(request, db)
     return approve_report(db, report_id=report_id, actor=admin, payload=payload, lang_code=lang_code)
+
+
+@router.put(
+    "/{report_id}/management-summary",
+    response_model=ReportResponse,
+    summary="Update Management Summary",
+    description="Updates the executive/management summary for a report.",
+)
+def update_management_summary_route(
+    report_id: UUID,
+    request: Request,
+    payload: UpdateManagementSummaryRequest,
+    admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
+    db: Session = Depends(get_db),
+) -> ReportResponse:
+    lang_code = get_language_code(request, db)
+    return update_management_summary(
+        db,
+        report_id=report_id,
+        actor=admin,
+        management_summary=payload.management_summary,
+        lang_code=lang_code,
+    )
 
 
 @router.post(

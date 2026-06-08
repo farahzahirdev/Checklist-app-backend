@@ -435,7 +435,7 @@
         {% for section in section_scores %}
         <div class="toc-item">
             <span class="toc-num">4{{ ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'][loop.index0] }}</span>
-            <span class="toc-title">§ {{ loop.index + 2 }} – {{ section.section_title }}</span>
+            <span class="toc-title">§ {{ section.section_number }} – {{ section.section_title }}</span>
             <span class="toc-dots"></span>
         </div>
         {% endfor %}
@@ -484,30 +484,30 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th style="width:5%"></th>
-                    <th style="width:32%">Rating</th>
+                    <th style="width:8%">Score</th>
+                    <th style="width:30%">Rating</th>
                     <th>Description</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td><span class="badge badge-green">4</span></td>
-                    <td><strong>Fully implemented</strong> (YES)</td>
+                    <td style="text-align:center;"><span class="badge badge-green">4</span></td>
+                    <td><strong>Fully implemented</strong><br/><span style="color:var(--slate-500);font-size:10px;">(YES)</span></td>
                     <td>The requirement is fully implemented, consistently applied in practice, and supported by appropriate and sufficient evidence.</td>
                 </tr>
                 <tr>
-                    <td><span class="badge badge-amber">3</span></td>
-                    <td><strong>Partially implemented</strong> (PARTIALLY)</td>
+                    <td style="text-align:center;"><span class="badge badge-amber">3</span></td>
+                    <td><strong>Partially implemented</strong><br/><span style="color:var(--slate-500);font-size:10px;">(PARTIALLY)</span></td>
                     <td>The requirement is implemented to a limited extent. There are gaps in implementation, consistency, or supporting evidence.</td>
                 </tr>
                 <tr>
-                    <td><span class="badge badge-red">2</span></td>
-                    <td><strong>Mostly Not Implemented</strong></td>
+                    <td style="text-align:center;"><span class="badge badge-red">2</span></td>
+                    <td><strong>Mostly Not Implemented</strong><br/><span style="color:var(--slate-500);font-size:10px;">(MOSTLY NO)</span></td>
                     <td>The requirement is mostly not implemented. There are only isolated measures or implementation is inadequate and unsystematic.</td>
                 </tr>
                 <tr>
-                    <td><span class="badge badge-red">1</span></td>
-                    <td><strong>Not implemented</strong> (NO)</td>
+                    <td style="text-align:center;"><span class="badge badge-red">1</span></td>
+                    <td><strong>Not implemented</strong><br/><span style="color:var(--slate-500);font-size:10px;">(NO)</span></td>
                     <td>The requirement is not implemented at all. No relevant measures or evidence are available.</td>
                 </tr>
             </tbody>
@@ -544,58 +544,87 @@
 
     <h3 class="section-heading">Section Performance Overview</h3>
     <div class="chart-legend-grid">
-        <!-- Spider chart SVG -->
-        <div>
-            <svg viewBox="0 0 380 340" style="width:100%; max-width:340px; display:block;">
-                <!-- Background grid -->
-                <defs>
-                    <linearGradient id="radarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.2" />
-                        <stop offset="100%" style="stop-color:#2563eb;stop-opacity:0.3" />
-                    </linearGradient>
-                    <filter id="glow">
-                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-                        <feMerge>
-                            <feMergeNode in="coloredBlur"/>
-                            <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                    </filter>
-                </defs>
-                {% for level in spider_chart_data.grid_levels %}
-                {% set stroke_color = '#cbd5e1' if loop.index == 3 else '#e2e8f0' %}
-                {% set stroke_width = '1.5' if loop.index == 3 else '1' %}
-                <path d="M {{ level|join(' L ') }} Z" fill="none" stroke="{{ stroke_color }}" stroke-width="{{ stroke_width }}"/>
-                {% endfor %}
-                <!-- Axis lines -->
-                {% for line in spider_chart_data.axis_lines %}
-                {% set x2, y2 = line.split(',') %}
-                <line x1="190" y1="170" x2="{{ x2 }}" y2="{{ y2 }}" stroke="#e8edf5" stroke-width="1"/>
-                {% endfor %}
-                <!-- Section labels -->
-                {% for label in spider_chart_data.labels %}
-                {% set x, y = label.position.split(',') %}
-                <text x="{{ x }}" y="{{ y }}" text-anchor="middle" dominant-baseline="middle" fill="#475569" font-size="11" font-weight="700" font-family="Inter,Arial,sans-serif">§ {{ label.number }}</text>
-                {% endfor %}
-                <!-- Data polygon -->
-                <polygon points="{{ spider_chart_data.data_points|join(' ') }}" fill="url(#radarGradient)" stroke="#2563eb" stroke-width="2.5" stroke-linejoin="round" filter="url(#glow)"/>
-                <!-- Data points -->
-                {% for point in spider_chart_data.data_points %}
-                {% set x, y = point.split(',') %}
-                <circle cx="{{ x }}" cy="{{ y }}" r="4.5" fill="#fff" stroke="#2563eb" stroke-width="2.5"/>
-                {% endfor %}
-                <!-- Center point -->
-                <circle cx="190" cy="170" r="3" fill="#2563eb"/>
-            </svg>
-            <div style="display:flex;gap:16px;margin-top:12px;font-size:9.5px;color:var(--slate-500);">
-                <span style="display:flex;align-items:center;gap:4px;"><span style="display:inline-block;width:16px;height:2px;background:var(--blue-500);"></span> Current score (%)</span>
+        <!-- Chart.js Spider Chart -->
+        <div style="width: 100%; max-width: 340px;">
+            <h2 class="sr-only">Spider chart showing section performance</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:16px;margin:1rem 0 0.5rem;font-size:13px;color:var(--slate-600);">
+                <span style="display:flex;align-items:center;gap:6px;">
+                    <span style="width:10px;height:10px;border-radius:2px;background:#378ADD;"></span>Current Score
+                </span>
             </div>
+            <div style="position:relative;width:100%;height:380px;">
+                <canvas id="spiderChart" role="img" aria-label="Spider chart showing section performance across {{ spider_chart_data.labels|join(', ') }}">
+                    {% for label, value in spider_chart_data.labels|zip(spider_chart_data.data) %}
+                    {{ label }}: {{ value }}%{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </canvas>
+            </div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+            <script>
+                const gridColor = 'rgba(0,0,0,0.10)';
+                const labelColor = '#5F5E5A';
+                const pointLabelColor = '#444441';
+
+                new Chart(document.getElementById('spiderChart'), {
+                    type: 'radar',
+                    data: {
+                        labels: {{ spider_chart_data.labels|tojson }},
+                        datasets: [
+                            {
+                                label: 'Current Score',
+                                data: {{ spider_chart_data.data|tojson }},
+                                backgroundColor: 'rgba(55,138,221,0.15)',
+                                borderColor: '#378ADD',
+                                borderWidth: 2,
+                                pointBackgroundColor: '#378ADD',
+                                pointBorderColor: '#fff',
+                                pointHoverBackgroundColor: '#fff',
+                                pointHoverBorderColor: '#378ADD',
+                                pointRadius: 5,
+                                pointHoverRadius: 7,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.parsed.r + '%'
+                                }
+                            }
+                        },
+                        scales: {
+                            r: {
+                                min: 0,
+                                max: 100,
+                                ticks: {
+                                    stepSize: 20,
+                                    color: labelColor,
+                                    font: { size: 11 },
+                                    backdropColor: 'transparent',
+                                    callback: v => v
+                                },
+                                grid: { color: gridColor },
+                                angleLines: { color: gridColor },
+                                pointLabels: {
+                                    color: pointLabelColor,
+                                    font: { size: 13, weight: '500' }
+                                }
+                            }
+                        }
+                    }
+                });
+            </script>
         </div>
 
         <!-- Legend -->
         <div>
             {% for section in section_scores %}
             <div class="legend-item">
-                <span class="legend-num">§ {{ loop.index + 2 }}</span>
+                <span class="legend-num">§ {{ section.section_number }}</span>
                 <span class="legend-name">{{ section.section_title }}</span>
             </div>
             {% endfor %}
@@ -669,7 +698,7 @@
                 <tr>
                     <td style="text-align:center; font-weight:600; color:var(--slate-400);">{{ loop.index }}</td>
                     <td>
-                        <span style="font-weight:600; color:var(--blue-500);">§ {{ loop.index + 2 }}</span>
+                        <span style="font-weight:600; color:var(--blue-500);">§ {{ section.section_number }}</span>
                         <span style="color:var(--slate-700);"> {{ section.section_title }}</span>
                     </td>
                     <td style="text-align:center;">
@@ -725,7 +754,7 @@
 <div class="page{% if loop.last %} page-last{% endif %}">
     <div class="page-header">
         <p class="page-header-kicker">Section Detail</p>
-        <h2 class="page-header-title">§ {{ loop.index + 2 }} &nbsp; {{ section.section_title }}</h2>
+        <h2 class="page-header-title">§ {{ section.section_number }} &nbsp; {{ section.section_title }}</h2>
         <p class="page-header-subtitle" style="font-size:10px; color:var(--slate-400);">{{ section.section_code }}</p>
     </div>
 
@@ -805,6 +834,39 @@
     {% else %}
     <div class="info-box">
         <p>No findings were found for this section. All requirements are adequately implemented.</p>
+    </div>
+    {% endif %}
+
+    <!-- Question Review Details -->
+    <h3 class="section-heading">Question Review Details</h3>
+    {% if section.question_scores %}
+    <div class="data-table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width:10%">Score</th>
+                    <th style="width:15%">%</th>
+                    <th>Question</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for question in section.question_scores %}
+                <tr>
+                    <td style="text-align:center;">
+                        <span class="badge {% if question.score >= 3 %}badge-green{% elif question.score >= 2 %}badge-amber{% else %}badge-red{% endif %}">
+                            {{ question.score }}
+                        </span>
+                    </td>
+                    <td style="text-align:center;">{{ "%.1f"|format(question.percentage) }}%</td>
+                    <td>{{ question.question_title }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="info-box">
+        <p>No question review data available for this section.</p>
     </div>
     {% endif %}
 

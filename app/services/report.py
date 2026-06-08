@@ -422,6 +422,32 @@ def approve_report(db: Session, *, report_id: UUID, actor: User, payload: Review
     return _serialize_report(db, report)
 
 
+def update_management_summary(
+    db: Session,
+    *,
+    report_id: UUID,
+    actor: User,
+    management_summary: str,
+    lang_code: str = "en"
+) -> ReportResponse:
+    """Update the management summary for a report."""
+    report = _get_report(db, report_id, lang_code)
+    report.management_summary = management_summary
+    db.commit()
+    db.refresh(report)
+
+    _log_report_audit(
+        db,
+        action="report_update",
+        report=report,
+        actor_user_id=actor.id,
+        changes_summary=f"Updated management summary for report {report_id}",
+        after_data={"management_summary": management_summary},
+    )
+
+    return _serialize_report(db, report)
+
+
 def list_reports(
     db: Session,
     *,
@@ -948,7 +974,7 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
     ).all()
     
     section_scores = []
-    for section in sections:
+    for idx, section in enumerate(sections, start=1):
         # Get questions in this section
         from app.models.checklist import ChecklistQuestion
         questions = db.scalars(
@@ -968,6 +994,9 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
         # Use section_code as the domain instead of question.report_domain
         # This ensures the radar chart shows actual checklist sections (e.g., § 3, § 4, § 5)
         section_domain = section.section_code or "General"
+        
+        # Add sequential section number for display (§1, §2, §3, etc.)
+        section_number = idx
             
         # Get answers for these questions
         question_ids = [q.id for q in questions]
@@ -1024,6 +1053,7 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
             "section_code": section.section_code,
             "section_domain": section_domain,
             "section_id": section.id,
+            "section_number": section_number,  # Sequential number for display (§1, §2, etc.)
             "score": total_score,
             "max_score": max_score,
             "percentage": round(percentage, 1),
