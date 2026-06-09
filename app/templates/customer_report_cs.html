@@ -192,7 +192,7 @@
         }
         .section-heading:first-of-type { margin-top: 0; }
 
-        /* ─── INFO BOX ─────────────────────────────────────────── */
+        /* ─── INFO BOX (with optional icon) ───────────────────── */
         .info-box {
             background: var(--slate-50);
             border: 1px solid var(--slate-200);
@@ -200,9 +200,32 @@
             padding: 14px 16px;
             margin-bottom: 14px;
         }
+        .info-box-with-icon {
+            background: var(--slate-50);
+            border: 1px solid var(--slate-200);
+            border-radius: 10px;
+            padding: 16px 18px;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 14px;
+            align-items: flex-start;
+        }
+        .info-box-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--blue-50);
+            border: 1px solid var(--blue-100);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .info-box-icon svg { width: 18px; height: 18px; }
+        .info-box-content { flex: 1; }
         .info-box-title {
-            font-size: 11px;
-            font-weight: 600;
+            font-size: 12px;
+            font-weight: 700;
             color: var(--slate-900);
             margin-bottom: 6px;
         }
@@ -211,21 +234,26 @@
             color: var(--slate-600);
             line-height: 1.65;
         }
+        .info-box-placeholder {
+            font-style: italic;
+            color: var(--blue-500) !important;
+            margin-bottom: 6px !important;
+        }
 
         /* ─── TABLE: KEY-VALUE ─────────────────────────────────── */
         .kv-table { width: 100%; border-collapse: collapse; }
         .kv-table th {
-            background: var(--blue-800);
+            background: var(--blue-600);
             color: #fff;
             font-size: 10.5px;
             font-weight: 600;
             text-align: left;
-            padding: 8px 12px;
+            padding: 9px 14px;
             width: 38%;
         }
         .kv-table td {
             font-size: 11px;
-            padding: 8px 12px;
+            padding: 9px 14px;
             border-bottom: 1px solid var(--slate-200);
             color: var(--slate-700);
         }
@@ -288,7 +316,15 @@
         .metric-bar-fill { height: 3px; background: var(--blue-500); border-radius: 2px; }
 
         /* ─── SPIDER CHART ─────────────────────────────────────── */
-        .chart-legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 14px; }
+        .chart-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 14px; }
+        .chart-legend-table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+        .chart-legend-table thead tr { background: var(--blue-800); color: #fff; }
+        .chart-legend-table thead th { padding: 7px 10px; text-align: left; font-weight: 600; font-size: 9.5px; }
+        .chart-legend-table tbody tr { border-bottom: 1px solid var(--slate-200); }
+        .chart-legend-table tbody td { padding: 7px 10px; color: var(--slate-700); vertical-align: middle; }
+        .chart-legend-table tbody tr:nth-child(even) { background: var(--slate-50); }
+        .chart-legend-table-wrapper { border: 1px solid var(--slate-200); border-radius: 8px; overflow: hidden; }
+
         .legend-item { display: flex; align-items: baseline; gap: 6px; padding: 4px 0; border-bottom: 1px dashed var(--slate-200); font-size: 10px; }
         .legend-num { font-weight: 700; color: var(--blue-500); min-width: 24px; flex-shrink: 0; }
         .legend-name { color: var(--slate-600); line-height: 1.35; }
@@ -321,7 +357,151 @@
         /* ─── SECTION PAGE ─────────────────────────────────────── */
         .section-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
 
-        /* ─── FINDINGS TABLE ───────────────────────────────────── */
+        /* ─── CHAPTER BREAKDOWN CARDS (ID-035) ────────────────── */
+        .chapter-cards { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+        .chapter-card {
+            border: 1px solid var(--slate-200);
+            border-radius: 10px;
+            padding: 12px 16px;
+            background: #fff;
+        }
+        .chapter-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        .chapter-card-id {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--blue-500);
+            margin-bottom: 3px;
+        }
+        .chapter-card-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--slate-900);
+        }
+        .chapter-card-score {
+            text-align: right;
+            flex-shrink: 0;
+            margin-left: 12px;
+        }
+        .chapter-card-score-label {
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--slate-400);
+            margin-bottom: 2px;
+        }
+        .chapter-card-score-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--blue-500);
+        }
+        .chapter-card-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 10px;
+            color: var(--slate-500);
+            margin-bottom: 8px;
+        }
+        .chapter-card-meta span strong { color: var(--slate-700); }
+        .chapter-card-bar {
+            height: 4px;
+            background: var(--slate-200);
+            border-radius: 2px;
+        }
+        .chapter-card-bar-fill {
+            height: 4px;
+            border-radius: 2px;
+        }
+        .bar-green  { background: #22c55e; }
+        .bar-amber  { background: #f59e0b; }
+        .bar-red    { background: #ef4444; }
+
+        /* ─── AREAS FOR IMPROVEMENT CARDS (ID-034) ────────────── */
+        .improvement-header-counts {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 16px;
+        }
+        .improvement-count-box {
+            text-align: center;
+            min-width: 60px;
+        }
+        .improvement-count-label {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+        .improvement-count-label.high   { color: var(--red-700); }
+        .improvement-count-label.medium { color: var(--amber-700); }
+        .improvement-count-label.low    { color: var(--blue-600); }
+        .improvement-count-value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+        .improvement-count-value.high   { color: var(--red-700); }
+        .improvement-count-value.medium { color: var(--amber-700); }
+        .improvement-count-value.low    { color: var(--blue-600); }
+
+        .finding-card {
+            border: 1px solid var(--slate-200);
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            background: #fff;
+        }
+        .finding-card-priority-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .finding-card-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--slate-900);
+            margin-bottom: 8px;
+        }
+        .finding-card-rec {
+            background: var(--slate-50);
+            border-radius: 6px;
+            padding: 8px 10px;
+        }
+        .finding-card-rec-label {
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--slate-400);
+            margin-bottom: 4px;
+        }
+        .finding-card-rec-text {
+            font-size: 10.5px;
+            color: var(--slate-600);
+            line-height: 1.5;
+        }
+        .priority-pill {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 20px;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .priority-pill.high   { background: #fee2e2; color: var(--red-700); }
+        .priority-pill.medium { background: #fef3c7; color: var(--amber-700); }
+        .priority-pill.low    { background: var(--blue-100); color: var(--blue-600); }
+
+        /* ─── TABULKA ZJIŠTĚNÍ (aktualizované rozložení ID-036) ──────────── */
         .findings-table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
         .findings-table thead tr { background: var(--blue-800); color: #fff; }
         .findings-table thead th { padding: 8px 10px; text-align: left; font-weight: 600; font-size: 9.5px; letter-spacing: 0.04em; }
@@ -329,8 +509,6 @@
         .findings-table tbody td { padding: 8px 10px; color: var(--slate-700); vertical-align: top; line-height: 1.45; }
         .findings-table tbody tr:nth-child(even) { background: var(--slate-50); }
         .findings-table-wrapper { border: 1px solid var(--slate-200); border-radius: 8px; overflow: hidden; margin-top: 10px; }
-        .findings-table col.col-priority   { width: 12%; }
-        .findings-table col.col-finding    { width: 88%; }
 
         /* ─── PRINT ────────────────────────────────────────────── */
         @media print {
@@ -340,18 +518,17 @@
             .page:last-child { page-break-after: auto; break-after: auto; }
         }
         table, th, td {
-  border: 0.5px solid;
-  border-color: rgba(0,0,0,0.2);
-}
+            border: 0.5px solid;
+            border-color: rgba(0,0,0,0.12);
+        }
     </style>
 </head>
 <body>
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 1: COVER / IDENTIFIKACE ZPRÁVY
+     PAGE 1: COVER / REPORT IDENTIFICATION
      ══════════════════════════════════════════════════════════════ -->
 <div class="page">
-
     <div class="cover-hero">
         <p class="cover-kicker">Zpráva o hodnocení souladu</p>
         <h1 class="cover-title">{{ checklist_title }}</h1>
@@ -364,7 +541,7 @@
                 <div class="cover-meta-sub">Rámec: {{ framework_name or audit_type or checklist_title }}</div>
             </div>
         </div>
-        <div class="cover-prepared">Připraveno: <strong>AuditReady</strong></div>
+        <div class="cover-prepared">Připravil: <strong>AuditReady</strong></div>
     </div>
 
     <div class="cover-details">
@@ -393,21 +570,21 @@
             <span class="cover-detail-value normal">Důvěrné</span>
         </div>
         <div class="cover-detail-row">
-            <span class="cover-detail-label">Připraveno</span>
+            <span class="cover-detail-label">Připravil</span>
             <span class="cover-detail-value normal">AuditReady</span>
         </div>
     </div>
 
     <div class="page-footer">
-        <span>Zpráva o kybernetickém auditu</span>
-        <span>Strana 1</span>
+        <span>Zpráva o auditu kybernetické bezpečnosti</span>
+        <span>Stránka 1</span>
         <span>Klasifikace: Důvěrné</span>
     </div>
 </div>
 
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 2: OBSAH (TABLE OF CONTENTS)
+     PAGE 2: TABLE OF CONTENTS
      ══════════════════════════════════════════════════════════════ -->
 <div class="page">
     <div class="page-header">
@@ -418,27 +595,32 @@
     <div>
         <div class="toc-item">
             <span class="toc-num">1</span>
-            <span class="toc-title">Identifikační údaje zprávy</span>
+            <span class="toc-title">Identifikace zprávy</span>
             <span class="toc-dots"></span>
         </div>
         <div class="toc-item">
             <span class="toc-num">2</span>
-            <span class="toc-title">Cíl auditu a metoda hodnocení</span>
+            <span class="toc-title">Cíl auditu a metodika hodnocení</span>
             <span class="toc-dots"></span>
         </div>
         <div class="toc-item">
             <span class="toc-num">3</span>
-            <span class="toc-title">Manažerské shrnutí</span>
+            <span class="toc-title">Souhrn pro vedení</span>
             <span class="toc-dots"></span>
         </div>
         <div class="toc-item">
             <span class="toc-num">4</span>
-            <span class="toc-title">Přehled výsledků po kapitolách</span>
+            <span class="toc-title">Přehled výsledků podle kapitol</span>
+            <span class="toc-dots"></span>
+        </div>
+        <div class="toc-item">
+            <span class="toc-num">5</span>
+            <span class="toc-title">Identifikované oblasti ke zlepšení</span>
             <span class="toc-dots"></span>
         </div>
         {% for section in section_scores %}
         <div class="toc-item" style="margin-left: 20px;">
-            <span class="toc-num">4{{ ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'][loop.index0] }}</span>
+            <span class="toc-num">6{{ ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'][loop.index0] }}</span>
             <span class="toc-title">§ {{ section.section_number }} – {{ section.section_title }}</span>
             <span class="toc-dots"></span>
         </div>
@@ -446,21 +628,21 @@
     </div>
 
     <div class="page-footer">
-        <span>Zpráva o kybernetickém auditu</span>
-        <span>Strana 2</span>
+        <span>Zpráva o auditu kybernetické bezpečnosti</span>
+        <span>Stránka 2</span>
         <span>Klasifikace: Důvěrné</span>
     </div>
 </div>
 
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 3: CÍL AUDITU A METODA HODNOCENÍ
+     PAGE 3: AUDIT OBJECTIVE AND ASSESSMENT METHOD
      ══════════════════════════════════════════════════════════════ -->
 <div class="page">
     <div class="page-header">
         <p class="page-header-kicker">Přehled auditu</p>
-        <h2 class="page-header-title">2 &nbsp; Cíl auditu a metoda hodnocení</h2>
-        <p class="page-header-subtitle">Tato strana popisuje účel auditu, způsob hodnocení a klíčové provozní údaje dokončené kontroly.</p>
+        <h2 class="page-header-title">2 &nbsp; Cíl auditu a metodika hodnocení</h2>
+        <p class="page-header-subtitle">Tato stránka popisuje cíl auditu, metodiku hodnocení a klíčová provozní data dokončeného přezkumu.</p>
     </div>
 
     <h3 class="section-heading">2.1 &nbsp; Základní informace o auditu</h3>
@@ -469,31 +651,57 @@
             <tr><th>Název auditu</th><td>{{ audit_type or checklist_title }}</td></tr>
             <tr><th>Datum hodnocení</th><td>{{ assessment_date.strftime('%d. %B %Y') }}</td></tr>
             <tr><th>Kontrolní seznam vyplnil</th><td>{{ customer_name }}</td></tr>
-            <tr><th>Přezkoumal</th><td>Lukáš Vaněk</td></tr>
+            <tr><th>Zkontroloval</th><td>Lukáš Vaněk</td></tr>
         </table>
     </div>
 
+    <!-- ID-036: Informační boxy nyní mají ikony odpovídající referenčnímu designu -->
     <h3 class="section-heading">2.2 &nbsp; Cíl auditu</h3>
-    <div class="info-box">
-        <p>Cílem auditu je posoudit aktuální úroveň kybernetické připravenosti organizace v souladu s příslušnými regulatorními požadavky, identifikovat mezery a slabá místa a poskytnout strukturovaný základ pro další nápravu, snížení rizik a přípravu na externí ujištění.</p>
+    <div class="info-box-with-icon">
+        <div class="info-box-icon">
+            <!-- Target / goal icon -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="6"/>
+                <circle cx="12" cy="12" r="2"/>
+            </svg>
+        </div>
+        <div class="info-box-content">
+            <p class="info-box-title">Cíl auditu</p>
+            <p>Cílem auditu je vyhodnotit aktuální úroveň připravenosti organizace na kybernetické bezpečnosti v souladu s příslušnými regulačními požadavky, identifikovat mezery a slabiny a poskytnout strukturovaný základ pro další nápravná opatření, snížení rizik a přípravu na externí zabezpečení.</p>
+        </div>
     </div>
 
-    <h3 class="section-heading">2.3 &nbsp; Metoda hodnocení</h3>
-    <div class="info-box">
-        <p>Odpovědi jsou posuzovány v souladu s příslušnými regulatorními požadavky a kontrolními cíli. Výsledné hodnocení odráží přezkoumaný stav po ověření předložených odpovědí, poznámek a podpůrných důkazů administrátorem. Hodnocení zohledňuje úplnost, efektivnost a kvalitu implementovaných opatření a zdokumentovaných důkazů.</p>
+    <h3 class="section-heading">2.3 &nbsp; Metodika hodnocení</h3>
+    <div class="info-box-with-icon">
+        <div class="info-box-icon">
+            <!-- Clipboard / checklist icon -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="8" y="2" width="8" height="4" rx="1"/>
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                <path d="M9 12l2 2 4-4"/>
+            </svg>
+        </div>
+        <div class="info-box-content">
+            <p class="info-box-title">Metoda vyhodnocení</p>
+            <p>Odpovědi jsou hodnoceny v souladu s příslušnými regulačními požadavky a kontrolními cíli. Výsledné hodnocení odráží přezkoumaný stav po ověření podaných odpovědí, poznámek a podpůrných důkazů administrátorem. Hodnocení bere v úvahu úplnost, efektivitu a kvalitu implementovaných opatření a dokumentovaných důkazů.</p>
+        </div>
     </div>
 
+    <!-- ID-036: Score labels updated to match "4 – Plně implementováno" format -->
     <h3 class="section-heading">2.4 &nbsp; Rozsah odpovědí</h3>
     <div class="data-table-wrapper">
         <table class="data-table">
             <tbody>
                 <tr>
-                    <td style="text-align:center; background-color:rgba(55, 179, 92, 0.3);"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="10" stroke="#28a745" stroke-width="2"/>
-        <path d="M8 12l3 3 5-5" stroke="#28a745" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg></td>
-                    <td><strong>Plně implementováno</strong><br/><span style="color:#28a745;font-size:10px;">(ANO)</span></td>
-                    <td>Požadavek je plně implementován, konzistentně uplatňován v praxi a podložen odpovídajícími a dostatečnými důkazy.</td>
+                    <td style="text-align:center; width:48px; background-color:rgba(34,197,94,0.12);">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="#16a34a" stroke-width="2"/>
+                            <path d="M8 12l3 3 5-5" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </td>
+                    <td style="width:200px;"><strong>4 – Plně implementováno</strong><br/><span style="color:#16a34a;font-size:10px;">(ANO)</span></td>
+                    <td>Požadavek je plně implementován, v praxi konzistentně uplatňován a podpořen odpovídajícími a dostatečnými důkazy.</td>
                 </tr>
                 <tr>
                     <td style="text-align:center; background-color:rgba(251, 191, 36, 0.3);"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="none">
@@ -503,70 +711,94 @@
         <path d="M12 2 L12 12 L4.9 19.1" stroke="#fbbe247c" stroke-width="2" stroke-linecap="round" fill="none"/>
     </svg></td>
                     <td><strong>Částečně implementováno</strong><br/><span style="color:#fbbf24;font-size:10px;">(ČÁSTEČNĚ)</span></td>
-                    <td>Požadavek je implementován v omezené míře. Existují mezery v implementaci, konzistenci nebo podpůrných důkazech.</td>
+                    <td>Požadavek je implementován do omezené míry. Existují mezery v implementaci, konzistenci nebo podpůrných důkazech.</td>
                 </tr>
                 <tr>
-                    <td style="text-align:center; background-color:rgba(239, 68, 68, 0.3);"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="10" stroke="#ef4444" stroke-width="2"/>
-        <rect x="7" y="9" width="10" height="6" rx="1" fill="#ef4444"/>
-    </svg></td>
-                    <td><strong>Převážně neimplementováno</strong><br/><span style="color:#ef4444;font-size:10px;">(PŘEVÁŽNĚ NE)</span></td>
-                    <td>Požadavek je z větší části neimplementován. Existují pouze izolovaná opatření nebo je implementace nedostatečná a nesystematická.</td>
+                    <td style="text-align:center; background-color:rgba(239,68,68,0.12);">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="#ef4444" stroke-width="2"/>
+                            <rect x="7" y="9" width="10" height="6" rx="1" fill="#ef4444"/>
+                        </svg>
+                    </td>
+                    <td><strong>2 – Převážně neimplementováno</strong><br/><span style="color:#ef4444;font-size:10px;">(PŘEVÁŽNĚ NEIMPLEMENTOVÁNO)</span></td>
+                    <td>Požadavek je převážně neimplementován. Existují pouze izolovaná opatření nebo implementace je nedostatečná a nesystematická.</td>
                 </tr>
                 <tr>
-                    <td style="text-align:center; background-color:rgba(107, 114, 128, 0.3);"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="none">
-        <circle cx="12" cy="12" r="10" stroke="#6b7280" stroke-width="2"/>
-        <path d="M9 9l6 6M15 9l-6 6" stroke="#6b7280" stroke-width="2" stroke-linecap="round"/>
-    </svg></td>
-                    <td><strong>Neimplementováno</strong><br/><span style="color:#6b7280;font-size:10px;">(NE)</span></td>
-                    <td>Požadavek není vůbec implementován. Nejsou k dispozici žádná relevantní opatření ani důkazy.</td>
+                    <td style="text-align:center; background-color:rgba(107,114,128,0.12);">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="10" stroke="#6b7280" stroke-width="2"/>
+                            <path d="M9 9l6 6M15 9l-6 6" stroke="#6b7280" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </td>
+                    <td><strong>1 – Neimplementováno</strong><br/><span style="color:#6b7280;font-size:10px;">(NEIMPLEMENTOVÁNO)</span></td>
+                    <td>Požadavek není vůbec implementován. Nejsou k dispozici žádná relevantní opatření nebo důkazy.</td>
                 </tr>
             </tbody>
         </table>
     </div>
 
     <div class="page-footer">
-        <span>Zpráva o kybernetickém auditu</span>
-        <span>Strana 3</span>
+        <span>Zpráva o auditu kybernetické bezpečnosti</span>
+        <span>Stránka 3</span>
         <span>Klasifikace: Důvěrné</span>
     </div>
 </div>
 
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 4: MANAŽERSKÉ SHRNUTÍ
+     PAGE 4: EXECUTIVE SUMMARY
      ══════════════════════════════════════════════════════════════ -->
 <div class="page">
     <div class="page-header">
-        <p class="page-header-kicker">Výkonné shrnutí</p>
-        <h2 class="page-header-title">3 &nbsp; Manažerské shrnutí</h2>
-        <p class="page-header-subtitle">Souhrnný přehled aktuálního stavu kybernetické bezpečnosti organizace a celkové připravenosti na audit.</p>
+        <p class="page-header-kicker">Souhrn pro vedení</p>
+        <h2 class="page-header-title">3 &nbsp; Souhrn pro vedení</h2>
+        <p class="page-header-subtitle">Vysokoúrovňový narativní souhrn aktuální připravenosti organizace na audit a celkového bezpečnostního postavení.</p>
     </div>
 
-    <h3 class="section-heading">Shrnutí</h3>
-    <div class="info-box">
-        {% if management_summary %}
-        <p>{{ management_summary }}</p>
-        {% else %}
-        <p style="color: var(--slate-400); font-style: italic;">[Zde bude doplněno manažerské shrnutí auditorem po dokončení přezkumu.]</p>
-        <p style="margin-top:8px;">Závěrečné znění bude dokončeno ve fázi přezkumu před zveřejněním zprávy.</p>
-        {% endif %}
+    <!-- Shrnutí s ikonou (ID-036) -->
+    <div class="info-box-with-icon" style="margin-bottom:20px;">
+        <div class="info-box-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="M7 8h10M7 12h10M7 16h6"/>
+            </svg>
+        </div>
+        <div class="info-box-content">
+            <p class="info-box-title">Shrnutí</p>
+            {% if management_summary %}
+            <p>{{ management_summary }}</p>
+            {% else %}
+            <p class="info-box-placeholder">Tato sekce je určena pro konečné shrnutí auditora určené pro vedení. Měla by vysvětlit celkovou úroveň připravenosti organizace, identifikovat nejdůležitější silné a slabé stránky a poskytnout stručný pohled na hlavní problémy, které pravděpodobně ovlivní výsledek auditu.</p>
+            <p class="info-box-placeholder" style="margin-top:4px;">[Zástupný symbol ručního shrnutí]</p>
+            <p style="margin-top:8px; font-size:11px; color:var(--slate-600);">Konečné znění bude dokončeno během fáze přezkumu před publikací zprávy.</p>
+            {% endif %}
+        </div>
     </div>
 
-    <h3 class="section-heading">Přehled výkonnosti sekcí</h3>
-    <div class="chart-legend-grid">
+    <!-- Radarový graf s tabulkou legendy sekce (ID-035 / ID-036) -->
+    <div class="info-box-with-icon" style="margin-bottom:12px; padding-bottom:8px;">
+        <div class="info-box-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2l3.5 7h7l-5.5 4.5 2 7L12 17l-7 3.5 2-7L1.5 9h7z"/>
+            </svg>
+        </div>
+        <div class="info-box-content">
+            <p class="info-box-title">Radarový graf</p>
+            <p style="font-size:10px; color:var(--slate-400); font-style:italic;">Níže uvedený graf bude vygenerován aplikací na základě finálního stavu přezkumu.</p>
+        </div>
+    </div>
 
-        <!-- Pure SVG Spider Chart (with mirroring for < 5 sections) -->
+    <div class="chart-layout">
+        <!-- Čistý SVG radarový graf -->
         <div style="width:100%; max-width:380px;">
             <svg viewBox="0 0 380 340" xmlns="http://www.w3.org/2000/svg"
                  role="img"
-                 aria-label="Pavoučí graf zobrazující výkon sekcí napříč všemi doménami"
+                 aria-label="Radarový graf zobrazující výkon sekce napříč všemi doménami"
                  style="width:100%; height:auto; display:block;">
 
-                <title>Přehled výkonnosti sekcí</title>
-                <desc>Radarový graf porovnávající skóre vyspělosti napříč všemi kontrolními sekcemi.</desc>
+                <title>Výkon sekce Radarový graf</title>
 
-                <!-- Grid rings (25 / 50 / 75 / 100 %) -->
+                <!-- Grid rings -->
                 {% for ring in spider_chart_data.grid_levels %}
                 <polygon points="{{ ring }}"
                          fill="none"
@@ -582,13 +814,21 @@
                       stroke="#e2e8f0" stroke-width="1"/>
                 {% endfor %}
 
-                <!-- Percentage labels on the top spoke (25/50/75/100) -->
+                <!-- % labels on top spoke -->
                 {% for level, label in [(25,'25%'), (50,'50%'), (75,'75%'), (100,'100%')] %}
                 {% set ry = 170 - (120 * level / 100) %}
                 <text x="194" y="{{ ry - 2 }}"
                       font-size="7" fill="#94a3b8"
                       font-family="Arial, sans-serif">{{ label }}</text>
                 {% endfor %}
+
+                <!-- Target 100% dashed ring (visual reference) -->
+                <polygon points="{% for endpoint in spider_chart_data.axis_lines %}{{ endpoint }} {% endfor %}"
+                         fill="none"
+                         stroke="#93c5fd"
+                         stroke-width="1.5"
+                         stroke-dasharray="4 3"
+                         opacity="0.7"/>
 
                 <!-- Filled data polygon -->
                 <polygon points="{{ spider_chart_data.data_polygon }}"
@@ -607,21 +847,17 @@
                         stroke-width="1.5"/>
                 {% endfor %}
 
-                <!-- Axis labels (section number + short title) -->
+                <!-- Axis section labels -->
                 {% for label in spider_chart_data.labels %}
                 {% if not label.hidden %}
                 {% set lx = label.x %}
                 {% set ly = label.y %}
-
-                <!-- Number badge -->
                 <circle cx="{{ lx }}" cy="{{ ly - 6 }}" r="8" fill="#1e4a88"/>
                 <text x="{{ lx }}" y="{{ ly - 2 }}"
                       text-anchor="middle"
                       font-size="8" font-weight="700"
                       fill="#ffffff"
                       font-family="Arial, sans-serif">{{ label.number }}</text>
-
-                <!-- Short title (first 14 chars) -->
                 <text x="{{ lx }}" y="{{ ly + 12 }}"
                       text-anchor="middle"
                       font-size="7.5" fill="#475569"
@@ -630,29 +866,45 @@
                 {% endfor %}
 
             </svg>
-        </div>
 
-        <!-- Legend list -->
-        <div>
-            {% for section in section_scores %}
-            <div class="legend-item">
-                <span class="legend-num">{{ loop.index }}</span>
-                <span class="legend-name">
-                    {{ section.section_title if section is mapping else section['section_title'] }}
-                    &nbsp;
-                    <span style="font-weight:600; color:
-                        {% set pct = (section.percentage if section is mapping else section['percentage']) | float %}
-                        {% if pct >= 80 %}#15803d{% elif pct >= 60 %}#b45309{% else %}#b91c1c{% endif %};">
-                        {{ "%.0f"|format(section.percentage if section is mapping else section['percentage']) }}%
-                    </span>
+            <!-- Chart legend line indicators -->
+            <div style="display:flex; gap:16px; justify-content:center; margin-top:6px; font-size:9.5px; color:var(--slate-500);">
+                <span style="display:flex; align-items:center; gap:5px;">
+                    <svg width="20" height="6"><line x1="0" y1="3" x2="20" y2="3" stroke="#2563eb" stroke-width="2"/><circle cx="10" cy="3" r="3" fill="#2563eb"/></svg>
+                    Aktuální skóre (%)
+                </span>
+                <span style="display:flex; align-items:center; gap:5px;">
+                    <svg width="20" height="6"><line x1="0" y1="3" x2="20" y2="3" stroke="#93c5fd" stroke-width="1.5" stroke-dasharray="4 3"/></svg>
+                    Cílové skóre (%)
                 </span>
             </div>
-            {% endfor %}
         </div>
 
+        <!-- Legenda tabulky (Sekce / Oblast Doména) odpovídající obrázku 2 -->
+        <div>
+            <div class="chart-legend-table-wrapper">
+                <table class="chart-legend-table">
+                    <thead>
+                        <tr>
+                            <th style="width:22%;">Sekce</th>
+                            <th>Oblast / Doména</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for section in section_scores %}
+                        <tr>
+                            <td style="font-weight:700; color:var(--blue-500);">§ {{ section.section_number if section is mapping else section['section_number'] }}</td>
+                            <td>{{ section.section_title if section is mapping else section['section_title'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p style="margin-top:8px; font-size:9px; font-style:italic; color:var(--slate-400);">Poznámka: Skóre jsou zobrazena v procentech (%). Vyšší skóre indikuje vyšší úroveň implementace.</p>
+        </div>
     </div>
 
-    <!-- Risk Summary -->
+    <!-- Shrnutí rizik -->
     {% set critical_findings = findings|selectattr('priority', 'equalto', 'high')|list %}
     {% set high_findings = findings|selectattr('priority', 'equalto', 'medium')|list %}
     <div class="risk-grid">
@@ -667,45 +919,46 @@
         <div class="risk-card high">
             <p class="risk-label">Vysoká priorita</p>
             <p class="risk-value">{{ high_findings|length }}</p>
-            <p class="risk-sub">Naplánujte nápravu</p>
+            <p class="risk-sub">Naplánovat nápravná opatření</p>
         </div>
         {% endif %}
         <div class="risk-card overall">
             <p class="risk-label">Celkové skóre</p>
             <p class="risk-value">{{ "%.1f"|format(total_score_percentage) }}%</p>
             <p class="risk-sub">
-                {% if total_score_percentage >= 80 %}Nízké riziko
-                {% elif total_score_percentage >= 60 %}Střední riziko
-                {% else %}Vysoké riziko{% endif %}
+                {% if total_score_percentage >= 80 %}nízké riziko
+                {% elif total_score_percentage >= 60 %}střední riziko
+                {% else %}vysoké riziko{% endif %}
             </p>
         </div>
     </div>
 
     <div class="page-footer">
-        <span>Zpráva o kybernetickém auditu</span>
-        <span>Strana 4</span>
+        <span>Zpráva o auditu kybernetické bezpečnosti</span>
+        <span>Stránka 4</span>
         <span>Klasifikace: Důvěrné</span>
     </div>
 </div>
 
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 5: PŘEHLED VÝSLEDKŮ PO KAPITOLÁCH
+     PAGE 5: RESULTS OVERVIEW BY CHAPTER  (ID-035 FIXED)
      ══════════════════════════════════════════════════════════════ -->
 <div class="page">
     <div class="page-header">
-        <p class="page-header-kicker">Podrobná analýza</p>
-        <h2 class="page-header-title">4 &nbsp; Přehled výsledků po kapitolách</h2>
-        <p class="page-header-subtitle">Souhrnná tabulka všech sekcí s hodnocením zralosti, prioritami a krátkým komentářem.</p>
+        <p class="page-header-kicker">Detailní analýza</p>
+        <h2 class="page-header-title">4 &nbsp; Výsledky podle kapitol</h2>
+        <p class="page-header-subtitle">Každá kapitola je představena se svým skóre vyspělosti, počtem zjištění a ukazatelem průběhu, takže výkon je okamžitě viditelný.</p>
     </div>
 
-    <div class="data-table-wrapper">
+    <!-- Tabulka shrnutí -->
+    <div class="data-table-wrapper" style="margin-bottom:18px;">
         <table class="data-table">
             <thead>
                 <tr>
-                    <th style="width:5%;">č.</th>
+                    <th style="width:5%;">Č.</th>
                     <th style="width:34%;">Kapitola / Sekce</th>
-                    <th style="width:13%; text-align:center;">Skóre zralosti</th>
+                    <th style="width:13%; text-align:center;">Skóre vyspělosti</th>
                     <th style="width:13%; text-align:center;">Vysoké priority</th>
                     <th>Shrnutí administrátora</th>
                 </tr>
@@ -716,7 +969,6 @@
                 {% set section_findings_medium = findings|selectattr('priority', 'equalto', 'medium')|selectattr('section_code', 'equalto', section.section_code)|list %}
                 {% set high_count = section_findings_high|length + section_findings_medium|length %}
                 {% set section_summary = section_summaries|selectattr('section_code', 'equalto', section.section_code)|first %}
-                {# Fallback: try matching by section_id if section_code doesn't work #}
                 {% if not section_summary %}
                 {% set section_summary = section_summaries|selectattr('section_id', 'equalto', section.section_id)|first %}
                 {% endif %}
@@ -751,28 +1003,126 @@
         </table>
     </div>
 
+    <!-- ID-035: Karty přehledu kapitol (karta pro každou sekci s ukazatelem průběhu) -->
+    <h3 class="section-heading" style="margin-top:0;">Přehled kapitol</h3>
+    <div class="chapter-cards">
+        {% for section in section_scores %}
+        {% set sec_findings = findings|selectattr('section_code', 'equalto', section.section_code)|list %}
+        {% set sec_pct = (section.percentage if section is mapping else section['percentage']) | float %}
+        {% set bar_class = 'bar-green' if sec_pct >= 80 else ('bar-amber' if sec_pct >= 60 else 'bar-red') %}
+        <div class="chapter-card">
+            <div class="chapter-card-header">
+                <div>
+                    <div class="chapter-card-id">SEC-{{ loop.index }}</div>
+                    <div class="chapter-card-title">§ {{ section.section_number }} – {{ section.section_title }}</div>
+                </div>
+                <div class="chapter-card-score">
+                    <div class="chapter-card-score-label">Skóre</div>
+                    <div class="chapter-card-score-value {% if sec_pct >= 80 %}green{% elif sec_pct >= 60 %}amber{% else %}red{% endif %}"
+                         style="color: {% if sec_pct >= 80 %}var(--green-700){% elif sec_pct >= 60 %}var(--amber-700){% else %}var(--red-700){% endif %};">
+                        {{ "%.1f"|format(sec_pct) }}%
+                    </div>
+                </div>
+            </div>
+            <div class="chapter-card-meta">
+                <span>Skóre <strong>{{ section.overall_score if section is mapping else section['overall_score'] }} / {{ section.max_score if section is mapping else section['max_score'] }}</strong></span>
+                <span>Zjištění <strong>{{ sec_findings|length }}</strong></span>
+            </div>
+            <div class="chapter-card-bar">
+                <div class="chapter-card-bar-fill {{ bar_class }}" style="width:{{ sec_pct }}%;"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
     <div style="margin-top:12px; background:var(--slate-50); border-radius:8px; padding:10px 12px; font-size:10px; color:var(--slate-500); border:1px solid var(--slate-200);">
-        <strong>Poznámka:</strong> Vysoké priority zahrnují zjištění s kritickou (vysokou) i střední prioritou vyžadující pozornost.
-        Hodnocení barevně: <span class="badge badge-green" style="margin:0 4px;">≥ 80 %</span> nízké riziko &nbsp;
+        <strong>Poznámka:</strong> Vysoké priority zahrnují zjištění s kritickou (vysokou) a střední prioritou vyžadující pozornost.
+        Barevné hodnocení: <span class="badge badge-green" style="margin:0 4px;">≥ 80 %</span> nízké riziko &nbsp;
         <span class="badge badge-amber" style="margin:0 4px;">60–79 %</span> střední riziko &nbsp;
         <span class="badge badge-red" style="margin:0 4px;">&lt; 60 %</span> vysoké riziko
     </div>
 
     <div class="page-footer">
-        <span>Zpráva o kybernetickém auditu</span>
-        <span>Strana 5</span>
+        <span>Zpráva o auditu kybernetické bezpečnosti</span>
+        <span>Stránka 5</span>
         <span>Klasifikace: Důvěrné</span>
     </div>
 </div>
 
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGES 6+: DETAIL SEKCE (one page per section)
+     PAGE 6: IDENTIFIED AREAS FOR IMPROVEMENT  (ID-034 NEW PAGE)
+     ══════════════════════════════════════════════════════════════ -->
+<div class="page">
+    <div class="page-header">
+        <p class="page-header-kicker">Oblasti ke zlepšení</p>
+        <h2 class="page-header-title">5 &nbsp; Identifikované oblasti ke zlepšení</h2>
+        <p class="page-header-subtitle">Tato stránka je záměrně vyhrazena pro problémy, které jsou nejvýznamnější. Rozložení je širší a klidnější, takže každé zjištění působí jako součást jedné navržené stránky.</p>
+    </div>
+
+    <!-- ID-034: Count summary row -->
+    {% set all_high   = findings|selectattr('priority', 'equalto', 'high')|list %}
+    {% set all_medium = findings|selectattr('priority', 'equalto', 'medium')|list %}
+    {% set all_low    = findings|selectattr('priority', 'equalto', 'low')|list %}
+    <div style="display:flex; align-items:center; gap:24px; margin-bottom:20px; padding:12px 16px; background:var(--slate-50); border:1px solid var(--slate-200); border-radius:10px;">
+        <div style="flex:1; font-size:11px; color:var(--slate-600);">
+            <strong style="color:var(--slate-900);">{{ findings|length }}</strong> celkový počet zjištění napříč všemi sekcemi
+        </div>
+        <div class="improvement-count-box">
+            <div class="improvement-count-label high">VYSOKÁ</div>
+            <div class="improvement-count-value high">{{ all_high|length }}</div>
+        </div>
+        <div class="improvement-count-box">
+            <div class="improvement-count-label medium">STŘEDNÍ</div>
+            <div class="improvement-count-value medium">{{ all_medium|length }}</div>
+        </div>
+        <div class="improvement-count-box">
+            <div class="improvement-count-label low">NÍZKÁ</div>
+            <div class="improvement-count-value low">{{ all_low|length }}</div>
+        </div>
+    </div>
+
+    <!-- ID-034: Jednotlivé karty zjištění s textem doporučení -->
+    {% for finding in findings|sort(attribute='priority', reverse=false) %}
+    <div class="finding-card">
+        <div class="finding-card-priority-row">
+            <span class="priority-pill {{ finding.priority }}">
+                {% if finding.priority == 'high' %}VYSOKÁ
+                {% elif finding.priority == 'medium' %}STŘEDNÍ
+                {% else %}NÍZKÁ{% endif %}
+            </span>
+            {% if finding.responsible_party %}
+            <span style="font-size:10px; color:var(--slate-400);">{{ finding.responsible_party }}</span>
+            {% endif %}
+        </div>
+        <div class="finding-card-title">{{ finding.question_text }}</div>
+        {% if finding.recommendation_text or finding.finding_text %}
+        <div class="finding-card-rec">
+            <div class="finding-card-rec-label">Doporučení</div>
+            <div class="finding-card-rec-text">{{ finding.recommendation_text or finding.finding_text }}</div>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="info-box">
+        <p style="color:var(--slate-400); font-style:italic;">Nebyla identifikována žádná zjištění. Všechny požadavky jsou ve všech sekcích odpovídajícím způsobem implementovány.</p>
+    </div>
+    {% endfor %}
+
+    <div class="page-footer">
+        <span>Zpráva o auditu kybernetické bezpečnosti</span>
+        <span>Stránka 6</span>
+        <span>Klasifikace: Důvěrné</span>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     PAGES 7+: DETAIL SEKCE (one page per section)  (ID-036 FIXED)
      ══════════════════════════════════════════════════════════════ -->
 {% for section in section_scores %}
 {% set section_findings = findings|selectattr('section_code', 'equalto', section.section_code)|list %}
 {% set section_summary  = section_summaries|selectattr('section_code', 'equalto', section.section_code)|first %}
-{# Fallback: try matching by section_id if section_code doesn't work #}
 {% if not section_summary %}
 {% set section_summary  = section_summaries|selectattr('section_id', 'equalto', section.section_id)|first %}
 {% endif %}
@@ -790,71 +1140,81 @@
     <!-- Metric cards -->
     <div class="section-metrics">
         <div class="metric-card">
-            <p class="metric-label">Skóre zralosti</p>
+            <p class="metric-label">Maturity Score</p>
             <p class="metric-value blue">{{ "%.1f"|format(section.percentage) }}%</p>
             <div class="metric-bar"><div class="metric-bar-fill" style="width:{{ section.percentage }}%;"></div></div>
         </div>
         <div class="metric-card">
-            <p class="metric-label">Vysoké priority</p>
+            <p class="metric-label">High Priorities</p>
             <p class="metric-value {% if high_count > 0 %}red{% else %}green{% endif %}">
                 {% if high_count > 0 %}{{ high_count }}{% else %}Žádné{% endif %}
             </p>
             <p class="metric-sub">{% if high_count > 0 %}Položky vyžadující pozornost{% else %}Žádné kritické problémy{% endif %}</p>
         </div>
         <div class="metric-card">
-            <p class="metric-label">Soubory důkazů</p>
+            <p class="metric-label">Důkazní soubory</p>
             <p class="metric-value blue">{{ section.evidence_count }}</p>
-            <p class="metric-sub">Nahraných podpůrných dokumentů</p>
+            <p class="metric-sub">Nahrané podpůrné dokumenty</p>
         </div>
     </div>
 
-    <!-- Section summary -->
+    <!-- Shrnutí sekce -->
     <h3 class="section-heading">Shrnutí sekce</h3>
     <div class="info-box">
         {% if section_summary and section_summary.summary_text %}
         <p>{{ section_summary.summary_text }}</p>
         {% else %}
-        <p style="color:var(--slate-400);font-style:italic;">Auditor/administrátor pro tuto sekci dosud nedoplnil shrnutí.</p>
+        <p style="color:var(--slate-400);font-style:italic;">Auditor/administrátor ještě nedokončil shrnutí pro tuto sekci.</p>
         {% endif %}
     </div>
 
-    <!-- Section recommendation -->
+    <!-- Doporučení sekce -->
     {% if section_summary and section_summary.recommendation_text %}
     <h3 class="section-heading">Doporučení pro sekci</h3>
-    <div class="info-box" style="border-color:var(--blue-200); background:var(--blue-50);">
+    <div class="info-box" style="border-color:var(--blue-100); background:var(--blue-50);">
         <p>{{ section_summary.recommendation_text }}</p>
     </div>
     {% endif %}
 
-    <!-- Findings table -->
-    <h3 class="section-heading">Zjištění</h3>
+    <!-- ID-036: Tabulka zjištění aktualizována na sloupce Požadavek / Zjištění / Priorita -->
+    <h3 class="section-heading">Požadavky se zjištěními a doporučeními</h3>
     {% if section_findings %}
     <div class="findings-table-wrapper">
         <table class="findings-table">
             <colgroup>
-                <col class="col-priority">
-                <col class="col-finding">
+                <col style="width:30%;">
+                <col style="width:55%;">
+                <col style="width:15%;">
             </colgroup>
             <thead>
                 <tr>
-                    <th>Priorita</th>
-                    <th>Zjištění / Požadavek</th>
+                    <th>Požadavek</th>
+                    <th>Zjištění</th>
+                    <th style="text-align:center;">Priorita</th>
                 </tr>
             </thead>
             <tbody>
                 {% for finding in section_findings %}
                 <tr>
-                    <td>
-                        <span class="badge
-                            {% if finding.priority == 'high' %}badge-red
-                            {% elif finding.priority == 'medium' %}badge-amber
-                            {% else %}badge-blue{% endif %}">
+                    <td style="font-weight:500; color:var(--slate-700);">{{ finding.question_text }}</td>
+                    <td style="color:var(--slate-600);">
+                        {% if finding.finding_text %}
+                        {{ finding.finding_text }}
+                        {% elif finding.priority == 'high' %}
+                        Klient odpověděl Ne – požadovaná kontrola není implementována.
+                        {% elif finding.priority == 'medium' %}
+                        Klient odpověděl Částečně – implementace existuje, ale je neúplná nebo nekonzistentně zdokumentovaná.
+                        {% else %}
+                        Klient odpověděl – důkazy nebo vlastnictví jsou nejasné.
+                        {% endif %}
+                    </td>
+                    <td style="text-align:center;">
+                        <span class="priority-pill {{ finding.priority }}">
                             {% if finding.priority == 'high' %}Vysoká
                             {% elif finding.priority == 'medium' %}Střední
                             {% else %}Nízká{% endif %}
                         </span>
                     </td>
-                    <td>{{ finding.question_text }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -862,12 +1222,12 @@
     </div>
     {% else %}
     <div class="info-box">
-        <p>Pro tuto sekci nebylo nalezeno žádné zjištění. Všechny požadavky jsou odpovídajícím způsobem implementovány.</p>
+        <p>V této sekci nebyla nalezena žádná zjištění. Všechny požadavky jsou odpovídajícím způsobem implementovány.</p>
     </div>
     {% endif %}
 
-    <!-- Question Review Details -->
-    <h3 class="section-heading">Detaily přezkumu otázek</h3>
+    <!-- Detailní vyhodnocení otázek -->
+    <h3 class="section-heading">Detailní vyhodnocení otázek</h3>
     {% if section.question_scores %}
     <div class="data-table-wrapper">
         <table class="data-table">
@@ -895,13 +1255,13 @@
     </div>
     {% else %}
     <div class="info-box">
-        <p>Pro tuto sekci nejsou k dispozici žádná data o přezkumu otázek.</p>
+        <p>Pro tuto sekci nejsou k dispozici údaje o vyhodnocení otázek.</p>
     </div>
     {% endif %}
 
     <div class="page-footer">
-        <span>Zpráva o kybernetickém auditu</span>
-        <span>Strana {{ 5 + loop.index }}</span>
+        <span>Zpráva o auditu kybernetické bezpečnosti</span>
+        <span>Stránka {{ 6 + loop.index }}</span>
         <span>Klasifikace: Důvěrné</span>
     </div>
 </div>
