@@ -13,20 +13,14 @@ def build_profile_completion(user: User, db: Session) -> ProfileCompletionRespon
     if user.primary_company_id:
         company = db.query(Company).filter(Company.id == user.primary_company_id).first()
 
-    personal_complete = all(
-        bool((value or "").strip())
-        for value in [user.full_name, user.username, user.job_title, user.department]
+    personal_complete = bool(
+        (user.username or "").strip()
     )
 
     company_complete = bool(
         company
         and (company.name or "").strip()
-        and (company.slug or "").strip()
-        and (company.industry or "").strip()
-        and (company.size or "").strip()
-        and (company.region or "").strip()
-        and (company.country or "").strip()
-        and (company.website or "").strip()
+        and (company.email or "").strip()
     )
 
     mfa_record = getattr(user, "mfa_totp", None)
@@ -48,6 +42,7 @@ def build_profile_completion(user: User, db: Session) -> ProfileCompletionRespon
         company
         and (company.billing_contact_name or "").strip()
         and (company.billing_email or "").strip()
+        and (company.billing_tax_id or "").strip()
         and (company.billing_address_line1 or "").strip()
         and (company.billing_city or "").strip()
         and (company.billing_postal_code or "").strip()

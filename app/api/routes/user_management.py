@@ -867,7 +867,19 @@ def get_customer(
                 "website": company.website,
                 "industry": company.industry,
                 "country": company.country,
+                "size": company.size,
+                "description": company.description,
                 "is_active": company.is_active,
+                "billing_contact_name": company.billing_contact_name,
+                "billing_email": company.billing_email,
+                "billing_phone": company.billing_phone,
+                "billing_address_line1": company.billing_address_line1,
+                "billing_address_line2": company.billing_address_line2,
+                "billing_city": company.billing_city,
+                "billing_state": company.billing_state,
+                "billing_postal_code": company.billing_postal_code,
+                "billing_country": company.billing_country,
+                "billing_tax_id": company.billing_tax_id,
             }
     
     return {

@@ -134,6 +134,7 @@ def get_assessment_answers_with_reviews(
     assessment_query = (
         db.query(Assessment)
         .options(joinedload(Assessment.user))
+        .options(joinedload(Assessment.company))
         .options(
             joinedload(Assessment.checklist)
             .joinedload(Checklist.translations)
@@ -305,11 +306,38 @@ def get_assessment_answers_with_reviews(
     )
     
     completion_percentage = assessment.completion_percent or 0
-    
+
+    # Build company info
+    company_info = None
+    if assessment.company:
+        company_info = {
+            "id": str(assessment.company.id),
+            "name": assessment.company.name,
+            "slug": assessment.company.slug,
+            "email": assessment.company.email,
+            "website": assessment.company.website,
+            "industry": assessment.company.industry,
+            "country": assessment.company.country,
+            "size": assessment.company.size,
+            "description": assessment.company.description,
+            "is_active": assessment.company.is_active,
+            "billing_contact_name": assessment.company.billing_contact_name,
+            "billing_email": assessment.company.billing_email,
+            "billing_phone": assessment.company.billing_phone,
+            "billing_address_line1": assessment.company.billing_address_line1,
+            "billing_address_line2": assessment.company.billing_address_line2,
+            "billing_city": assessment.company.billing_city,
+            "billing_state": assessment.company.billing_state,
+            "billing_postal_code": assessment.company.billing_postal_code,
+            "billing_country": assessment.company.billing_country,
+            "billing_tax_id": assessment.company.billing_tax_id,
+        }
+
     return AssessmentAnswerListResponse(
         assessment_id=assessment_id,
         customer_email=assessment.user.email,
-        customer_name=assessment.user.email,
+        customer_name=assessment.user.full_name or assessment.user.email,
+        customer_username=assessment.user.username,
         checklist_title=checklist_translation.title if checklist_translation else f"Checklist v{assessment.checklist.version}",
         checklist_version=f"v{assessment.checklist.version}",
         assessment_status=assessment.status.value,
@@ -320,6 +348,7 @@ def get_assessment_answers_with_reviews(
         action_required_answers=action_required_count,
         average_score=average_score,
         completion_percentage=completion_percentage,
+        company=company_info,
         generated_at=_now_utc(),
     )
 

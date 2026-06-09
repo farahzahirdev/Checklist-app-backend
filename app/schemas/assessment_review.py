@@ -144,21 +144,25 @@ class AssessmentAnswerListResponse(BaseModel):
     assessment_id: UUID
     customer_email: str
     customer_name: str
+    customer_username: Optional[str] = None
     checklist_title: str
     checklist_version: str
     assessment_status: str
     submitted_at: Optional[datetime]
-    
+
+    # Company information
+    company: Optional[dict] = None
+
     # Answers with reviews
     answers: List[AnswerWithReview]
     total_answers: int
     reviewed_answers: int
     action_required_answers: int
-    
+
     # Summary statistics
     average_score: float
     completion_percentage: float
-    
+
     generated_at: datetime
 
 
