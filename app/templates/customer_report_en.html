@@ -339,6 +339,10 @@
             .page { page-break-after: always; break-after: page; }
             .page:last-child { page-break-after: auto; break-after: auto; }
         }
+        table, th, td {
+  border: 0.5px solid;
+  border-color: rgba(0,0,0,0.3);
+}
     </style>
 </head>
 <body>
@@ -482,32 +486,39 @@
     <h3 class="section-heading">2.4 &nbsp; Response Scale</h3>
     <div class="data-table-wrapper">
         <table class="data-table">
-            <thead>
-                <tr>
-                    <th style="width:8%">Score</th>
-                    <th style="width:30%">Rating</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
             <tbody>
                 <tr>
-                    <td style="text-align:center;"><span class="badge badge-green">4</span></td>
-                    <td><strong>Fully implemented</strong><br/><span style="color:var(--slate-500);font-size:10px;">(YES)</span></td>
+                    <td style="text-align:center; background-color:rgba(55, 179, 92, 0.3);"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="#28a745" stroke-width="2"/>
+        <path d="M8 12l3 3 5-5" stroke="#28a745" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg></td>
+                    <td><strong>Fully implemented</strong><br/><span style="color:#28a745;font-size:10px;">(YES)</span></td>
                     <td>The requirement is fully implemented, consistently applied in practice, and supported by appropriate and sufficient evidence.</td>
                 </tr>
                 <tr>
-                    <td style="text-align:center;"><span class="badge badge-amber">3</span></td>
-                    <td><strong>Partially implemented</strong><br/><span style="color:var(--slate-500);font-size:10px;">(PARTIALLY)</span></td>
+                    <td style="text-align:center; background-color:rgba(251, 191, 36, 0.3);"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="#fbbf24" stroke-width="2"/>
+        <path d="M12 2 L12 12 L20.5 15.5" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M12 2 A10 10 0 0 1 22 14 L12 12 Z" fill="#fbbf24" stroke="#fbbf24" stroke-width="2"/>
+        <path d="M12 2 L12 12 L4.9 19.1" stroke="#fbbe247c" stroke-width="2" stroke-linecap="round" fill="none"/>
+    </svg></td>
+                    <td><strong>Partially implemented</strong><br/><span style="color:#fbbf24;font-size:10px;">(PARTIALLY)</span></td>
                     <td>The requirement is implemented to a limited extent. There are gaps in implementation, consistency, or supporting evidence.</td>
                 </tr>
                 <tr>
-                    <td style="text-align:center;"><span class="badge badge-red">2</span></td>
-                    <td><strong>Mostly Not Implemented</strong><br/><span style="color:var(--slate-500);font-size:10px;">(MOSTLY NO)</span></td>
+                    <td style="text-align:center; background-color:rgba(239, 68, 68, 0.3);"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="#ef4444" stroke-width="2"/>
+        <rect x="7" y="9" width="10" height="6" rx="1" fill="#ef4444"/>
+    </svg></td>
+                    <td><strong>Mostly Not Implemented</strong><br/><span style="color:#ef4444;font-size:10px;">(MOSTLY NO)</span></td>
                     <td>The requirement is mostly not implemented. There are only isolated measures or implementation is inadequate and unsystematic.</td>
                 </tr>
                 <tr>
-                    <td style="text-align:center;"><span class="badge badge-red">1</span></td>
-                    <td><strong>Not implemented</strong><br/><span style="color:var(--slate-500);font-size:10px;">(NO)</span></td>
+                    <td style="text-align:center; background-color:rgba(107, 114, 128, 0.3);"><svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" stroke="#6b7280" stroke-width="2"/>
+        <path d="M9 9l6 6M15 9l-6 6" stroke="#6b7280" stroke-width="2" stroke-linecap="round"/>
+    </svg></td>
+                    <td><strong>Not implemented</strong><br/><span style="color:#6b7280;font-size:10px;">(NO)</span></td>
                     <td>The requirement is not implemented at all. No relevant measures or evidence are available.</td>
                 </tr>
             </tbody>
