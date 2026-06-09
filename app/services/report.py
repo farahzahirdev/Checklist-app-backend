@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 from app.services.admin_checklist import _latest_section_translation
-from app.services.assessment import _latest_checklist_translation
+from app.services.assessment import _latest_checklist_translation, _checklist_translation_for_language, _section_translation_for_language
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import selectinload
@@ -681,7 +681,7 @@ def get_report_pdf_password(
     if report.status != ReportStatus.published:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Report is not yet available for download",
+            detail=translate("report_not_available_for_download", lang_code),
         )
 
     if not report.final_pdf_password_encrypted:
@@ -873,16 +873,16 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
     
     # Only allow approved/published reports
     if report.status not in [ReportStatus.approved, ReportStatus.published]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Report not available")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("report_not_available", lang_code))
     
     # Get assessment and user data
     assessment = db.get(Assessment, report.assessment_id)
     if assessment is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("assessment_not_found", lang_code))
     
     user = db.get(User, assessment.user_id)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("user_not_found", lang_code))
 
     company = report.company or (db.get(Company, report.company_id) if report.company_id else None)
     if company is None and assessment.company_id is not None:
@@ -892,22 +892,22 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
     from app.models.checklist import Checklist, ChecklistSection, ChecklistSectionTranslation
     checklist = db.get(Checklist, assessment.checklist_id)
     if checklist is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Checklist not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("checklist_not_found", lang_code))
     
     # Get checklist type for audit type/regime
     checklist_type_name = checklist.checklist_type.name if checklist.checklist_type else None
     
-    # Get checklist translation
-    checklist_translation = _latest_checklist_translation(db, checklist.id)
+    # Get checklist translation with language support
+    checklist_translation = _checklist_translation_for_language(db, checklist.id, lang_code)
     checklist_title = checklist_translation.title if checklist_translation else f"Checklist v{checklist.version}"
     
     # Calculate scores and gather data
-    section_scores = _calculate_section_scores(db, assessment)
+    section_scores = _calculate_section_scores(db, assessment, lang_code)
     domain_data = _calculate_domain_data(db, assessment)
     question_score_distribution, total_questions, answered_questions = _calculate_question_distribution(db, assessment)
-    chapter_data = _calculate_chapter_data(db, assessment)
-    findings = _get_customer_findings(db, report_id)
-    section_summaries = _get_section_summaries_for_customer(db, report_id)
+    chapter_data = _calculate_chapter_data(db, assessment, lang_code)
+    findings = _get_customer_findings(db, report_id, lang_code)
+    section_summaries = _get_section_summaries_for_customer(db, report_id, lang_code)
     public_suggestions = _get_public_suggestions(db, report_id)
     auditor_note = _latest_auditor_note(db, report_id)
     
@@ -963,7 +963,7 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
 
 
 # Helper functions for customer report data
-def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]:
+def _calculate_section_scores(db: Session, assessment: Assessment, lang_code: str = "en") -> list[dict]:
     """Calculate scores by section for radar chart"""
     from app.models.checklist import ChecklistSection, ChecklistSectionTranslation
     from app.models.assessment import AssessmentEvidenceFile
@@ -990,7 +990,7 @@ def _calculate_section_scores(db: Session, assessment: Assessment) -> list[dict]
             continue
         
         # Get section translation and domain first
-        translation = _latest_section_translation(db, section.id)
+        translation = _section_translation_for_language(db, section.id, lang_code)
         section_title = sanitize_text(translation.title) if translation else section.section_code
         # Use section_code as the domain instead of question.report_domain
         # This ensures the radar chart shows actual checklist sections (e.g., § 3, § 4, § 5)
@@ -1196,7 +1196,7 @@ def _latest_question_translation(db: Session, question_id: UUID):
     )
 
 
-def _calculate_chapter_data(db: Session, assessment: Assessment) -> list[dict]:
+def _calculate_chapter_data(db: Session, assessment: Assessment, lang_code: str = "en") -> list[dict]:
     """Calculate chapter overview data"""
     from app.models.checklist import ChecklistQuestion
     
@@ -1220,7 +1220,7 @@ def _calculate_chapter_data(db: Session, assessment: Assessment) -> list[dict]:
             section = question.section
             chapter_code = section.section_code
             if section.id not in section_title_cache:
-                section_translation = _latest_section_translation(db, section.id)
+                section_translation = _section_translation_for_language(db, section.id, lang_code)
                 section_title_cache[section.id] = sanitize_text(section_translation.title) if section_translation else section.section_code
             chapter_title = section_title_cache[section.id]
 
@@ -1273,7 +1273,7 @@ def _calculate_chapter_data(db: Session, assessment: Assessment) -> list[dict]:
     return sorted(chapter_data, key=lambda x: x["chapter_code"])
 
 
-def _get_customer_findings(db: Session, report_id: UUID) -> list[dict]:
+def _get_customer_findings(db: Session, report_id: UUID, lang_code: str = "en") -> list[dict]:
     """Get findings for customer report"""
     findings = db.scalars(
         select(ReportFinding)
@@ -1292,7 +1292,7 @@ def _get_customer_findings(db: Session, report_id: UUID) -> list[dict]:
             if section:
                 section_code = section.section_code
                 # Get section translation
-                translation = _latest_section_translation(db, section.id)
+                translation = _section_translation_for_language(db, section.id, lang_code)
                 section_title = sanitize_text(translation.title) if translation else section.section_code
         
         # Use section_code as domain, fallback to section_title, then to "General"
@@ -1317,7 +1317,7 @@ def _get_customer_findings(db: Session, report_id: UUID) -> list[dict]:
     return customer_findings
 
 
-def _get_section_summaries_for_customer(db: Session, report_id: UUID) -> list[dict]:
+def _get_section_summaries_for_customer(db: Session, report_id: UUID, lang_code: str = "en") -> list[dict]:
     """Get admin-written section summaries for customer"""
     summaries = db.scalars(
         select(ReportSectionSummary)
@@ -1332,7 +1332,7 @@ def _get_section_summaries_for_customer(db: Session, report_id: UUID) -> list[di
         section_code = section.section_code if section else "General"
         section_title = None
         if section:
-            translation = _latest_section_translation(db, section.id)
+            translation = _section_translation_for_language(db, section.id, lang_code)
             section_title = sanitize_text(translation.title) if translation else section.section_code
         
         customer_summaries.append({

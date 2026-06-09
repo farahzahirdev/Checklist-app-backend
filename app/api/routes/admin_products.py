@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_admin_only
 from app.db.session import get_db
-from app.models.checklist import Checklist
 from app.models.product_catalog import Product, ProductCategory
 from app.schemas.product_catalog import (
     AdminProductListResponse,
@@ -28,7 +27,6 @@ from app.services.product_catalog import (
     list_product_categories,
     remove_product,
     remove_checklist_product,
-    sync_checklist_product,
     to_admin_product_response,
     update_product,
 )
@@ -195,15 +193,3 @@ def admin_delete_product(
     if not removed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product_not_found")
     db.commit()
-
-
-@router.post("/sync-checklists", response_model=AdminProductListResponse)
-def admin_sync_checklist_products(
-    _admin=Depends(require_admin_only()),
-    db: Session = Depends(get_db),
-) -> AdminProductListResponse:
-    for checklist in db.scalars(select(Checklist)).all():
-        sync_checklist_product(db, checklist=checklist)
-    db.commit()
-    total, products = list_admin_products(db, skip=0, limit=500)
-    return {"total": total, "products": products, "skip": 0, "limit": 500}

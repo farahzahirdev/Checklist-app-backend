@@ -16,6 +16,7 @@ from playwright.async_api import async_playwright
 from app.core.security import decrypt_secret
 from app.models.report import Report, ReportStatus
 from app.services.report import get_customer_report_data
+from app.utils.i18n_messages import translate
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
     logger.info(f"generate_report_pdf called with lang_code: {lang_code}")
     report_data = get_customer_report_data(db, report_id=report_id, company_id=company_id, lang_code=lang_code)
     if report_data.report_status != ReportStatus.published:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Report must be published before PDF generation")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("report_must_be_published", lang_code))
 
     section_scores = [score.model_dump(mode='json') for score in report_data.section_scores]
 
@@ -261,7 +262,7 @@ def generate_report_pdf(db: Session, *, report_id: UUID, company_id: UUID | None
     template_dir = os.path.join(os.path.dirname(__file__), '..', 'templates')
     if not os.path.exists(template_dir):
         logger.error(f"Template directory not found: {template_dir}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Report template not found")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=translate("report_template_not_found", lang_code))
 
     # Select template based on language
     template_name = f'customer_report_{lang_code}.html'

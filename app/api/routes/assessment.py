@@ -56,7 +56,7 @@ def start_assessment_route(
     if current_user.role != UserRole.admin:
         resolved_company_id = resolve_company_id(current_user, request.company_id)
         if resolved_company_id is None:
-            raise HTTPException(status_code=400, detail="Please set up a company before starting an assessment.")
+            raise HTTPException(status_code=400, detail=translate("company_setup_required", lang_code))
     return start_assessment(db, user=current_user, checklist_id=request.checklist_id, company_id=request.company_id, lang_code=lang_code)
 
 
@@ -149,7 +149,7 @@ def get_assessment_answers_route(
         )
     )
     if not assessment:
-        raise HTTPException(status_code=404, detail="Assessment not found")
+        raise HTTPException(status_code=404, detail=translate("assessment_not_found", lang_code))
     
     # Get all answers for this assessment
     answers = db.scalars(
@@ -191,7 +191,7 @@ def debug_assessment_completion(
         )
     )
     if not assessment:
-        raise HTTPException(status_code=404, detail="Assessment not found")
+        raise HTTPException(status_code=404, detail=translate("assessment_not_found", lang_code))
     
     # Get detailed counts
     total_questions = db.scalar(
@@ -471,6 +471,8 @@ def download_evidence_file(
     from fastapi.responses import Response
     import os
     
+    lang_code = get_language_code(http_request, db, current_user) if http_request else "en"
+    
     # Get evidence record
     evidence = db.query(AssessmentEvidenceFile).filter(
         AssessmentEvidenceFile.id == evidence_id,
@@ -478,12 +480,12 @@ def download_evidence_file(
     ).first()
     
     if not evidence:
-        raise HTTPException(status_code=404, detail="Evidence not found")
+        raise HTTPException(status_code=404, detail=translate("evidence_not_found", lang_code))
     
     # Get media record
     media = db.get(Media, evidence.media_id)
     if not media:
-        raise HTTPException(status_code=404, detail="Media file not found")
+        raise HTTPException(status_code=404, detail=translate("media_file_not_found", lang_code))
     
     # Check file path storage
     file_path = media.file_path
@@ -493,7 +495,7 @@ def download_evidence_file(
         # Base64 storage - not supported for download yet
         raise HTTPException(
             status_code=503,
-            detail="File download not available for base64-stored files. Please contact administrator."
+            detail=translate("file_download_base64_not_available", lang_code)
         )
     elif file_path and os.path.exists(file_path):
         # Local file storage with encryption
@@ -513,13 +515,13 @@ def download_evidence_file(
                 }
             )
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
+            raise HTTPException(status_code=500, detail=translate("error_reading_file", lang_code).format(str(e)))
     else:
         # S3 or other storage - would need to implement S3 download with decryption
         # For now, return error
         raise HTTPException(
             status_code=503,
-            detail="File download not available for cloud storage. Please contact administrator."
+            detail=translate("file_download_cloud_not_available", lang_code)
         )
 
 
@@ -538,6 +540,8 @@ def view_evidence_file(
     from fastapi.responses import Response
     import os
     
+    lang_code = get_language_code(http_request, db, current_user) if http_request else "en"
+    
     # Get evidence record
     evidence = db.query(AssessmentEvidenceFile).filter(
         AssessmentEvidenceFile.id == evidence_id,
@@ -545,12 +549,12 @@ def view_evidence_file(
     ).first()
     
     if not evidence:
-        raise HTTPException(status_code=404, detail="Evidence not found")
+        raise HTTPException(status_code=404, detail=translate("evidence_not_found", lang_code))
     
     # Get media record
     media = db.get(Media, evidence.media_id)
     if not media:
-        raise HTTPException(status_code=404, detail="Media file not found")
+        raise HTTPException(status_code=404, detail=translate("media_file_not_found", lang_code))
     
     # Check file path storage
     file_path = media.file_path
@@ -560,7 +564,7 @@ def view_evidence_file(
         # Base64 storage - not supported for view yet
         raise HTTPException(
             status_code=503,
-            detail="File view not available for base64-stored files. Please contact administrator."
+            detail=translate("file_view_base64_not_available", lang_code)
         )
     elif file_path and os.path.exists(file_path):
         # Local file storage with encryption
@@ -580,11 +584,11 @@ def view_evidence_file(
                 }
             )
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error reading file: {str(e)}")
+            raise HTTPException(status_code=500, detail=translate("error_reading_file", lang_code).format(str(e)))
     else:
         # S3 or other storage - would need to implement S3 download with decryption
         # For now, return error
         raise HTTPException(
             status_code=503,
-            detail="File view not available for cloud storage. Please contact administrator."
+            detail=translate("file_view_cloud_not_available", lang_code)
         )

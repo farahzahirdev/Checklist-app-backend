@@ -71,6 +71,7 @@ class Product(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     short_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    benefits: Mapped[str | None] = mapped_column(Text, nullable=True)
     product_kind: Mapped[str] = mapped_column(String(40), nullable=False, default=ProductKind.documentation.value)
     status: Mapped[str] = mapped_column(String(40), nullable=False, default=ProductStatus.draft.value)
     display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

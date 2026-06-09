@@ -59,6 +59,7 @@ class ProductCreateRequest(BaseModel):
     slug: str | None = Field(default=None, max_length=255)
     short_description: str | None = None
     description: str | None = None
+    benefits: str | None = None
     product_kind: ProductKind = "documentation"
     status: ProductStatus = "draft"
     checklist_id: UUID | None = None
@@ -79,6 +80,7 @@ class ProductUpdateRequest(BaseModel):
     slug: str | None = Field(default=None, max_length=255)
     short_description: str | None = None
     description: str | None = None
+    benefits: str | None = None
     product_kind: ProductKind | None = None
     status: ProductStatus | None = None
     parent_product_id: UUID | None = None
@@ -114,6 +116,7 @@ class ProductBaseResponse(BaseModel):
     name: str
     short_description: str | None = None
     description: str | None = None
+    benefits: str | None = None
     product_kind: ProductKind
     status: ProductStatus
     display_order: int

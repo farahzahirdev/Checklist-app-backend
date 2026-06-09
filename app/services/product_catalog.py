@@ -258,6 +258,7 @@ def to_admin_product_response(db: Session, product: Product) -> AdminProductResp
         name=product.name,
         short_description=product.short_description,
         description=product.description,
+        benefits=product.benefits,
         product_kind=product.product_kind,  # type: ignore[arg-type]
         status=product.status,  # type: ignore[arg-type]
         display_order=product.display_order,
@@ -287,6 +288,7 @@ def to_public_product_response(db: Session, product: Product) -> ProductBaseResp
         name=product.name,
         short_description=product.short_description,
         description=product.description,
+        benefits=product.benefits,
         product_kind=product.product_kind,  # type: ignore[arg-type]
         status=product.status,  # type: ignore[arg-type]
         display_order=product.display_order,
@@ -452,6 +454,7 @@ def create_product(db: Session, *, payload, actor_id: uuid.UUID | None = None) -
         name=payload.name,
         short_description=payload.short_description,
         description=payload.description,
+        benefits=getattr(payload, 'benefits', None),
         product_kind=payload.product_kind,
         status=payload.status,
         display_order=payload.display_order,
@@ -492,6 +495,8 @@ def update_product(db: Session, product: Product, *, payload) -> Product:
         product.short_description = payload.short_description
     if payload.description is not None:
         product.description = payload.description
+    if getattr(payload, 'benefits', None) is not None:
+        product.benefits = payload.benefits
     if payload.product_kind is not None:
         product.product_kind = payload.product_kind
     if payload.status is not None:

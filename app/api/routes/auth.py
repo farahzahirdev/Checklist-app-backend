@@ -34,6 +34,7 @@ from app.services.auth import (
 )
 from app.utils.i18n import get_language_code
 from app.utils.i18n_messages import translate
+from app.services.audit_log import create_audit_log
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -47,7 +48,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def register(request: RegistrationRequest, http_request: Request, db: Session = Depends(get_db),
 ) -> AuthResponse:
     
-    lang_code = 'cs'
+    lang_code = get_language_code(http_request, db)
     try:
         return register_user(
             db,
@@ -81,10 +82,45 @@ def register(request: RegistrationRequest, http_request: Request, db: Session = 
 )
 def login(request: LoginRequest, http_request: Request, db: Session = Depends(get_db),
 ) -> AuthResponse:
-    lang_code = 'cs'
+    lang_code = get_language_code(http_request, db)
     try:
-        return authenticate_user(db, email=request.email, password=request.password, lang_code=lang_code)
+        result = authenticate_user(db, email=request.email, password=request.password, lang_code=lang_code)
+        
+        # Log successful login action
+        create_audit_log(
+            db=db,
+            action="auth_login",
+            target_entity="auth",
+            actor_user_id=result.user.id,
+            ip_address=http_request.client.host if http_request.client else None,
+            user_agent=http_request.headers.get("user-agent"),
+            changes_summary=f"User {result.user.email} logged in",
+            success=True
+        )
+        
+        return result
     except HTTPException as exc:
+        # Log failed login attempt
+        try:
+            # Try to get user by email for the audit log
+            from app.models.user import User
+            user = db.query(User).filter(User.email == request.email).first()
+            
+            create_audit_log(
+                db=db,
+                action="auth_login",
+                target_entity="auth",
+                actor_user_id=user.id if user else None,
+                ip_address=http_request.client.host if http_request.client else None,
+                user_agent=http_request.headers.get("user-agent"),
+                changes_summary=f"Failed login attempt for {request.email}",
+                success=False,
+                error_message=exc.detail
+            )
+        except:
+            # Don't let audit logging fail the login attempt
+            pass
+        
         exc.detail = translate(exc.detail, lang_code)
         raise
 
@@ -96,7 +132,7 @@ def login(request: LoginRequest, http_request: Request, db: Session = Depends(ge
     description="Issues a password reset token and sends an email if the account exists.",
 )
 def forgot_password(request: ForgotPasswordRequest, http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
-    lang_code = 'cs'
+    lang_code = get_language_code(http_request, db)
     frontend_base_url = (http_request.headers.get("origin") or str(http_request.base_url)).rstrip("/")
     issue_forgot_password_reset(
         db,
@@ -126,9 +162,7 @@ def request_email_verification(
         lang_code=lang_code,
         production_base_url=frontend_base_url,
     )
-    if lang_code == "cs":
-        return MessageResponse(message="Ověřovací e-mail byl odeslán.")
-    return MessageResponse(message="Verification email sent.")
+    return MessageResponse(message=translate("verification_email_sent", lang_code))
 
 
 @router.post(
@@ -143,7 +177,7 @@ def confirm_email_verification_token(
     db: Session = Depends(get_db),
 
 ) -> AuthResponse:
-    lang_code = 'cs'
+    lang_code = get_language_code(http_request, db)
     return confirm_email_verification(db, token=request.token, lang_code=lang_code)
 
 
@@ -154,7 +188,7 @@ def confirm_email_verification_token(
     description="Resets account password using a valid password-reset token.",
 )
 def reset_password(request: ResetPasswordWithTokenRequest, http_request: Request, db: Session = Depends(get_db)) -> MessageResponse:
-    lang_code = 'cs'
+    lang_code = get_language_code(http_request, db)
     reset_password_with_token(
         db,
         token=request.token,
@@ -172,7 +206,7 @@ def reset_password(request: ResetPasswordWithTokenRequest, http_request: Request
     description="Verifies login-time challenge_token plus TOTP code and returns the final bearer access token.",
 )
 def verify_login_mfa_challenge(request: MfaChallengeVerifyRequest, http_request: Request, db: Session = Depends(get_db)) -> AuthResponse:
-    lang_code = 'cs'
+    lang_code = get_language_code(http_request, db)
     try:
         return verify_mfa_challenge(db, challenge_token=request.challenge_token, code=request.code, lang_code=lang_code)
     except HTTPException as exc:
@@ -199,6 +233,18 @@ def me(http_request: Request, db: Session = Depends(get_db), current_user=Depend
 )
 def logout(http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> MessageResponse:
     lang_code = get_language_code(http_request, db, current_user)
+    
+    # Log logout action
+    create_audit_log(
+        db=db,
+        action="auth_logout",
+        target_entity="auth",
+        actor_user_id=current_user.id,
+        ip_address=http_request.client.host if http_request.client else None,
+        user_agent=http_request.headers.get("user-agent"),
+        changes_summary=f"User {current_user.email} logged out"
+    )
+    
     return MessageResponse(message=translate("logged_out", lang_code))
 
 
