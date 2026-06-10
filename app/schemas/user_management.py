@@ -192,6 +192,12 @@ class CustomerResponse(BaseModel):
 class CustomerDetailResponse(CustomerResponse):
     """Detailed customer response with fixed permissions."""
     
+    full_name: str | None = None
+    username: str | None = None
+    job_title: str | None = None
+    department: str | None = None
+    primary_company_id: str | None = None
+    company: dict | None = None
     permissions: list[dict] = Field(
         default=[
             {"resource": "checklist", "action": "read"},
