@@ -7,7 +7,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.checklist import Checklist, ChecklistStatus, ChecklistTranslation, ChecklistType
-from app.models.media import Media
+from app.models.media import Media, MediaType
 from app.models.product_catalog import Product, ProductCategory, ProductKind, ProductStatus
 from app.models.product_media import ProductMedia
 from app.models.reference import Language
@@ -31,6 +31,16 @@ DEFAULT_CATEGORY_SEED = (
     ("documentation", "Documentation", "Ready-made documentation templates", 20),
     ("module", "Modules", "Future product modules and builders", 30),
 )
+
+
+def _extract_uuid_from_url(url: str) -> uuid.UUID | None:
+    match = re.search(r"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}", url, re.IGNORECASE)
+    if match:
+        try:
+            return uuid.UUID(match.group(0))
+        except ValueError:
+            return None
+    return None
 
 
 def _slugify(value: str) -> str:
@@ -84,19 +94,6 @@ def _checklist_product_name(db: Session, checklist: Checklist) -> tuple[str, str
     if checklist.checklist_type:
         return checklist.checklist_type.name, checklist.checklist_type.description
     return f"Checklist {checklist.version}", None
-
-
-def _checklist_type_link(db: Session, checklist_type_id: uuid.UUID | None) -> ProductChecklistTypeLinkResponse | None:
-    if checklist_type_id is None:
-        return None
-    checklist_type = db.get(ChecklistType, checklist_type_id)
-    if checklist_type is None:
-        return ProductChecklistTypeLinkResponse(checklist_type_id=checklist_type_id)
-    return ProductChecklistTypeLinkResponse(
-        checklist_type_id=checklist_type.id,
-        checklist_type_code=checklist_type.code,
-        checklist_type_name=checklist_type.name,
-    )
 
 
 def _checklist_type_link(db: Session, checklist_type_id: uuid.UUID | None) -> ProductChecklistTypeLinkResponse | None:
@@ -229,7 +226,7 @@ def _build_documentation_files(db: Session, product: Product) -> list[ProductDoc
     documentation_files = []
     for product_media in sorted(product.media_files, key=lambda pm: pm.display_order):
         media = product_media.media
-        if media and media.media_type.value == "document":
+        if media and media.media_type == MediaType.document:
             # Determine file type from mime type
             file_type = "docx" if "docx" in media.mime_type.lower() else "pdf"
             
@@ -466,6 +463,21 @@ def create_product(db: Session, *, payload, actor_id: uuid.UUID | None = None) -
     )
     db.add(product)
     db.flush()
+
+    if getattr(payload, "documentation_files", None) is not None:
+        for index, doc in enumerate(payload.documentation_files):
+            media_id = _extract_uuid_from_url(doc.url)
+            if media_id:
+                media_exists = db.scalar(select(Media.id).where(Media.id == media_id))
+                if media_exists:
+                    new_pm = ProductMedia(
+                        product_id=product.id,
+                        media_id=media_id,
+                        display_order=index,
+                    )
+                    db.add(new_pm)
+        db.flush()
+
     return product
 
 
@@ -515,6 +527,42 @@ def update_product(db: Session, product: Product, *, payload) -> Product:
         product.external_url = payload.external_url
     if payload.cta_label is not None:
         product.cta_label = payload.cta_label
+
+    if getattr(payload, "documentation_files", None) is not None:
+        new_media_ids = []
+        for doc in payload.documentation_files:
+            media_id = _extract_uuid_from_url(doc.url)
+            if media_id:
+                new_media_ids.append(media_id)
+
+        existing_pms = {pm.media_id: pm for pm in product.media_files}
+        pms_to_keep = []
+
+        for index, media_id in enumerate(new_media_ids):
+            media_exists = db.scalar(select(Media.id).where(Media.id == media_id))
+            if not media_exists:
+                continue
+
+            if media_id in existing_pms:
+                pm = existing_pms[media_id]
+                pm.display_order = index
+                pms_to_keep.append(pm)
+            else:
+                new_pm = ProductMedia(
+                    product_id=product.id,
+                    media_id=media_id,
+                    display_order=index,
+                )
+                db.add(new_pm)
+                pms_to_keep.append(new_pm)
+
+        for pm in list(product.media_files):
+            if pm not in pms_to_keep:
+                db.delete(pm)
+
+        product.media_files = pms_to_keep
+        db.flush()
+
     return product
 
 

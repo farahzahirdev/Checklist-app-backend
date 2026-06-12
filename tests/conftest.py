@@ -14,14 +14,17 @@ import os
 import dotenv
 from jose import jwt
 
-dotenv.load_dotenv(dotenv.find_dotenv(".env", usecwd=True))
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "password")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_NAME", "ckecklist")
+# Map PostgreSQL INET type to VARCHAR for SQLite tests
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.dialects.postgresql import INET
 
-DATABASE_URL = f"postgresql+psycopg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+@compiles(INET, "sqlite")
+def compile_inet_sqlite(element, compiler, **kw):
+    return "VARCHAR(45)"
+
+dotenv.load_dotenv(dotenv.find_dotenv(".env", usecwd=True))
+# Use sqlite for fast local testing
+DATABASE_URL = "sqlite:///:memory:"
 
 @pytest.fixture(scope="function")
 def db():

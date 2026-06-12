@@ -24,7 +24,9 @@ ALLOWED_MIME_TYPES = {
     "image/png", 
     "image/gif",
     "image/webp",
-    "application/pdf"
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword"
 }
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10MB
