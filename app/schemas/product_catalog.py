@@ -53,6 +53,14 @@ class ProductCategoryResponse(ProductCategoryBase):
     product_count: int = 0
 
 
+class ProductDocumentationFileInput(BaseModel):
+    id: str | None = None
+    url: str
+    filename: str | None = None
+    file_type: str | None = None
+    uploaded_at: datetime | None = None
+
+
 class ProductCreateRequest(BaseModel):
     category_code: str = Field(min_length=1, max_length=80)
     name: str = Field(min_length=1, max_length=255)
@@ -72,6 +80,7 @@ class ProductCreateRequest(BaseModel):
     hero_image_url: str | None = None
     external_url: str | None = None
     cta_label: str | None = None
+    documentation_files: list[ProductDocumentationFileInput] | None = None
 
 
 class ProductUpdateRequest(BaseModel):
@@ -92,6 +101,7 @@ class ProductUpdateRequest(BaseModel):
     hero_image_url: str | None = None
     external_url: str | None = None
     cta_label: str | None = None
+    documentation_files: list[ProductDocumentationFileInput] | None = None
 
 
 class ProductChecklistLinkResponse(BaseModel):

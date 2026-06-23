@@ -279,6 +279,10 @@ def get_assessment_review_status(
         "submitted_at": review.submitted_at,
         "created_at": review.created_at,
         "updated_at": review.updated_at,
+        "summary_notes": review.summary_notes,
+        "recommendations": review.recommendations,
+        "strengths": review.strengths,
+        "improvement_areas": review.improvement_areas,
     }
 
 

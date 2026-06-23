@@ -334,6 +334,7 @@
         .toc-num { font-weight: 700; color: var(--blue-500); min-width: 22px; }
         .toc-title { color: var(--slate-700); }
         .toc-dots { flex: 1; border-bottom: 1px dotted var(--slate-300); margin: 0 6px; position: relative; top: -2px; }
+        .toc-page { font-weight: 600; color: var(--slate-600); min-width: 30px; text-align: right; }
 
         /* ─── RISK SUMMARY CARDS ───────────────────────────────── */
         .risk-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
@@ -356,72 +357,6 @@
 
         /* ─── SECTION PAGE ─────────────────────────────────────── */
         .section-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-
-        /* ─── CHAPTER BREAKDOWN CARDS (ID-035) ────────────────── */
-        .chapter-cards { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
-        .chapter-card {
-            border: 1px solid var(--slate-200);
-            border-radius: 10px;
-            padding: 12px 16px;
-            background: #fff;
-        }
-        .chapter-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 8px;
-        }
-        .chapter-card-id {
-            font-size: 9px;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: var(--blue-500);
-            margin-bottom: 3px;
-        }
-        .chapter-card-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--slate-900);
-        }
-        .chapter-card-score {
-            text-align: right;
-            flex-shrink: 0;
-            margin-left: 12px;
-        }
-        .chapter-card-score-label {
-            font-size: 8px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--slate-400);
-            margin-bottom: 2px;
-        }
-        .chapter-card-score-value {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--blue-500);
-        }
-        .chapter-card-meta {
-            display: flex;
-            gap: 16px;
-            font-size: 10px;
-            color: var(--slate-500);
-            margin-bottom: 8px;
-        }
-        .chapter-card-meta span strong { color: var(--slate-700); }
-        .chapter-card-bar {
-            height: 4px;
-            background: var(--slate-200);
-            border-radius: 2px;
-        }
-        .chapter-card-bar-fill {
-            height: 4px;
-            border-radius: 2px;
-        }
-        .bar-green  { background: #22c55e; }
-        .bar-amber  { background: #f59e0b; }
-        .bar-red    { background: #ef4444; }
 
         /* ─── AREAS FOR IMPROVEMENT CARDS (ID-034) ────────────── */
         .improvement-header-counts {
@@ -559,7 +494,7 @@
         </div>
         <div class="cover-detail-row">
             <span class="cover-detail-label">Assessment Date</span>
-            <span class="cover-detail-value normal">{{ assessment_date.strftime('%d. %B %Y') }}</span>
+            <span class="cover-detail-value normal">{{ assessment_date.strftime('%d. %m. %Y') }}</span>
         </div>
         <div class="cover-detail-row">
             <span class="cover-detail-label">Overall Score</span>
@@ -597,32 +532,32 @@
             <span class="toc-num">1</span>
             <span class="toc-title">Report Identification</span>
             <span class="toc-dots"></span>
+            <span class="toc-page">1</span>
         </div>
         <div class="toc-item">
             <span class="toc-num">2</span>
             <span class="toc-title">Audit Objective and Assessment Method</span>
             <span class="toc-dots"></span>
+            <span class="toc-page">3</span>
         </div>
         <div class="toc-item">
             <span class="toc-num">3</span>
             <span class="toc-title">Executive Summary</span>
             <span class="toc-dots"></span>
+            <span class="toc-page">4</span>
         </div>
         <div class="toc-item">
             <span class="toc-num">4</span>
             <span class="toc-title">Results Overview by Chapter</span>
             <span class="toc-dots"></span>
-        </div>
-        <div class="toc-item">
-            <span class="toc-num">5</span>
-            <span class="toc-title">Identified Areas for Improvement</span>
-            <span class="toc-dots"></span>
+            <span class="toc-page">5</span>
         </div>
         {% for section in section_scores %}
         <div class="toc-item" style="margin-left: 20px;">
-            <span class="toc-num">6{{ ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'][loop.index0] }}</span>
-            <span class="toc-title">§ {{ section.section_number }} – {{ section.section_title }}</span>
+            <span class="toc-num">4.{{ loop.index }}</span>
+            <span class="toc-title">{{ section.section_title }}</span>
             <span class="toc-dots"></span>
+            <span class="toc-page">{{ 5 + loop.index }}</span>
         </div>
         {% endfor %}
     </div>
@@ -649,7 +584,7 @@
     <div class="kv-table-wrapper">
         <table class="kv-table">
             <tr><th>Audit Name</th><td>{{ audit_type or checklist_title }}</td></tr>
-            <tr><th>Assessment Date</th><td>{{ assessment_date.strftime('%d. %B %Y') }}</td></tr>
+            <tr><th>Assessment Date</th><td>{{ assessment_date.strftime('%d. %m. %Y') }}</td></tr>
             <tr><th>Checklist completed by</th><td>{{ customer_name }}</td></tr>
             <tr><th>Reviewed by</th><td>Lukáš Vaněk</td></tr>
         </table>
@@ -684,7 +619,7 @@
         </div>
         <div class="info-box-content">
             <p class="info-box-title">Evaluation Method</p>
-            <p>Responses are evaluated in accordance with applicable regulatory requirements and control objectives. The resulting assessment reflects the reviewed status after verification of submitted answers, notes, and supporting evidence by the administrator. The assessment takes into account the completeness, effectiveness, and quality of implemented measures and documented evidence.</p>
+            <p>Responses are evaluated in accordance with applicable regulatory requirements and control objectives. The resulting assessment reflects the reviewed status after verification of submitted answers, notes, and supporting evidence by the auditor. The assessment takes into account the completeness, effectiveness, and quality of implemented measures and documented evidence.</p>
         </div>
     </div>
 
@@ -880,20 +815,18 @@
             </div>
         </div>
 
-        <!-- Legend table (Section / Area Domain) matching Image 2 -->
+        <!-- Legend table (Area / Domain) -->
         <div>
             <div class="chart-legend-table-wrapper">
                 <table class="chart-legend-table">
                     <thead>
                         <tr>
-                            <th style="width:22%;">Section</th>
                             <th>Area / Domain</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for section in section_scores %}
                         <tr>
-                            <td style="font-weight:700; color:var(--blue-500);">§ {{ section.section_number if section is mapping else section['section_number'] }}</td>
                             <td>{{ section.section_title if section is mapping else section['section_title'] }}</td>
                         </tr>
                         {% endfor %}
@@ -956,11 +889,9 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th style="width:5%;">No.</th>
-                    <th style="width:34%;">Chapter / Section</th>
-                    <th style="width:13%; text-align:center;">Maturity Score</th>
-                    <th style="width:13%; text-align:center;">High Priorities</th>
-                    <th>Administrator summary</th>
+                    <th style="width:60%;">Chapter / Section</th>
+                    <th style="width:20%; text-align:center;">Maturity Score</th>
+                    <th style="width:20%; text-align:center;">High Priorities</th>
                 </tr>
             </thead>
             <tbody>
@@ -973,9 +904,8 @@
                 {% set section_summary = section_summaries|selectattr('section_id', 'equalto', section.section_id)|first %}
                 {% endif %}
                 <tr>
-                    <td style="text-align:center; font-weight:600; color:var(--slate-400);">{{ loop.index }}</td>
                     <td>
-                        <span style="font-weight:600; color:var(--blue-500);">§ {{ section.section_number }}</span>
+                        <span style="font-weight:600; color:var(--blue-500);">{{ section.section_number }}</span>
                         <span style="color:var(--slate-700);"> {{ section.section_title }}</span>
                     </td>
                     <td style="text-align:center;">
@@ -990,49 +920,10 @@
                         <span style="color:var(--slate-300);">—</span>
                         {% endif %}
                     </td>
-                    <td style="font-size:10px; color:var(--slate-500); line-height:1.4;">
-                        {% if section_summary and section_summary.summary_text %}
-                        {{ section_summary.summary_text[:110] }}{% if section_summary.summary_text|length > 110 %}…{% endif %}
-                        {% else %}
-                        <em>Summary not available</em>
-                        {% endif %}
-                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-    </div>
-
-    <!-- ID-035: Chapter breakdown cards (per-section card with progress bar) -->
-    <h3 class="section-heading" style="margin-top:0;">Chapter Breakdown</h3>
-    <div class="chapter-cards">
-        {% for section in section_scores %}
-        {% set sec_findings = findings|selectattr('section_code', 'equalto', section.section_code)|list %}
-        {% set sec_pct = (section.percentage if section is mapping else section['percentage']) | float %}
-        {% set bar_class = 'bar-green' if sec_pct >= 80 else ('bar-amber' if sec_pct >= 60 else 'bar-red') %}
-        <div class="chapter-card">
-            <div class="chapter-card-header">
-                <div>
-                    <div class="chapter-card-id">SEC-{{ loop.index }}</div>
-                    <div class="chapter-card-title">§ {{ section.section_number }} – {{ section.section_title }}</div>
-                </div>
-                <div class="chapter-card-score">
-                    <div class="chapter-card-score-label">Score</div>
-                    <div class="chapter-card-score-value {% if sec_pct >= 80 %}green{% elif sec_pct >= 60 %}amber{% else %}red{% endif %}"
-                         style="color: {% if sec_pct >= 80 %}var(--green-700){% elif sec_pct >= 60 %}var(--amber-700){% else %}var(--red-700){% endif %};">
-                        {{ "%.1f"|format(sec_pct) }}%
-                    </div>
-                </div>
-            </div>
-            <div class="chapter-card-meta">
-                <span>Score <strong>{{ section.overall_score if section is mapping else section['overall_score'] }} / {{ section.max_score if section is mapping else section['max_score'] }}</strong></span>
-                <span>Findings <strong>{{ sec_findings|length }}</strong></span>
-            </div>
-            <div class="chapter-card-bar">
-                <div class="chapter-card-bar-fill {{ bar_class }}" style="width:{{ sec_pct }}%;"></div>
-            </div>
-        </div>
-        {% endfor %}
     </div>
 
     <div style="margin-top:12px; background:var(--slate-50); border-radius:8px; padding:10px 12px; font-size:10px; color:var(--slate-500); border:1px solid var(--slate-200);">
@@ -1051,74 +942,7 @@
 
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 6: IDENTIFIED AREAS FOR IMPROVEMENT  (ID-034 NEW PAGE)
-     ══════════════════════════════════════════════════════════════ -->
-<div class="page">
-    <div class="page-header">
-        <p class="page-header-kicker">Areas for Improvement</p>
-        <h2 class="page-header-title">5 &nbsp; Identified Areas for Improvement</h2>
-        <p class="page-header-subtitle">This page is intentionally reserved for the issues that matter most. The layout is broader and calmer so each finding feels like part of one designed page.</p>
-    </div>
-
-    <!-- ID-034: Count summary row -->
-    {% set all_high   = findings|selectattr('priority', 'equalto', 'high')|list %}
-    {% set all_medium = findings|selectattr('priority', 'equalto', 'medium')|list %}
-    {% set all_low    = findings|selectattr('priority', 'equalto', 'low')|list %}
-    <div style="display:flex; align-items:center; gap:24px; margin-bottom:20px; padding:12px 16px; background:var(--slate-50); border:1px solid var(--slate-200); border-radius:10px;">
-        <div style="flex:1; font-size:11px; color:var(--slate-600);">
-            <strong style="color:var(--slate-900);">{{ findings|length }}</strong> total findings identified across all sections
-        </div>
-        <div class="improvement-count-box">
-            <div class="improvement-count-label high">HIGH</div>
-            <div class="improvement-count-value high">{{ all_high|length }}</div>
-        </div>
-        <div class="improvement-count-box">
-            <div class="improvement-count-label medium">MEDIUM</div>
-            <div class="improvement-count-value medium">{{ all_medium|length }}</div>
-        </div>
-        <div class="improvement-count-box">
-            <div class="improvement-count-label low">LOW</div>
-            <div class="improvement-count-value low">{{ all_low|length }}</div>
-        </div>
-    </div>
-
-    <!-- ID-034: Individual finding cards with recommendation text -->
-    {% for finding in findings|sort(attribute='priority', reverse=false) %}
-    <div class="finding-card">
-        <div class="finding-card-priority-row">
-            <span class="priority-pill {{ finding.priority }}">
-                {% if finding.priority == 'high' %}HIGH
-                {% elif finding.priority == 'medium' %}MEDIUM
-                {% else %}LOW{% endif %}
-            </span>
-            {% if finding.responsible_party %}
-            <span style="font-size:10px; color:var(--slate-400);">{{ finding.responsible_party }}</span>
-            {% endif %}
-        </div>
-        <div class="finding-card-title">{{ finding.question_text }}</div>
-        {% if finding.recommendation_text or finding.finding_text %}
-        <div class="finding-card-rec">
-            <div class="finding-card-rec-label">Recommendation</div>
-            <div class="finding-card-rec-text">{{ finding.recommendation_text or finding.finding_text }}</div>
-        </div>
-        {% endif %}
-    </div>
-    {% else %}
-    <div class="info-box">
-        <p style="color:var(--slate-400); font-style:italic;">No findings have been identified. All requirements are adequately implemented across all sections.</p>
-    </div>
-    {% endfor %}
-
-    <div class="page-footer">
-        <span>Cybersecurity Audit Report</span>
-        <span>Page 6</span>
-        <span>Classification: Confidential</span>
-    </div>
-</div>
-
-
-<!-- ══════════════════════════════════════════════════════════════
-     PAGES 7+: DETAIL SEKCE (one page per section)  (ID-036 FIXED)
+     PAGES 6+: DETAIL SEKCE (one page per section)  (ID-036 FIXED)
      ══════════════════════════════════════════════════════════════ -->
 {% for section in section_scores %}
 {% set section_findings = findings|selectattr('section_code', 'equalto', section.section_code)|list %}
@@ -1133,7 +957,7 @@
 <div class="page{% if loop.last %} page-last{% endif %}">
     <div class="page-header">
         <p class="page-header-kicker">Section Detail</p>
-        <h2 class="page-header-title">§ {{ section.section_number }} &nbsp; {{ section.section_title }}</h2>
+        <h2 class="page-header-title">{{ section.section_number }} &nbsp; {{ section.section_title }}</h2>
         <p class="page-header-subtitle" style="font-size:10px; color:var(--slate-400);">{{ section.section_code }}</p>
     </div>
 
@@ -1164,7 +988,7 @@
         {% if section_summary and section_summary.summary_text %}
         <p>{{ section_summary.summary_text }}</p>
         {% else %}
-        <p style="color:var(--slate-400);font-style:italic;">Auditor/administrator has not yet completed summary for this section.</p>
+        <p style="color:var(--slate-400);font-style:italic;">Auditor has not yet completed summary for this section.</p>
         {% endif %}
     </div>
 
@@ -1226,42 +1050,9 @@
     </div>
     {% endif %}
 
-    <!-- Question Review Details -->
-    <h3 class="section-heading">Question Review Details</h3>
-    {% if section.question_scores %}
-    <div class="data-table-wrapper">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th style="width:10%">Score</th>
-                    <th style="width:15%">%</th>
-                    <th>Question</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for question in section.question_scores %}
-                <tr>
-                    <td style="text-align:center;">
-                        <span class="badge {% if question.score >= 3 %}badge-green{% elif question.score >= 2 %}badge-amber{% else %}badge-red{% endif %}">
-                            {{ question.score }}
-                        </span>
-                    </td>
-                    <td style="text-align:center;">{{ "%.1f"|format(question.percentage) }}%</td>
-                    <td>{{ question.question_title }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div class="info-box">
-        <p>No question review data available for this section.</p>
-    </div>
-    {% endif %}
-
     <div class="page-footer">
         <span>Cybersecurity Audit Report</span>
-        <span>Page {{ 6 + loop.index }}</span>
+        <span>Page {{ 5 + loop.index }}</span>
         <span>Classification: Confidential</span>
     </div>
 </div>

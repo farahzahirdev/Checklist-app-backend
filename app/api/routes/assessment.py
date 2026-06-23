@@ -508,9 +508,9 @@ def download_evidence_file(
             
             return Response(
                 content=decrypted_data,
-                media_type=media.mime_type,
                 headers={
-                    "Content-Disposition": f"attachment; filename={media.original_filename}",
+                    "Content-Type": media.mime_type,
+                    "Content-Disposition": f'attachment; filename="{media.original_filename}"',
                     "Cache-Control": "no-cache"
                 }
             )
@@ -577,9 +577,9 @@ def view_evidence_file(
             
             return Response(
                 content=decrypted_data,
-                media_type=media.mime_type,
                 headers={
-                    "Content-Disposition": f"inline; filename={media.original_filename}",
+                    "Content-Type": media.mime_type,
+                    "Content-Disposition": f'inline; filename="{media.original_filename}"',
                     "Cache-Control": "no-cache"
                 }
             )

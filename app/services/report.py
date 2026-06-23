@@ -185,6 +185,7 @@ def _serialize_report(db: Session, report: Report) -> ReportResponse:
         checklist_title=checklist_title,
         checklist_version=checklist_version,
         section_overviews=_build_report_section_overviews(db, report),
+        management_summary=report.management_summary,
     )
 
 
@@ -192,6 +193,11 @@ def _get_report(db: Session, report_id: UUID, lang_code: str = "en") -> Report:
     report = db.get(Report, report_id)
     if report is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("report_not_found", lang_code))
+    
+    # Block access to deleted reports
+    if report.final_deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("report_not_available", lang_code))
+    
     return report
 
 
@@ -784,6 +790,7 @@ def _build_summary_item(
         section_title=(section_score or {}).get("section_title"),
         chapter_code=summary.chapter_code,
         summary_text=summary.summary_text,
+        recommendation_text=summary.recommendation_text,
         score=(section_score or {}).get("score"),
         max_score=(section_score or {}).get("max_score"),
         percentage=(section_score or {}).get("percentage"),
@@ -837,6 +844,7 @@ def _build_report_section_overviews(db: Session, report: Report) -> list[ReportS
                 section_number=section_score.get("section_number"),
                 chapter_code=summary_row.chapter_code if summary_row else section_code,
                 summary_text=summary_row.summary_text if summary_row else None,
+                recommendation_text=summary_row.recommendation_text if summary_row else None,
                 score=section_score.get("score"),
                 max_score=section_score.get("max_score"),
                 percentage=section_score.get("percentage"),
@@ -873,6 +881,10 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
     
     # Only allow approved/published reports
     if report.status not in [ReportStatus.approved, ReportStatus.published]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("report_not_available", lang_code))
+    
+    # Block access to deleted reports
+    if report.final_deleted_at is not None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("report_not_available", lang_code))
     
     # Get assessment and user data

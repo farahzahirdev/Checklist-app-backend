@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_admin_only
 from app.db.session import get_db
-from app.models.product_catalog import Product, ProductCategory
+from app.models.product_catalog import ProductCategory
 from app.schemas.product_catalog import (
     AdminProductListResponse,
     AdminProductResponse,
@@ -141,8 +141,11 @@ def admin_create_product(
 ) -> AdminProductResponse:
     product = create_product(db, payload=payload, actor_id=_admin.id)
     db.commit()
-    db.refresh(product)
-    return to_admin_product_response(db, product)
+    # Re-fetch with eager-loaded relationships so media_files is populated
+    fresh = get_product_by_id(db, product.id)
+    if fresh is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product_not_found")
+    return to_admin_product_response(db, fresh)
 
 
 @router.get("/{product_id}", response_model=AdminProductResponse)
@@ -164,13 +167,18 @@ def admin_update_product(
     _admin=Depends(require_admin_only()),
     db: Session = Depends(get_db),
 ) -> AdminProductResponse:
-    product = db.get(Product, product_id)
+    # Use get_product_by_id so that media_files (and other relationships) are
+    # eagerly loaded before update_product tries to iterate / mutate them.
+    product = get_product_by_id(db, product_id)
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product_not_found")
     update_product(db, product, payload=payload)
     db.commit()
-    db.refresh(product)
-    return to_admin_product_response(db, product)
+    # Re-fetch a fresh copy so all relationships reflect the committed state.
+    fresh = get_product_by_id(db, product_id)
+    if fresh is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product_not_found")
+    return to_admin_product_response(db, fresh)
 
 
 @router.delete("/checklist/{checklist_id}", status_code=status.HTTP_204_NO_CONTENT)

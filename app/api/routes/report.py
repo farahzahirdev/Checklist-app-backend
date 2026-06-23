@@ -197,7 +197,7 @@ def upsert_summary_route(
     report_id: UUID,
     request: Request,
     payload: UpsertReportSummaryRequest,
-    admin=Depends(require_roles(UserRole.admin)),
+    admin=Depends(require_roles(UserRole.admin, UserRole.auditor)),
     db: Session = Depends(get_db),
 ) -> ReportSummaryItem:
     lang_code = get_language_code(request, db)

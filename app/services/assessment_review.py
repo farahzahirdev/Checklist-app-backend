@@ -281,6 +281,7 @@ def get_assessment_answers_with_reviews(
             expected_implementation=expected_implementation,
             section_code=answer.question.section.section_code,
             section_name=section_name,
+            section_id=answer.question.section_id,
             customer_answer=answer.answer.value if answer.answer else "Not answered",
             customer_score=answer.answer_score,
             weighted_priority=answer.weighted_priority.value if answer.weighted_priority else None,
@@ -728,6 +729,16 @@ def create_bulk_answer_reviews(
     
     for review_data in bulk_data.answer_reviews:
         try:
+            # Verify answer_id is provided for bulk operations
+            if not review_data.answer_id:
+                results.append(BulkAnswerReviewResult(
+                    answer_id=None,
+                    success=False,
+                    message="answer_id is required for bulk review operations",
+                ))
+                failure_count += 1
+                continue
+
             # Verify answer belongs to assessment
             answer = (
                 db.query(AssessmentAnswer)
@@ -737,7 +748,7 @@ def create_bulk_answer_reviews(
                 )
                 .first()
             )
-            
+
             if not answer:
                 results.append(BulkAnswerReviewResult(
                     answer_id=review_data.answer_id,

@@ -445,15 +445,17 @@ def get_purchase_eligibility(
     user_id: UUID,
     checklist_id: UUID,
     company_id: UUID | None = None,
+    lang_code: str = "en",
 ) -> dict:
     """
     Returns whether a user can purchase the given checklist right now.
     Rules:
-    - No prior succeeded payment → can purchase.
-    - Succeeded payment with active access window and NO published report → cannot purchase.
-    - Succeeded payment with active access window and published report → can purchase.
-    - Access window expired (forfeited) → can purchase again.
+    - No active access window → can purchase.
+    - Active access window exists (regardless of report status) → cannot purchase.
+    - Access window expired → can purchase again.
     """
+    from app.utils.i18n_messages import translate
+    
     now = datetime.now(timezone.utc)
 
     active_window_query = select(AccessWindow.id).where(
@@ -486,26 +488,7 @@ def get_purchase_eligibility(
     if not active_window_ids:
         return {"can_purchase": True, "reason": None}
 
-    published_window_ids = set(
-        db.scalars(
-            select(Assessment.access_window_id)
-            .join(Report, Report.assessment_id == Assessment.id)
-            .where(
-                Assessment.user_id == user_id,
-                Assessment.checklist_id == checklist_id,
-                Assessment.access_window_id.in_(active_window_ids),
-                Report.status == ReportStatus.published,
-            )
-        ).all()
-    )
-
-    if active_window_ids.issubset(published_window_ids):
-        return {"can_purchase": True, "reason": None}
-
     return {
         "can_purchase": False,
-        "reason": (
-            "You already have an active purchase for this checklist. "
-            "You can buy again once your report has been published."
-        ),
+        "reason": translate("purchase.already_has_access", lang_code),
     }

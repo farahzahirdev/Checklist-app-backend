@@ -153,13 +153,15 @@ def create_checkout_session(
 )
 def check_purchase_eligibility(
     checklist_id: UUID,
+    request: Request,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     from app.services.payments import get_purchase_eligibility
     from app.services.company_context import resolve_company_id
+    lang_code = get_language_code(request, db, current_user)
     company_id = resolve_company_id(current_user, None)
-    result = get_purchase_eligibility(db, user_id=current_user.id, checklist_id=checklist_id, company_id=company_id)
+    result = get_purchase_eligibility(db, user_id=current_user.id, checklist_id=checklist_id, company_id=company_id, lang_code=lang_code)
     return {
         "checklist_id": checklist_id,
         "can_purchase": result["can_purchase"],

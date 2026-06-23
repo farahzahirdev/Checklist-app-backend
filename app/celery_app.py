@@ -50,6 +50,11 @@ celery_app.conf.update(
             "task": "lifecycle.purge_assessment_evidence",
             "schedule": timedelta(hours=1),
         },
+        # Purge expired reports every hour (deletes report data after access window expiry)
+        "purge-expired-reports": {
+            "task": "lifecycle.purge_expired_reports",
+            "schedule": timedelta(hours=1),
+        },
     },
 )
 

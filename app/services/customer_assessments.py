@@ -732,11 +732,12 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
     now = _now_utc()
 
     # Get purchased checklists with active access windows
+    # Join through AccessWindow.checklist_id to ensure we find checklists even if Payment.checklist_id is not set
     purchased_checklists_query = (
         db.query(Checklist, ChecklistType, ChecklistTranslation, Language)
         .join(ChecklistType, Checklist.checklist_type_id == ChecklistType.id)
-        .join(Payment, Checklist.id == Payment.checklist_id)
-        .join(AccessWindow, Payment.id == AccessWindow.payment_id)
+        .join(AccessWindow, Checklist.id == AccessWindow.checklist_id)
+        .join(Payment, AccessWindow.payment_id == Payment.id)
         .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
         .outerjoin(Language, ChecklistTranslation.language_id == Language.id)
         .filter(
@@ -754,19 +755,37 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
     for checklist, checklist_type, translation, language in purchased_checklists_query:
         title = translation.title if translation else f"Checklist v{checklist.version}"
 
-        # Skip checklists that already have a published report — cycle complete
-        has_published_report = (
+        # Count active access windows for this checklist
+        active_access_windows_count = (
             db.scalar(
-                select(func.count(Report.id))
-                .join(Assessment, Report.assessment_id == Assessment.id)
+                select(func.count(AccessWindow.id))
+                .join(Payment, AccessWindow.payment_id == Payment.id)
+                .where(
+                    Payment.user_id == user_id,
+                    AccessWindow.checklist_id == checklist.id,
+                    AccessWindow.expires_at > now,
+                )
+            ) or 0
+        )
+
+        # Count only ACTIVE assessments for this checklist (not_started, in_progress)
+        # This allows users to start new assessments when they have unused access windows,
+        # even if they have previous completed/expired assessments
+        active_assessments_count = (
+            db.scalar(
+                select(func.count(Assessment.id))
                 .where(
                     Assessment.user_id == user_id,
                     Assessment.checklist_id == checklist.id,
-                    Report.status == ReportStatus.published,
+                    Assessment.purged_at.is_(None),  # Exclude purged assessments
+                    Assessment.expires_at > now,  # Only non-expired assessments
+                    Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
                 )
             ) or 0
-        ) > 0
-        if has_published_report:
+        )
+
+        # Skip checklists where all access windows have been used (no remaining unused access windows)
+        if active_access_windows_count <= active_assessments_count:
             continue
 
         # Check if user already has an active (non-expired) assessment for this checklist
@@ -787,7 +806,7 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
             .join(Payment, AccessWindow.payment_id == Payment.id)
             .filter(
                 Payment.user_id == user_id,
-                Payment.checklist_id == checklist.id,
+                AccessWindow.checklist_id == checklist.id,
                 AccessWindow.expires_at > now,
             )
             .first()

@@ -65,6 +65,7 @@ class ReportResponse(BaseModel):
     checklist_title: str | None = None
     checklist_version: str | None = None
     section_overviews: list[ReportSummaryItem] = Field(default_factory=list)
+    management_summary: str | None = None
 
 
 class PaginatedCustomerReportsResponse(BaseModel):
@@ -93,7 +94,7 @@ class ReportPdfPasswordResponse(BaseModel):
 class UpsertReportSummaryRequest(BaseModel):
     section_id: UUID | None = None
     chapter_code: str | None = Field(default=None, max_length=120)
-    summary_text: str = Field(min_length=10, max_length=5000)
+    summary_text: str | None = Field(default=None, max_length=5000)
     recommendation_text: str | None = Field(default=None, max_length=5000)
 
 

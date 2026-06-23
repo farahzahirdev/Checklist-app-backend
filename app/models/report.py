@@ -80,7 +80,7 @@ class ReportSectionSummary(Base):
         UUID(as_uuid=True), ForeignKey("checklist_sections.id", ondelete="SET NULL"), nullable=True
     )
     chapter_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    summary_text: Mapped[str] = mapped_column(Text, nullable=False)
+    summary_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     recommendation_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     updated_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 class AnswerReviewCreate(BaseModel):
     """Schema for creating answer review."""
+    answer_id: Optional[UUID] = Field(None, description="ID of the answer being reviewed (required for bulk operations)")
     suggestion_type: str = Field(..., description="Type of suggestion: improvement, required_change, best_practice, reference, clarification, approved")
     suggestion_text: str = Field(..., min_length=10, description="Detailed suggestion text")
     reference_materials: Optional[str] = Field(None, description="Reference materials or links")
@@ -123,6 +124,7 @@ class AnswerWithReview(BaseModel):
     expected_implementation: Optional[str] = None
     section_code: str
     section_name: str
+    section_id: Optional[UUID] = None
     customer_answer: str
     customer_score: int
     weighted_priority: Optional[str]
@@ -195,7 +197,7 @@ class BulkAnswerReviewResponse(BaseModel):
 
 class BulkAnswerReviewResult(BaseModel):
     """Result of individual bulk answer review operation."""
-    answer_id: UUID
+    answer_id: Optional[UUID]
     success: bool
     message: str
     review_id: Optional[UUID] = None

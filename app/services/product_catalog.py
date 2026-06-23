@@ -7,7 +7,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.checklist import Checklist, ChecklistStatus, ChecklistTranslation, ChecklistType
-from app.models.media import Media
+from app.models.media import Media, MediaType
 from app.models.product_catalog import Product, ProductCategory, ProductKind, ProductStatus
 from app.models.product_media import ProductMedia
 from app.models.reference import Language
@@ -31,6 +31,16 @@ DEFAULT_CATEGORY_SEED = (
     ("documentation", "Documentation", "Ready-made documentation templates", 20),
     ("module", "Modules", "Future product modules and builders", 30),
 )
+
+
+def _extract_uuid_from_url(url: str) -> uuid.UUID | None:
+    match = re.search(r"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}", url, re.IGNORECASE)
+    if match:
+        try:
+            return uuid.UUID(match.group(0))
+        except ValueError:
+            return None
+    return None
 
 
 def _slugify(value: str) -> str:
@@ -99,19 +109,6 @@ def _checklist_type_link(db: Session, checklist_type_id: uuid.UUID | None) -> Pr
     )
 
 
-def _checklist_type_link(db: Session, checklist_type_id: uuid.UUID | None) -> ProductChecklistTypeLinkResponse | None:
-    if checklist_type_id is None:
-        return None
-    checklist_type = db.get(ChecklistType, checklist_type_id)
-    if checklist_type is None:
-        return ProductChecklistTypeLinkResponse(checklist_type_id=checklist_type_id)
-    return ProductChecklistTypeLinkResponse(
-        checklist_type_id=checklist_type.id,
-        checklist_type_code=checklist_type.code,
-        checklist_type_name=checklist_type.name,
-    )
-
-
 def _checklist_product_status(checklist: Checklist) -> str:
     if checklist.status == ChecklistStatus.published:
         return ProductStatus.published.value
@@ -151,10 +148,6 @@ def sync_checklist_product(db: Session, *, checklist: Checklist) -> Product:
     product.checklist_id = checklist.id
     product.checklist_type_id = checklist.checklist_type_id
     product.product_kind = ProductKind.checklist.value
-    product.status = status
-    product.name = name
-    product.short_description = description
-    product.description = description
     if not product.slug:
         product.slug = _ensure_unique_slug(db, base_slug, exclude_product_id=product.id)
     return product
@@ -229,7 +222,7 @@ def _build_documentation_files(db: Session, product: Product) -> list[ProductDoc
     documentation_files = []
     for product_media in sorted(product.media_files, key=lambda pm: pm.display_order):
         media = product_media.media
-        if media and media.media_type.value == "document":
+        if media and media.media_type == MediaType.document:
             # Determine file type from mime type
             file_type = "docx" if "docx" in media.mime_type.lower() else "pdf"
             
@@ -466,10 +459,27 @@ def create_product(db: Session, *, payload, actor_id: uuid.UUID | None = None) -
     )
     db.add(product)
     db.flush()
+
+    if getattr(payload, "documentation_files", None) is not None:
+        for index, doc in enumerate(payload.documentation_files):
+            media_id = _extract_uuid_from_url(doc.url)
+            if media_id:
+                media_exists = db.scalar(select(Media.id).where(Media.id == media_id))
+                if media_exists:
+                    new_pm = ProductMedia(
+                        product_id=product.id,
+                        media_id=media_id,
+                        display_order=index,
+                    )
+                    db.add(new_pm)
+        db.flush()
+
     return product
 
 
 def update_product(db: Session, product: Product, *, payload) -> Product:
+    provided_fields = payload.model_fields_set
+
     if payload.category_code is not None:
         category = _resolve_category(db, payload.category_code)
         if category is None:
@@ -491,30 +501,66 @@ def update_product(db: Session, product: Product, *, payload) -> Product:
             product.checklist_type_id = checklist.checklist_type_id
     if payload.name is not None:
         product.name = payload.name
-    if payload.short_description is not None:
+    if "short_description" in provided_fields:
         product.short_description = payload.short_description
-    if payload.description is not None:
+    if "description" in provided_fields:
         product.description = payload.description
-    if getattr(payload, 'benefits', None) is not None:
+    if "benefits" in provided_fields:
         product.benefits = payload.benefits
     if payload.product_kind is not None:
         product.product_kind = payload.product_kind
     if payload.status is not None:
         product.status = payload.status
-    if payload.parent_product_id is not None:
+    if "parent_product_id" in provided_fields:
         product.parent_product_id = payload.parent_product_id
     if payload.display_order is not None:
         product.display_order = payload.display_order
     if payload.is_featured is not None:
         product.is_featured = payload.is_featured
-    if payload.brochure_pdf_url is not None:
+    if "brochure_pdf_url" in provided_fields:
         product.brochure_pdf_url = payload.brochure_pdf_url
-    if payload.hero_image_url is not None:
+    if "hero_image_url" in provided_fields:
         product.hero_image_url = payload.hero_image_url
-    if payload.external_url is not None:
+    if "external_url" in provided_fields:
         product.external_url = payload.external_url
-    if payload.cta_label is not None:
+    if "cta_label" in provided_fields:
         product.cta_label = payload.cta_label
+
+    if getattr(payload, "documentation_files", None) is not None:
+        new_media_ids = []
+        for doc in payload.documentation_files:
+            media_id = _extract_uuid_from_url(doc.url)
+            if media_id:
+                new_media_ids.append(media_id)
+
+        existing_pms = {pm.media_id: pm for pm in product.media_files}
+        pms_to_keep = []
+
+        for index, media_id in enumerate(new_media_ids):
+            media_exists = db.scalar(select(Media.id).where(Media.id == media_id))
+            if not media_exists:
+                continue
+
+            if media_id in existing_pms:
+                pm = existing_pms[media_id]
+                pm.display_order = index
+                pms_to_keep.append(pm)
+            else:
+                new_pm = ProductMedia(
+                    product_id=product.id,
+                    media_id=media_id,
+                    display_order=index,
+                )
+                db.add(new_pm)
+                pms_to_keep.append(new_pm)
+
+        for pm in list(product.media_files):
+            if pm not in pms_to_keep:
+                db.delete(pm)
+
+        product.media_files = pms_to_keep
+        db.flush()
+
     return product
 
 
@@ -560,19 +606,10 @@ def list_public_catalog(db: Session) -> PublicProductCatalogResponse:
         .order_by(Product.display_order.asc(), Product.created_at.asc())
     ).all()
 
-    # Filter products: exclude checklist products where the underlying checklist is not published
-    filtered_products = []
-    for product in products:
-        if product.product_kind == ProductKind.checklist.value and product.checklist_id is not None:
-            checklist = product.checklist
-            if checklist is None or checklist.status != ChecklistStatus.published:
-                continue
-        filtered_products.append(product)
-
     grouped: list[ProductCategoryWithProductsResponse] = []
     total = 0
     for category in categories:
-        category_products = [product for product in filtered_products if product.category_id == category.id]
+        category_products = [product for product in products if product.category_id == category.id]
         total += len(category_products)
         grouped.append(
             ProductCategoryWithProductsResponse(
@@ -588,11 +625,6 @@ def public_product_detail(db: Session, slug: str) -> ProductDetailResponse | Non
     product = get_product_by_slug(db, slug)
     if product is None or product.status not in {ProductStatus.published.value, ProductStatus.coming_soon.value}:
         return None
-    # Exclude unpublished checklists from public access
-    if product.product_kind == ProductKind.checklist.value and product.checklist_id is not None:
-        checklist = product.checklist
-        if checklist is None or checklist.status != ChecklistStatus.published:
-            return None
     pricing = _pricing_for_product(db, product)
     checkout_available = bool(pricing and pricing.available and product.status == ProductStatus.published.value)
     base = to_public_product_response(db, product)

@@ -334,6 +334,7 @@
         .toc-num { font-weight: 700; color: var(--blue-500); min-width: 22px; }
         .toc-title { color: var(--slate-700); }
         .toc-dots { flex: 1; border-bottom: 1px dotted var(--slate-300); margin: 0 6px; position: relative; top: -2px; }
+        .toc-page { font-weight: 600; color: var(--slate-600); min-width: 30px; text-align: right; }
 
         /* ─── RISK SUMMARY CARDS ───────────────────────────────── */
         .risk-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
@@ -356,72 +357,6 @@
 
         /* ─── SECTION PAGE ─────────────────────────────────────── */
         .section-metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-
-        /* ─── CHAPTER BREAKDOWN CARDS (ID-035) ────────────────── */
-        .chapter-cards { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
-        .chapter-card {
-            border: 1px solid var(--slate-200);
-            border-radius: 10px;
-            padding: 12px 16px;
-            background: #fff;
-        }
-        .chapter-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 8px;
-        }
-        .chapter-card-id {
-            font-size: 9px;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: var(--blue-500);
-            margin-bottom: 3px;
-        }
-        .chapter-card-title {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--slate-900);
-        }
-        .chapter-card-score {
-            text-align: right;
-            flex-shrink: 0;
-            margin-left: 12px;
-        }
-        .chapter-card-score-label {
-            font-size: 8px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--slate-400);
-            margin-bottom: 2px;
-        }
-        .chapter-card-score-value {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--blue-500);
-        }
-        .chapter-card-meta {
-            display: flex;
-            gap: 16px;
-            font-size: 10px;
-            color: var(--slate-500);
-            margin-bottom: 8px;
-        }
-        .chapter-card-meta span strong { color: var(--slate-700); }
-        .chapter-card-bar {
-            height: 4px;
-            background: var(--slate-200);
-            border-radius: 2px;
-        }
-        .chapter-card-bar-fill {
-            height: 4px;
-            border-radius: 2px;
-        }
-        .bar-green  { background: #22c55e; }
-        .bar-amber  { background: #f59e0b; }
-        .bar-red    { background: #ef4444; }
 
         /* ─── AREAS FOR IMPROVEMENT CARDS (ID-034) ────────────── */
         .improvement-header-counts {
@@ -559,7 +494,7 @@
         </div>
         <div class="cover-detail-row">
             <span class="cover-detail-label">Datum hodnocení</span>
-            <span class="cover-detail-value normal">{{ assessment_date.strftime('%d. %B %Y') }}</span>
+            <span class="cover-detail-value normal">{{ assessment_date.strftime('%d. %m. %Y') }}</span>
         </div>
         <div class="cover-detail-row">
             <span class="cover-detail-label">Celkové skóre</span>
@@ -597,32 +532,32 @@
             <span class="toc-num">1</span>
             <span class="toc-title">Identifikace zprávy</span>
             <span class="toc-dots"></span>
+            <span class="toc-page">1</span>
         </div>
         <div class="toc-item">
             <span class="toc-num">2</span>
             <span class="toc-title">Cíl auditu a metodika hodnocení</span>
             <span class="toc-dots"></span>
+            <span class="toc-page">3</span>
         </div>
         <div class="toc-item">
             <span class="toc-num">3</span>
             <span class="toc-title">Souhrn pro vedení</span>
             <span class="toc-dots"></span>
+            <span class="toc-page">4</span>
         </div>
         <div class="toc-item">
             <span class="toc-num">4</span>
             <span class="toc-title">Přehled výsledků podle kapitol</span>
             <span class="toc-dots"></span>
-        </div>
-        <div class="toc-item">
-            <span class="toc-num">5</span>
-            <span class="toc-title">Identifikované oblasti ke zlepšení</span>
-            <span class="toc-dots"></span>
+            <span class="toc-page">5</span>
         </div>
         {% for section in section_scores %}
         <div class="toc-item" style="margin-left: 20px;">
-            <span class="toc-num">6{{ ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'][loop.index0] }}</span>
-            <span class="toc-title">§ {{ section.section_number }} – {{ section.section_title }}</span>
+            <span class="toc-num">4.{{ loop.index }}</span>
+            <span class="toc-title">{{ section.section_title }}</span>
             <span class="toc-dots"></span>
+            <span class="toc-page">{{ 5 + loop.index }}</span>
         </div>
         {% endfor %}
     </div>
@@ -649,7 +584,7 @@
     <div class="kv-table-wrapper">
         <table class="kv-table">
             <tr><th>Název auditu</th><td>{{ audit_type or checklist_title }}</td></tr>
-            <tr><th>Datum hodnocení</th><td>{{ assessment_date.strftime('%d. %B %Y') }}</td></tr>
+            <tr><th>Datum hodnocení</th><td>{{ assessment_date.strftime('%d. %m. %Y') }}</td></tr>
             <tr><th>Kontrolní seznam vyplnil</th><td>{{ customer_name }}</td></tr>
             <tr><th>Zkontroloval</th><td>Lukáš Vaněk</td></tr>
         </table>
@@ -684,7 +619,7 @@
         </div>
         <div class="info-box-content">
             <p class="info-box-title">Metoda vyhodnocení</p>
-            <p>Odpovědi jsou hodnoceny v souladu s příslušnými regulačními požadavky a kontrolními cíli. Výsledné hodnocení odráží přezkoumaný stav po ověření podaných odpovědí, poznámek a podpůrných důkazů administrátorem. Hodnocení bere v úvahu úplnost, efektivitu a kvalitu implementovaných opatření a dokumentovaných důkazů.</p>
+            <p>Odpovědi jsou hodnoceny v souladu s příslušnými regulačními požadavky a kontrolními cíli. Výsledné hodnocení odráží přezkoumaný stav po ověření podaných odpovědí, poznámek a podpůrných důkazů auditorem. Hodnocení bere v úvahu úplnost, efektivitu a kvalitu implementovaných opatření a dokumentovaných důkazů.</p>
         </div>
     </div>
 
@@ -880,20 +815,18 @@
             </div>
         </div>
 
-        <!-- Legenda tabulky (Sekce / Oblast Doména) odpovídající obrázku 2 -->
+        <!-- Legenda tabulky (Oblast / Doména) -->
         <div>
             <div class="chart-legend-table-wrapper">
                 <table class="chart-legend-table">
                     <thead>
                         <tr>
-                            <th style="width:22%;">Sekce</th>
                             <th>Oblast / Doména</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for section in section_scores %}
                         <tr>
-                            <td style="font-weight:700; color:var(--blue-500);">§ {{ section.section_number if section is mapping else section['section_number'] }}</td>
                             <td>{{ section.section_title if section is mapping else section['section_title'] }}</td>
                         </tr>
                         {% endfor %}
@@ -956,11 +889,9 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th style="width:5%;">Č.</th>
-                    <th style="width:34%;">Kapitola / Sekce</th>
-                    <th style="width:13%; text-align:center;">Skóre vyspělosti</th>
-                    <th style="width:13%; text-align:center;">Vysoké priority</th>
-                    <th>Shrnutí administrátora</th>
+                    <th style="width:60%;">Kapitola / Sekce</th>
+                    <th style="width:20%; text-align:center;">Skóre vyspělosti</th>
+                    <th style="width:20%; text-align:center;">Vysoké priority</th>
                 </tr>
             </thead>
             <tbody>
@@ -973,9 +904,8 @@
                 {% set section_summary = section_summaries|selectattr('section_id', 'equalto', section.section_id)|first %}
                 {% endif %}
                 <tr>
-                    <td style="text-align:center; font-weight:600; color:var(--slate-400);">{{ loop.index }}</td>
                     <td>
-                        <span style="font-weight:600; color:var(--blue-500);">§ {{ section.section_number }}</span>
+                        <span style="font-weight:600; color:var(--blue-500);">{{ section.section_number }}</span>
                         <span style="color:var(--slate-700);"> {{ section.section_title }}</span>
                     </td>
                     <td style="text-align:center;">
@@ -990,49 +920,10 @@
                         <span style="color:var(--slate-300);">—</span>
                         {% endif %}
                     </td>
-                    <td style="font-size:10px; color:var(--slate-500); line-height:1.4;">
-                        {% if section_summary and section_summary.summary_text %}
-                        {{ section_summary.summary_text[:110] }}{% if section_summary.summary_text|length > 110 %}…{% endif %}
-                        {% else %}
-                        <em>Shrnutí není k dispozici</em>
-                        {% endif %}
-                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-    </div>
-
-    <!-- ID-035: Karty přehledu kapitol (karta pro každou sekci s ukazatelem průběhu) -->
-    <h3 class="section-heading" style="margin-top:0;">Přehled kapitol</h3>
-    <div class="chapter-cards">
-        {% for section in section_scores %}
-        {% set sec_findings = findings|selectattr('section_code', 'equalto', section.section_code)|list %}
-        {% set sec_pct = (section.percentage if section is mapping else section['percentage']) | float %}
-        {% set bar_class = 'bar-green' if sec_pct >= 80 else ('bar-amber' if sec_pct >= 60 else 'bar-red') %}
-        <div class="chapter-card">
-            <div class="chapter-card-header">
-                <div>
-                    <div class="chapter-card-id">SEC-{{ loop.index }}</div>
-                    <div class="chapter-card-title">§ {{ section.section_number }} – {{ section.section_title }}</div>
-                </div>
-                <div class="chapter-card-score">
-                    <div class="chapter-card-score-label">Skóre</div>
-                    <div class="chapter-card-score-value {% if sec_pct >= 80 %}green{% elif sec_pct >= 60 %}amber{% else %}red{% endif %}"
-                         style="color: {% if sec_pct >= 80 %}var(--green-700){% elif sec_pct >= 60 %}var(--amber-700){% else %}var(--red-700){% endif %};">
-                        {{ "%.1f"|format(sec_pct) }}%
-                    </div>
-                </div>
-            </div>
-            <div class="chapter-card-meta">
-                <span>Skóre <strong>{{ section.overall_score if section is mapping else section['overall_score'] }} / {{ section.max_score if section is mapping else section['max_score'] }}</strong></span>
-                <span>Zjištění <strong>{{ sec_findings|length }}</strong></span>
-            </div>
-            <div class="chapter-card-bar">
-                <div class="chapter-card-bar-fill {{ bar_class }}" style="width:{{ sec_pct }}%;"></div>
-            </div>
-        </div>
-        {% endfor %}
     </div>
 
     <div style="margin-top:12px; background:var(--slate-50); border-radius:8px; padding:10px 12px; font-size:10px; color:var(--slate-500); border:1px solid var(--slate-200);">
@@ -1051,74 +942,7 @@
 
 
 <!-- ══════════════════════════════════════════════════════════════
-     PAGE 6: IDENTIFIED AREAS FOR IMPROVEMENT  (ID-034 NEW PAGE)
-     ══════════════════════════════════════════════════════════════ -->
-<div class="page">
-    <div class="page-header">
-        <p class="page-header-kicker">Oblasti ke zlepšení</p>
-        <h2 class="page-header-title">5 &nbsp; Identifikované oblasti ke zlepšení</h2>
-        <p class="page-header-subtitle">Tato stránka je záměrně vyhrazena pro problémy, které jsou nejvýznamnější. Rozložení je širší a klidnější, takže každé zjištění působí jako součást jedné navržené stránky.</p>
-    </div>
-
-    <!-- ID-034: Count summary row -->
-    {% set all_high   = findings|selectattr('priority', 'equalto', 'high')|list %}
-    {% set all_medium = findings|selectattr('priority', 'equalto', 'medium')|list %}
-    {% set all_low    = findings|selectattr('priority', 'equalto', 'low')|list %}
-    <div style="display:flex; align-items:center; gap:24px; margin-bottom:20px; padding:12px 16px; background:var(--slate-50); border:1px solid var(--slate-200); border-radius:10px;">
-        <div style="flex:1; font-size:11px; color:var(--slate-600);">
-            <strong style="color:var(--slate-900);">{{ findings|length }}</strong> celkový počet zjištění napříč všemi sekcemi
-        </div>
-        <div class="improvement-count-box">
-            <div class="improvement-count-label high">VYSOKÁ</div>
-            <div class="improvement-count-value high">{{ all_high|length }}</div>
-        </div>
-        <div class="improvement-count-box">
-            <div class="improvement-count-label medium">STŘEDNÍ</div>
-            <div class="improvement-count-value medium">{{ all_medium|length }}</div>
-        </div>
-        <div class="improvement-count-box">
-            <div class="improvement-count-label low">NÍZKÁ</div>
-            <div class="improvement-count-value low">{{ all_low|length }}</div>
-        </div>
-    </div>
-
-    <!-- ID-034: Jednotlivé karty zjištění s textem doporučení -->
-    {% for finding in findings|sort(attribute='priority', reverse=false) %}
-    <div class="finding-card">
-        <div class="finding-card-priority-row">
-            <span class="priority-pill {{ finding.priority }}">
-                {% if finding.priority == 'high' %}VYSOKÁ
-                {% elif finding.priority == 'medium' %}STŘEDNÍ
-                {% else %}NÍZKÁ{% endif %}
-            </span>
-            {% if finding.responsible_party %}
-            <span style="font-size:10px; color:var(--slate-400);">{{ finding.responsible_party }}</span>
-            {% endif %}
-        </div>
-        <div class="finding-card-title">{{ finding.question_text }}</div>
-        {% if finding.recommendation_text or finding.finding_text %}
-        <div class="finding-card-rec">
-            <div class="finding-card-rec-label">Doporučení</div>
-            <div class="finding-card-rec-text">{{ finding.recommendation_text or finding.finding_text }}</div>
-        </div>
-        {% endif %}
-    </div>
-    {% else %}
-    <div class="info-box">
-        <p style="color:var(--slate-400); font-style:italic;">Nebyla identifikována žádná zjištění. Všechny požadavky jsou ve všech sekcích odpovídajícím způsobem implementovány.</p>
-    </div>
-    {% endfor %}
-
-    <div class="page-footer">
-        <span>Zpráva o auditu kybernetické bezpečnosti</span>
-        <span>Stránka 6</span>
-        <span>Klasifikace: Důvěrné</span>
-    </div>
-</div>
-
-
-<!-- ══════════════════════════════════════════════════════════════
-     PAGES 7+: DETAIL SEKCE (one page per section)  (ID-036 FIXED)
+     PAGES 6+: DETAIL SEKCE (one page per section)  (ID-036 FIXED)
      ══════════════════════════════════════════════════════════════ -->
 {% for section in section_scores %}
 {% set section_findings = findings|selectattr('section_code', 'equalto', section.section_code)|list %}
@@ -1133,7 +957,7 @@
 <div class="page{% if loop.last %} page-last{% endif %}">
     <div class="page-header">
         <p class="page-header-kicker">Detail sekce</p>
-        <h2 class="page-header-title">§ {{ section.section_number }} &nbsp; {{ section.section_title }}</h2>
+        <h2 class="page-header-title">{{ section.section_number }} &nbsp; {{ section.section_title }}</h2>
         <p class="page-header-subtitle" style="font-size:10px; color:var(--slate-400);">{{ section.section_code }}</p>
     </div>
 
@@ -1164,7 +988,7 @@
         {% if section_summary and section_summary.summary_text %}
         <p>{{ section_summary.summary_text }}</p>
         {% else %}
-        <p style="color:var(--slate-400);font-style:italic;">Auditor/administrátor ještě nedokončil shrnutí pro tuto sekci.</p>
+        <p style="color:var(--slate-400);font-style:italic;">Auditor ještě nedokončil shrnutí pro tuto sekci.</p>
         {% endif %}
     </div>
 
@@ -1226,42 +1050,9 @@
     </div>
     {% endif %}
 
-    <!-- Detailní vyhodnocení otázek -->
-    <h3 class="section-heading">Detailní vyhodnocení otázek</h3>
-    {% if section.question_scores %}
-    <div class="data-table-wrapper">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th style="width:10%">Skóre</th>
-                    <th style="width:15%">%</th>
-                    <th>Otázka</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for question in section.question_scores %}
-                <tr>
-                    <td style="text-align:center;">
-                        <span class="badge {% if question.score >= 3 %}badge-green{% elif question.score >= 2 %}badge-amber{% else %}badge-red{% endif %}">
-                            {{ question.score }}
-                        </span>
-                    </td>
-                    <td style="text-align:center;">{{ "%.1f"|format(question.percentage) }}%</td>
-                    <td>{{ question.question_title }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div class="info-box">
-        <p>Pro tuto sekci nejsou k dispozici údaje o vyhodnocení otázek.</p>
-    </div>
-    {% endif %}
-
     <div class="page-footer">
         <span>Zpráva o auditu kybernetické bezpečnosti</span>
-        <span>Stránka {{ 6 + loop.index }}</span>
+        <span>Stránka {{ 5 + loop.index }}</span>
         <span>Klasifikace: Důvěrné</span>
     </div>
 </div>

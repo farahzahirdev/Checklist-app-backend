@@ -106,6 +106,7 @@ def test_admin_create_update_get_documentation_product_with_checklist_type(clien
 
     assert created["checklist_type"]["checklist_type_id"] == str(sample_checklist.checklist_type_id)
     assert created["checklist_type"]["checklist_type_code"] == sample_checklist.checklist_type.code
+    assert created["short_description"] == "Template set"
 
     get_response = client.get(
         f"{API_PREFIX}/admin/products/{created['id']}",
@@ -116,12 +117,21 @@ def test_admin_create_update_get_documentation_product_with_checklist_type(clien
     update_response = client.patch(
         f"{API_PREFIX}/admin/products/{created['id']}",
         headers=_admin_headers(admin_token),
-        json={"status": "published", "is_featured": True},
+        json={"status": "published", "is_featured": True, "short_description": "Updated template set"},
     )
     assert update_response.status_code == 200
     updated = update_response.json()
     assert updated["status"] == "published"
     assert updated["is_featured"] is True
+    assert updated["short_description"] == "Updated template set"
+
+    clear_response = client.patch(
+        f"{API_PREFIX}/admin/products/{created['id']}",
+        headers=_admin_headers(admin_token),
+        json={"short_description": None},
+    )
+    assert clear_response.status_code == 200
+    assert clear_response.json()["short_description"] is None
 
 
 def test_admin_delete_checklist_product(client, db, admin_token, sample_checklist):
