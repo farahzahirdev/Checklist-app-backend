@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import distinct, func, select, and_, or_, desc
+from sqlalchemy import distinct, func, select, and_, or_, desc, case
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
@@ -98,6 +98,69 @@ def _access_window_lookup(
     }
 
 
+def _language_code_preference_score(lang_code: str, code: str | None) -> int:
+    if code == lang_code:
+        return 0
+    if code == "en":
+        return 1
+    return 2
+
+
+def _translation_language_filter(lang_code: str):
+    if lang_code == "en":
+        return or_(Language.code == "en", Language.id.is_(None))
+    return or_(Language.code.in_([lang_code, "en"]), Language.id.is_(None))
+
+
+def _translation_language_order(lang_code: str):
+    return case(
+        (Language.code == lang_code, 0),
+        (Language.code == "en", 1),
+        else_=2,
+    )
+
+
+def _preferred_checklist_translations(
+    db: Session,
+    checklist_ids: list[UUID],
+    lang_code: str,
+) -> dict[UUID, ChecklistTranslation]:
+    if not checklist_ids:
+        return {}
+
+    rows = (
+        db.query(ChecklistTranslation, Language.code)
+        .join(Language, ChecklistTranslation.language_id == Language.id)
+        .filter(ChecklistTranslation.checklist_id.in_(checklist_ids))
+        .filter(_translation_language_filter(lang_code))
+        .all()
+    )
+
+    best: dict[UUID, ChecklistTranslation] = {}
+    best_scores: dict[UUID, int] = {}
+    for translation, code in rows:
+        score = _language_code_preference_score(lang_code, code)
+        checklist_id = translation.checklist_id
+        if checklist_id not in best_scores or score < best_scores[checklist_id]:
+            best_scores[checklist_id] = score
+            best[checklist_id] = translation
+    return best
+
+
+def _dedupe_translation_join_rows(rows: list[tuple], lang_code: str, *, entity_index: int = 0) -> list[tuple]:
+    best: dict[UUID, tuple] = {}
+    best_scores: dict[UUID, int] = {}
+    for row in rows:
+        entity_id = row[entity_index].id
+        language = row[-1]
+        code = language.code if language else None
+        score = _language_code_preference_score(lang_code, code)
+        if entity_id not in best_scores or score < best_scores[entity_id]:
+            best_scores[entity_id] = score
+            best[entity_id] = row
+    return list(best.values())
+
+
 def get_customer_assessments(
     db: Session, 
     user_id: UUID, 
@@ -113,15 +176,12 @@ def get_customer_assessments(
 ) -> CustomerAssessmentListResponse:
     """Get customer's assessments with filtering and sorting."""
     
-    # Base query with joins for translations
+    # Base query without translation join; titles are resolved with language fallback.
     query = (
-        db.query(Assessment, Checklist, ChecklistType, ChecklistTranslation, Language)
+        db.query(Assessment, Checklist, ChecklistType)
         .join(Checklist, Assessment.checklist_id == Checklist.id)
         .join(ChecklistType, Checklist.checklist_type_id == ChecklistType.id)
-        .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
-        .outerjoin(Language, ChecklistTranslation.language_id == Language.id)
         .filter(Assessment.user_id == user_id)
-        .filter(Language.code == lang_code if lang_code != "en" else True)
     )
     
     # Apply filters
@@ -134,11 +194,19 @@ def get_customer_assessments(
     
     if search:
         search_term = f"%{search}%"
+        translated_checklist_ids = (
+            select(ChecklistTranslation.checklist_id)
+            .join(Language, ChecklistTranslation.language_id == Language.id)
+            .where(
+                _translation_language_filter(lang_code),
+                ChecklistTranslation.title.ilike(search_term),
+            )
+        )
         query = query.filter(
             or_(
-                ChecklistTranslation.title.ilike(search_term),
+                Checklist.id.in_(translated_checklist_ids),
                 ChecklistType.name.ilike(search_term),
-                Checklist.version.ilike(search_term)
+                Checklist.version.ilike(search_term),
             )
         )
     
@@ -170,6 +238,11 @@ def get_customer_assessments(
     results = query.all() if should_include_synthetic_startables else query.offset(skip).limit(limit).all()
 
     report_lookup = _report_lookup_for_assessments(db, [assessment.id for assessment, *_ in results])
+    translation_lookup = _preferred_checklist_translations(
+        db,
+        [checklist.id for _, checklist, _ in results],
+        lang_code,
+    )
     access_window_lookup = _access_window_lookup(
         db,
         [assessment.access_window_id for assessment, *_ in results],
@@ -177,8 +250,8 @@ def get_customer_assessments(
 
     # Build response rows from persisted assessments.
     result_assessments = []
-    for assessment, checklist, checklist_type, translation, language in results:
-        # Get translation
+    for assessment, checklist, checklist_type in results:
+        translation = translation_lookup.get(checklist.id)
         title = translation.title if translation else f"Checklist v{checklist.version}"
         report_details = report_lookup.get(assessment.id)
         access_window_details = access_window_lookup.get(assessment.access_window_id)
@@ -311,22 +384,20 @@ def get_assessment_detail(
 ) -> AssessmentDetail:
     """Get detailed assessment information."""
     
-    # Get assessment with joins for translations
+    # Get assessment with checklist metadata; title resolved with language fallback.
     assessment_data = (
-        db.query(Assessment, Checklist, ChecklistType, ChecklistTranslation, Language)
+        db.query(Assessment, Checklist, ChecklistType)
         .join(Checklist, Assessment.checklist_id == Checklist.id)
         .join(ChecklistType, Checklist.checklist_type_id == ChecklistType.id)
-        .outerjoin(ChecklistTranslation, Checklist.id == ChecklistTranslation.checklist_id)
-        .outerjoin(Language, ChecklistTranslation.language_id == Language.id)
         .filter(Assessment.id == assessment_id, Assessment.user_id == user_id)
-        .filter(Language.code == lang_code if lang_code != "en" else True)
         .first()
     )
     
     if not assessment_data:
         raise ValueError("Assessment not found")
     
-    assessment, checklist, checklist_type, translation, language = assessment_data
+    assessment, checklist, checklist_type = assessment_data
+    translation = _preferred_checklist_translations(db, [checklist.id], lang_code).get(checklist.id)
     title = translation.title if translation else f"Checklist v{checklist.version}"
     
     # Get sections and questions for progress calculation
@@ -428,10 +499,12 @@ def get_assessment_progress(
         .outerjoin(ChecklistSectionTranslation, ChecklistSection.id == ChecklistSectionTranslation.section_id)
         .outerjoin(Language, ChecklistSectionTranslation.language_id == Language.id)
         .filter(ChecklistSection.checklist_id == assessment.checklist_id)
-        .filter(Language.code == lang_code if lang_code != "en" else True)
-        .order_by(ChecklistSection.display_order)
+        .filter(_translation_language_filter(lang_code))
+        .order_by(ChecklistSection.display_order, _translation_language_order(lang_code))
         .all()
     )
+    sections_query = _dedupe_translation_join_rows(sections_query, lang_code, entity_index=0)
+    sections_query.sort(key=lambda row: row[0].display_order)
     
     questions_query = (
         db.query(ChecklistQuestion)
@@ -573,12 +646,12 @@ def get_customer_dashboard_enhanced(
             Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
             Assessment.expires_at > _now_utc(),
         )
-        .filter(Language.code == lang_code if lang_code != "en" else True)
-        .order_by(Assessment.updated_at.desc())
-        .limit(5)
+        .filter(_translation_language_filter(lang_code))
+        .order_by(Assessment.updated_at.desc(), _translation_language_order(lang_code))
+        .limit(10)
+        .all()
     )
-    
-    active_rows = list(active_assessments_query)
+    active_rows = _dedupe_translation_join_rows(list(active_assessments_query), lang_code, entity_index=0)[:5]
     active_report_lookup = _report_lookup_for_assessments(db, [assessment.id for assessment, *_ in active_rows])
 
     active_assessments = []
@@ -615,12 +688,12 @@ def get_customer_dashboard_enhanced(
             Assessment.user_id == user_id,
             Assessment.status == AssessmentStatus.submitted,
         )
-        .filter(Language.code == lang_code if lang_code != "en" else True)
-        .order_by(Assessment.submitted_at.desc())
-        .limit(5)
+        .filter(_translation_language_filter(lang_code))
+        .order_by(Assessment.submitted_at.desc(), _translation_language_order(lang_code))
+        .limit(10)
+        .all()
     )
-    
-    submission_rows = list(recent_submissions_query)
+    submission_rows = _dedupe_translation_join_rows(list(recent_submissions_query), lang_code, entity_index=0)[:5]
     submission_report_lookup = _report_lookup_for_assessments(db, [assessment.id for assessment, *_ in submission_rows])
 
     recent_submissions = []
@@ -660,12 +733,12 @@ def get_customer_dashboard_enhanced(
             Assessment.expires_at <= seven_days_from_now,
             Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
         )
-        .filter(Language.code == lang_code if lang_code != "en" else True)
-        .order_by(Assessment.expires_at.asc())
-        .limit(5)
+        .filter(_translation_language_filter(lang_code))
+        .order_by(Assessment.expires_at.asc(), _translation_language_order(lang_code))
+        .limit(10)
+        .all()
     )
-    
-    expiring_rows = list(expiring_soon_query)
+    expiring_rows = _dedupe_translation_join_rows(list(expiring_soon_query), lang_code, entity_index=0)[:5]
     expiring_report_lookup = _report_lookup_for_assessments(db, [assessment.id for assessment, *_ in expiring_rows])
 
     expiring_soon = []
@@ -746,9 +819,13 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
             AccessWindow.expires_at > now,
             Checklist.status_code_id == 2,  # published
         )
-        .filter(Language.code == lang_code if lang_code != "en" else True)
-        .distinct()
+        .filter(_translation_language_filter(lang_code))
         .all()
+    )
+    purchased_checklists_query = _dedupe_translation_join_rows(
+        list(purchased_checklists_query),
+        lang_code,
+        entity_index=0,
     )
 
     available = []
