@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import distinct, func, select, and_, or_, desc, case
+from sqlalchemy import distinct, exists, func, select, and_, or_, desc, case
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
@@ -799,6 +799,25 @@ def get_customer_dashboard_enhanced(
     )
 
 
+def _assessment_consumes_access_window():
+    """Assessments linked to an access window that still occupy that purchase slot."""
+    return (
+        select(Assessment.id)
+        .where(
+            Assessment.access_window_id == AccessWindow.id,
+            Assessment.status.in_(
+                [
+                    AssessmentStatus.not_started,
+                    AssessmentStatus.in_progress,
+                    AssessmentStatus.submitted,
+                    AssessmentStatus.closed,
+                ]
+            ),
+        )
+        .correlate(AccessWindow)
+    )
+
+
 def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> list[AvailableChecklist]:
     """Get checklists available for the customer to start or continue."""
 
@@ -832,8 +851,9 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
     for checklist, checklist_type, translation, language in purchased_checklists_query:
         title = translation.title if translation else f"Checklist v{checklist.version}"
 
-        # Count active access windows for this checklist
-        active_access_windows_count = (
+        # Only show startable slots when there is an active access window with no assessment on it yet.
+        # A submitted/closed assessment still tied to the window counts as "used" (one purchase = one audit).
+        unused_access_windows_count = (
             db.scalar(
                 select(func.count(AccessWindow.id))
                 .join(Payment, AccessWindow.payment_id == Payment.id)
@@ -841,31 +861,15 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
                     Payment.user_id == user_id,
                     AccessWindow.checklist_id == checklist.id,
                     AccessWindow.expires_at > now,
+                    ~exists(_assessment_consumes_access_window()),
                 )
-            ) or 0
+            )
+            or 0
         )
 
-        # Count only ACTIVE assessments for this checklist (not_started, in_progress)
-        # This allows users to start new assessments when they have unused access windows,
-        # even if they have previous completed/expired assessments
-        active_assessments_count = (
-            db.scalar(
-                select(func.count(Assessment.id))
-                .where(
-                    Assessment.user_id == user_id,
-                    Assessment.checklist_id == checklist.id,
-                    Assessment.purged_at.is_(None),  # Exclude purged assessments
-                    Assessment.expires_at > now,  # Only non-expired assessments
-                    Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
-                )
-            ) or 0
-        )
-
-        # Skip checklists where all access windows have been used (no remaining unused access windows)
-        if active_access_windows_count <= active_assessments_count:
+        if unused_access_windows_count == 0:
             continue
 
-        # Check if user already has an active (non-expired) assessment for this checklist
         has_active_assessment = (
             db.scalar(
                 select(func.count(Assessment.id)).where(
@@ -874,10 +878,10 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
                     Assessment.expires_at > now,
                     Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
                 )
-            ) or 0
+            )
+            or 0
         ) > 0
 
-        # Get access window
         access_window = (
             db.query(AccessWindow)
             .join(Payment, AccessWindow.payment_id == Payment.id)
@@ -885,6 +889,7 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
                 Payment.user_id == user_id,
                 AccessWindow.checklist_id == checklist.id,
                 AccessWindow.expires_at > now,
+                ~exists(_assessment_consumes_access_window()),
             )
             .first()
         )
