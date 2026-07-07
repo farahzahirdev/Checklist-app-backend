@@ -11,7 +11,15 @@ from app.core.config import get_settings
 from app.services.company_context import resolve_company_id, user_has_company_access
 from app.services.settings_manager import get_runtime_int
 from app.models.access_window import AccessWindow
-from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentEvidenceFile, AssessmentStatus, PriorityLevel
+from app.models.assessment import (
+    ACCESS_WINDOW_CONSUMING_STATUSES,
+    AnswerChoice,
+    Assessment,
+    AssessmentAnswer,
+    AssessmentEvidenceFile,
+    AssessmentStatus,
+    PriorityLevel,
+)
 from app.models.checklist import (
     Checklist,
     ChecklistQuestion,
@@ -104,8 +112,8 @@ def _active_access_window(
     company_id: UUID | None = None,
 ) -> AccessWindow | None:
     """
-    Get the most recent active access window for the user that hasn't been 
-    used for a submitted assessment yet.
+    Get the most recent active access window for the user that hasn't been
+    used for an assessment yet (one purchase = one audit run).
     """
     if hasattr(db, "query"):
         # Get active access windows (not expired)
@@ -144,26 +152,25 @@ def _active_access_window(
 
         access_windows.sort(key=lambda item: item.expires_at, reverse=True)
     
-    # Check each access window to see if it has a submitted assessment
+    # Check each access window to see if it already has an assessment on it.
     for aw in access_windows:
         if hasattr(db, "assessments"):
-            submitted_assessment = next(
+            consuming_assessment = next(
                 (
                     item
                     for item in db.assessments
-                    if item.access_window_id == aw.id and item.status == AssessmentStatus.submitted
+                    if item.access_window_id == aw.id and item.status in ACCESS_WINDOW_CONSUMING_STATUSES
                 ),
                 None,
             )
         else:
-            submitted_assessment = db.scalar(
+            consuming_assessment = db.scalar(
                 select(Assessment).where(
                     Assessment.access_window_id == aw.id,
-                    Assessment.status == AssessmentStatus.submitted,
+                    Assessment.status.in_(ACCESS_WINDOW_CONSUMING_STATUSES),
                 )
             )
-        # Only return if no submitted assessment exists for this access window
-        if submitted_assessment is None:
+        if consuming_assessment is None:
             return aw
     
     return None
@@ -296,15 +303,6 @@ def start_assessment(
 
         return _serialize_assessment(existing, is_new=False)
 
-    # Check if user already has a submitted assessment for this checklist.
-    submitted_for_checklist = db.scalar(
-        select(Assessment).where(
-            Assessment.user_id == user.id,
-            Assessment.checklist_id == checklist_id,
-            Assessment.status == AssessmentStatus.submitted,
-        )
-    )
-
     if user.role == UserRole.admin:
         access_window = _ensure_access_window(
             db,
@@ -321,31 +319,19 @@ def start_assessment(
 
         if not user_has_company_access(db, user=user, company_id=company_id):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("forbidden", lang_code))
-        
-        # For non-admin users, check if their latest payment already has a submitted assessment
-        if submitted_for_checklist is not None:
-            # They submitted with this checklist already
-            # Check if the payment they're trying to use is the SAME payment linked to submitted assessment
-            submitted_access_window = db.scalar(
-                select(AccessWindow).where(
-                    AccessWindow.id == submitted_for_checklist.access_window_id
-                )
-            )
-            if submitted_access_window and submitted_access_window.payment_id == payment.id:
-                # Same payment being reused - not allowed
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=translate("assessment_already_submitted_with_this_payment", lang_code)
-                )
-        
-        access_window = _ensure_access_window(
+
+        access_window = _active_access_window(
             db,
-            user=user,
+            user_id=user.id,
             checklist_id=checklist_id,
-            payment=payment,
             now=now,
             company_id=company_id,
         )
+        if access_window is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=translate("assessment_already_submitted_with_this_payment", lang_code),
+            )
     
     assessment = Assessment(
         user_id=user.id,

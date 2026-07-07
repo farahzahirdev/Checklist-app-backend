@@ -300,6 +300,7 @@ def get_auditor_dashboard(db: Session, *, company_id: UUID | None = None, lang_c
 
 
 def get_customer_dashboard(db: Session, *, user_id: UUID, lang_code: str = "en") -> CustomerDashboardResponse:
+    now = _now()
     paid_checklists_count = (
         db.scalar(
             select(func.count(distinct(Payment.checklist_id))).where(
@@ -315,15 +316,17 @@ def get_customer_dashboard(db: Session, *, user_id: UUID, lang_code: str = "en")
             select(func.count(Assessment.id)).where(
                 Assessment.user_id == user_id,
                 Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
+                Assessment.expires_at > now,
             )
         )
         or 0
     )
+    # "Completed" KPI: submitted audits and closed audits (after report publish).
     submitted_assessments_count = (
         db.scalar(
             select(func.count(Assessment.id)).where(
                 Assessment.user_id == user_id,
-                Assessment.status == AssessmentStatus.submitted,
+                Assessment.status.in_([AssessmentStatus.submitted, AssessmentStatus.closed]),
             )
         )
         or 0

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
 from app.models.assessment import (
+    ACCESS_WINDOW_CONSUMING_STATUSES,
     Assessment, 
     AssessmentAnswer, 
     AssessmentStatus, 
@@ -229,13 +230,15 @@ def get_customer_assessments(
     else:
         query = query.order_by(sort_column)
     
-    # Include purchased checklists with active access but without active assessment as synthetic
-    # "not_started" rows. When synthetic rows are enabled, we paginate after combining all rows
-    # so paging stays correct across pages.
+    # Include synthetic rows for purchases without a persisted assessment:
+    # - active access window → not_started (startable)
+    # - expired access window, never started → expired (historical, not startable)
     should_include_synthetic_startables = status_filter is None or AssessmentStatus.not_started in status_filter
+    should_include_synthetic_expired_unstarted = status_filter is None or AssessmentStatus.expired in status_filter
+    should_merge_synthetic_rows = should_include_synthetic_startables or should_include_synthetic_expired_unstarted
 
     # Apply pagination directly only when synthetic rows are not in play.
-    results = query.all() if should_include_synthetic_startables else query.offset(skip).limit(limit).all()
+    results = query.all() if should_merge_synthetic_rows else query.offset(skip).limit(limit).all()
 
     report_lookup = _report_lookup_for_assessments(db, [assessment.id for assessment, *_ in results])
     translation_lookup = _preferred_checklist_translations(
@@ -329,6 +332,21 @@ def get_customer_assessments(
         if synthetic_startables:
             result_assessments.extend(synthetic_startables)
 
+    if should_include_synthetic_expired_unstarted:
+        existing_row_ids = {row.id for row in result_assessments}
+        for summary in _get_expired_unstarted_access_windows(db, user_id, lang_code):
+            if summary.id in existing_row_ids:
+                continue
+            if checklist_type_filter and summary.checklist_type_code not in checklist_type_filter:
+                continue
+            if search:
+                search_term = search.strip().lower()
+                if search_term and search_term not in summary.checklist_title.lower():
+                    continue
+            result_assessments.append(summary)
+            existing_row_ids.add(summary.id)
+
+    if should_merge_synthetic_rows:
         if sort_by == "expires_at":
             result_assessments.sort(
                 key=lambda item: item.expires_at,
@@ -591,6 +609,7 @@ def get_customer_dashboard_enhanced(
             select(func.count(Assessment.id)).where(
                 Assessment.user_id == user_id,
                 Assessment.status.in_([AssessmentStatus.not_started, AssessmentStatus.in_progress]),
+                Assessment.expires_at > _now_utc(),
             )
         ) or 0
     )
@@ -805,14 +824,7 @@ def _assessment_consumes_access_window():
         select(Assessment.id)
         .where(
             Assessment.access_window_id == AccessWindow.id,
-            Assessment.status.in_(
-                [
-                    AssessmentStatus.not_started,
-                    AssessmentStatus.in_progress,
-                    AssessmentStatus.submitted,
-                    AssessmentStatus.closed,
-                ]
-            ),
+            Assessment.status.in_(ACCESS_WINDOW_CONSUMING_STATUSES),
         )
         .correlate(AccessWindow)
     )
@@ -910,6 +922,73 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
         ))
 
     return available
+
+
+def _get_expired_unstarted_access_windows(
+    db: Session,
+    user_id: UUID,
+    lang_code: str,
+) -> list[AssessmentSummary]:
+    """Purchases whose access window lapsed before the customer started an assessment."""
+    now = _now_utc()
+    rows = (
+        db.query(AccessWindow, Checklist, ChecklistType)
+        .join(Payment, AccessWindow.payment_id == Payment.id)
+        .join(Checklist, AccessWindow.checklist_id == Checklist.id)
+        .join(ChecklistType, Checklist.checklist_type_id == ChecklistType.id)
+        .filter(
+            Payment.user_id == user_id,
+            Payment.status == PaymentStatus.succeeded,
+            AccessWindow.checklist_id.is_not(None),
+            AccessWindow.expires_at <= now,
+            ~exists(_assessment_consumes_access_window()),
+        )
+        .order_by(desc(AccessWindow.expires_at))
+        .all()
+    )
+
+    if not rows:
+        return []
+
+    translation_lookup = _preferred_checklist_translations(
+        db,
+        [checklist.id for _, checklist, _ in rows],
+        lang_code,
+    )
+    access_window_lookup = _access_window_lookup(db, [aw.id for aw, _, _ in rows])
+
+    summaries: list[AssessmentSummary] = []
+    for access_window, checklist, checklist_type in rows:
+        translation = translation_lookup.get(checklist.id)
+        title = translation.title if translation else f"Checklist v{checklist.version}"
+        access_window_details = access_window_lookup.get(access_window.id)
+        if not access_window_details:
+            continue
+        access_window_start, expires_at, purchased_at = access_window_details
+        summaries.append(
+            AssessmentSummary(
+                id=access_window.id,
+                checklist_id=checklist.id,
+                checklist_title=title,
+                checklist_type_code=checklist_type.code,
+                checklist_version=f"v{checklist.version}",
+                status=AssessmentStatus.expired,
+                completion_percent=0,
+                started_at=None,
+                submitted_at=None,
+                expires_at=expires_at,
+                days_until_expiry=_days_until_expiry(expires_at),
+                has_report=False,
+                report_id=None,
+                report_status=None,
+                report_published_at=None,
+                purchased_at=purchased_at,
+                access_window_started_at=access_window_start,
+                access_window_expires_at=expires_at,
+                last_activity=expires_at,
+            )
+        )
+    return summaries
 
 
 def _generate_quick_actions(active_assessments: list[AssessmentSummary], available_checklists: list[AvailableChecklist]) -> list[QuickAction]:

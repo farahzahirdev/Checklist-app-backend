@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.access_window import AccessWindow
-from app.models.assessment import Assessment, AssessmentStatus
+from app.models.assessment import ACCESS_WINDOW_CONSUMING_STATUSES, Assessment, AssessmentStatus
 from app.models.checklist import Checklist
 from app.models.payment import Payment, PaymentStatus
 from app.models.report import Report, ReportStatus
@@ -472,13 +472,7 @@ def get_purchase_eligibility(
         Assessment.user_id == user_id,
         Assessment.checklist_id == checklist_id,
         Assessment.expires_at > now,
-        Assessment.status.in_(
-            [
-                AssessmentStatus.not_started,
-                AssessmentStatus.in_progress,
-                AssessmentStatus.submitted,
-            ]
-        ),
+        Assessment.status.in_(ACCESS_WINDOW_CONSUMING_STATUSES),
     )
     if company_id is not None:
         active_assessment_window_query = active_assessment_window_query.where(Assessment.company_id == company_id)

@@ -173,9 +173,18 @@ def test_start_assessment_creates_session_and_is_idempotent() -> None:
         status=PaymentStatus.succeeded,
         paid_at=now - timedelta(minutes=5),
     )
+    access_window = AccessWindow(
+        id=uuid4(),
+        user_id=user.id,
+        payment_id=payment.id,
+        checklist_id=checklist.id,
+        activated_at=now - timedelta(minutes=5),
+        expires_at=now + timedelta(days=7),
+    )
     db.add(user)
     db.add(checklist)
     db.add(payment)
+    db.add(access_window)
 
     started = start_assessment(db, user=user, checklist_id=checklist.id)
     assert started.is_new is True
@@ -184,6 +193,60 @@ def test_start_assessment_creates_session_and_is_idempotent() -> None:
     started_again = start_assessment(db, user=user, checklist_id=checklist.id)
     assert started_again.is_new is False
     assert started_again.assessment_id == started.assessment_id
+
+
+def test_start_assessment_blocks_restart_after_closed_report() -> None:
+    db = FakeSession()
+    now = datetime.now(timezone.utc)
+    user = User(id=uuid4(), email="u@example.com", password_hash="x", role=UserRole.customer, is_active=True)
+    checklist = Checklist(
+        id=uuid4(),
+        checklist_type_id=uuid4(),
+        version=1,
+        status=ChecklistStatus.published,
+        created_by=user.id,
+        updated_by=user.id,
+    )
+    payment = Payment(
+        id=uuid4(),
+        user_id=user.id,
+        checklist_id=checklist.id,
+        stripe_payment_intent_id="pi_closed",
+        amount_cents=4900,
+        currency="USD",
+        status=PaymentStatus.succeeded,
+        paid_at=now - timedelta(days=2),
+    )
+    access_window = AccessWindow(
+        id=uuid4(),
+        user_id=user.id,
+        payment_id=payment.id,
+        checklist_id=checklist.id,
+        activated_at=now - timedelta(days=2),
+        expires_at=now + timedelta(days=5),
+    )
+    closed_assessment = Assessment(
+        id=uuid4(),
+        user_id=user.id,
+        checklist_id=checklist.id,
+        access_window_id=access_window.id,
+        started_at=now - timedelta(days=2),
+        submitted_at=now - timedelta(days=1),
+        status=AssessmentStatus.closed,
+        expires_at=now + timedelta(days=5),
+        completion_percent=100,
+    )
+    db.add(user)
+    db.add(checklist)
+    db.add(payment)
+    db.add(access_window)
+    db.add(closed_assessment)
+
+    with pytest.raises(HTTPException) as exc:
+        start_assessment(db, user=user, checklist_id=checklist.id)
+
+    assert exc.value.status_code == 403
+    assert exc.value.detail == "You have already submitted an assessment with this payment. Please make a new payment to start another assessment."
 
 
 def test_start_assessment_requires_payment_for_same_checklist() -> None:

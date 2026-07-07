@@ -34,6 +34,18 @@ class AssessmentStatus(StrEnum):
     closed = "closed"
 
 
+# Statuses that occupy a purchase access window (one payment = one audit run).
+ACCESS_WINDOW_CONSUMING_STATUSES: frozenset[AssessmentStatus] = frozenset(
+    {
+        AssessmentStatus.not_started,
+        AssessmentStatus.in_progress,
+        AssessmentStatus.submitted,
+        AssessmentStatus.closed,
+        AssessmentStatus.expired,
+    }
+)
+
+
 class MalwareScanStatus(StrEnum):
     pending = "pending"
     clean = "clean"

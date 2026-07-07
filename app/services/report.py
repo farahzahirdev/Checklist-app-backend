@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 from app.services.admin_checklist import _latest_section_translation
-from app.services.assessment import _latest_checklist_translation, _checklist_translation_for_language, _section_translation_for_language
+from app.services.assessment import _checklist_translation_for_language, _section_translation_for_language
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import selectinload
@@ -138,7 +138,7 @@ def _question_content(db: Session, question_id: UUID) -> tuple[str, str | None]:
     return translation.question_text, recommendation
 
 
-def _serialize_report(db: Session, report: Report) -> ReportResponse:
+def _serialize_report(db: Session, report: Report, lang_code: str = "en") -> ReportResponse:
     findings_count, summaries_count = _report_counts(db, report.id)
     auditor_note = _latest_auditor_note(db, report.id)
     company = _report_company(report, db)
@@ -152,7 +152,7 @@ def _serialize_report(db: Session, report: Report) -> ReportResponse:
         checklist = db.get(Checklist, assessment.checklist_id)
         if checklist is not None:
             checklist_version = checklist.version
-            translation = _latest_checklist_translation(db, checklist.id)
+            translation = _checklist_translation_for_language(db, checklist.id, lang_code)
             if translation and translation.title:
                 checklist_title = translation.title
             elif checklist.checklist_type:
@@ -239,7 +239,7 @@ def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User, lang
 
     existing = db.scalar(select(Report).where(Report.assessment_id == assessment_id))
     if existing is not None:
-        return _serialize_report(db, existing)
+        return _serialize_report(db, existing, lang_code)
 
     now = _now()
     report = Report(
@@ -292,18 +292,18 @@ def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User, lang
         after_data={"assessment_id": str(assessment_id), "status": str(report.status)},
     )
 
-    return _serialize_report(db, report)
+    return _serialize_report(db, report, lang_code)
 
 
 def get_report_by_assessment(db: Session, *, assessment_id: UUID, lang_code: str = "en") -> ReportResponse:
     report = db.scalar(select(Report).where(Report.assessment_id == assessment_id))
     if report is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("report_not_found", lang_code))
-    return _serialize_report(db, report)
+    return _serialize_report(db, report, lang_code)
 
 
 def get_report(db: Session, *, report_id: UUID, lang_code: str = "en") -> ReportResponse:
-    return _serialize_report(db, _get_report(db, report_id, lang_code))
+    return _serialize_report(db, _get_report(db, report_id, lang_code), lang_code)
 
 
 def start_review(db: Session, *, report_id: UUID, actor: User, payload: ReviewActionRequest, lang_code: str = "en") -> ReportResponse:
@@ -324,7 +324,7 @@ def start_review(db: Session, *, report_id: UUID, actor: User, payload: ReviewAc
         after_data={"status": str(report.status), "note": payload.note},
     )
 
-    return _serialize_report(db, report)
+    return _serialize_report(db, report, lang_code)
 
 
 def request_changes(db: Session, *, report_id: UUID, actor: User, payload: ReviewActionRequest, lang_code: str = "en") -> ReportResponse:
@@ -385,7 +385,7 @@ def request_changes(db: Session, *, report_id: UUID, actor: User, payload: Revie
         logger = logging.getLogger(__name__)
         logger.error(f"Failed to send report_changes_requested notification: {e}", exc_info=True)
 
-    return _serialize_report(db, report)
+    return _serialize_report(db, report, lang_code)
 
 
 def approve_report(db: Session, *, report_id: UUID, actor: User, payload: ReviewActionRequest, lang_code: str = "en") -> ReportResponse:
@@ -425,7 +425,7 @@ def approve_report(db: Session, *, report_id: UUID, actor: User, payload: Review
         logger = logging.getLogger(__name__)
         logger.error(f"Failed to send report_approved notification: {e}", exc_info=True)
 
-    return _serialize_report(db, report)
+    return _serialize_report(db, report, lang_code)
 
 
 def update_management_summary(
@@ -451,7 +451,7 @@ def update_management_summary(
         after_data={"management_summary": management_summary},
     )
 
-    return _serialize_report(db, report)
+    return _serialize_report(db, report, lang_code)
 
 
 def list_reports(
@@ -558,12 +558,12 @@ def list_reports(
                 reviewer_cache[report.reviewed_by] = reviewer.email if reviewer else None
             reviewer_name = reviewer_cache[report.reviewed_by]
         
-        # Get checklist title from translation
+        # Get checklist title in the requested language (fallback: default, then latest)
         checklist_title = None
-        if report.assessment.checklist and report.assessment.checklist.translations:
-            # Get the first translation (English if available)
-            translation = report.assessment.checklist.translations[0]
-            checklist_title = translation.title
+        if report.assessment.checklist:
+            translation = _checklist_translation_for_language(db, report.assessment.checklist.id, lang_code)
+            if translation and translation.title:
+                checklist_title = translation.title
         
         report_items.append({
             "id": str(report.id),
@@ -669,7 +669,7 @@ def publish_report(
         logger = logging.getLogger(__name__)
         logger.error(f"Failed to send report_published notification: {e}", exc_info=True)
 
-    return _serialize_report(db, report)
+    return _serialize_report(db, report, lang_code)
 
 
 def get_report_pdf_password(

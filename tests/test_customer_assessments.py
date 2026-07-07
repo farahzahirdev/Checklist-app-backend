@@ -492,3 +492,41 @@ class TestCustomerAssessmentAPI:
         assert data["success"] is True
         assert data["action_performed"] == "extend"
         assert data["updated_expires_at"] is not None
+
+    def test_expired_unstarted_purchase_stays_visible(self, db, customer_user, sample_checklist):
+        """A purchased checklist that was never started should appear as expired after access lapses."""
+        now = datetime.now(timezone.utc)
+        payment = Payment(
+            user_id=customer_user.id,
+            checklist_id=sample_checklist.id,
+            stripe_payment_intent_id=f"pi_{uuid4().hex}",
+            status=PaymentStatus.succeeded,
+            amount_cents=1000,
+            currency="USD",
+            paid_at=now - timedelta(days=10),
+        )
+        db.add(payment)
+        db.flush()
+
+        access_window = AccessWindow(
+            user_id=customer_user.id,
+            checklist_id=sample_checklist.id,
+            payment_id=payment.id,
+            activated_at=now - timedelta(days=10),
+            expires_at=now - timedelta(days=3),
+        )
+        db.add(access_window)
+        db.commit()
+
+        result = get_customer_assessments(db, customer_user.id)
+        assert result.total == 1
+        assert result.assessments[0].status == AssessmentStatus.expired
+        assert result.assessments[0].id == access_window.id
+        assert result.assessments[0].completion_percent == 0
+
+        expired_only = get_customer_assessments(
+            db,
+            customer_user.id,
+            status_filter=[AssessmentStatus.expired],
+        )
+        assert expired_only.total == 1
