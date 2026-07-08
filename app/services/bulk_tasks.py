@@ -166,14 +166,22 @@ def _filter_bulk_tasks(task_ids: List[str]) -> List[str]:
             is_bulk_task = False
             
             # Method 1: Check task name
-            if task_name and ('bulk_import' in task_name or 'create_checklist' in task_name):
+            if task_name and (
+                'bulk_import' in task_name
+                or 'create_checklist' in task_name
+                or 'replace_checklist' in task_name
+            ):
                 is_bulk_task = True
                 logger.info(f"✓ Identified bulk task by name: {task_id} ({task_name})")
             
             # Method 2: Check extracted name from Redis
             elif not task_name or task_name == 'None':
                 extracted_name = _extract_task_name_from_redis(task_id)
-                if extracted_name and ('bulk_import' in extracted_name or 'create_checklist' in extracted_name):
+                if extracted_name and (
+                    'bulk_import' in extracted_name
+                    or 'create_checklist' in extracted_name
+                    or 'replace_checklist' in extracted_name
+                ):
                     is_bulk_task = True
                     logger.info(f"✓ Identified bulk task from Redis: {task_id} ({extracted_name})")
                 else:
@@ -337,7 +345,11 @@ def _extract_task_name_from_redis(task_id: str) -> str:
                     if isinstance(exc_message, list) and len(exc_message) > 0:
                         # Task name is often in the exception message for NotRegistered errors
                         potential_name = exc_message[0]
-                        if 'bulk_import' in potential_name or 'create_checklist' in potential_name:
+                        if (
+                            'bulk_import' in potential_name
+                            or 'create_checklist' in potential_name
+                            or 'replace_checklist' in potential_name
+                        ):
                             return potential_name
                 
                 # Check if task_id contains the name

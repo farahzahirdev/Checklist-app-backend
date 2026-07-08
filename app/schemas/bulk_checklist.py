@@ -83,6 +83,15 @@ class BulkChecklistCreateRequest(BaseModel):
     checklist_type_code: str = Field(default="compliance")
 
 
+class BulkChecklistReplaceRequest(BaseModel):
+    """Request to replace an existing checklist's structure from a parsed file."""
+    file_content: bytes | str = Field(description="File content (base64 or raw)")
+    file_name: str
+    column_mapping: ColumnMapping
+    checklist_title: str | None = Field(default=None, max_length=255)
+    checklist_description: str | None = Field(default=None)
+
+
 class BulkChecklistCreateResponse(BaseModel):
     """Response after creating checklist from bulk import."""
     checklist_id: UUID | None

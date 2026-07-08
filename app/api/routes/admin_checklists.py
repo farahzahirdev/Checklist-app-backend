@@ -75,6 +75,7 @@ from app.schemas.bulk_checklist import (
     VerifyMappingResponse,
     BulkChecklistCreateRequest,
     BulkChecklistCreateResponse,
+    BulkChecklistReplaceRequest,
     BulkChecklistTaskResponse,
     BulkChecklistTaskStatusResponse,
     BulkTasksListResponse,
@@ -85,7 +86,7 @@ from app.services.bulk_checklist import (
     create_checklist_from_file,
 )
 from app.services.bulk_tasks import get_all_bulk_tasks, get_stuck_tasks
-from app.tasks.bulk_import import create_checklist_task
+from app.tasks.bulk_import import create_checklist_task, replace_checklist_task
 from app.celery_app import celery_app
 from app.utils.html_sanitizer import sanitize_html, sanitize_text
 
@@ -1289,6 +1290,55 @@ def create_from_file(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue bulk import task: {str(e)}"
+        )
+
+
+@router.post(
+    "/{checklist_id}/bulk/replace",
+    response_model=BulkChecklistTaskResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Replace Checklist Structure from File",
+    description=(
+        "Queue replacing sections and questions of an existing draft checklist from Excel/CSV. "
+        "Keeps the same checklist, Stripe product, and pricing. Blocked for published checklists "
+        "or checklists with assessments/payments."
+    ),
+)
+def replace_from_file(
+    checklist_id: UUID,
+    request: BulkChecklistReplaceRequest,
+    admin=Depends(require_admin_only()),
+) -> BulkChecklistTaskResponse:
+    """Queue checklist structure replacement from uploaded Excel/CSV in the background."""
+    try:
+        if isinstance(request.file_content, str):
+            try:
+                file_content = base64.b64decode(request.file_content)
+            except Exception:
+                file_content = request.file_content.encode("utf-8")
+        else:
+            file_content = request.file_content
+
+        task = replace_checklist_task.apply_async(
+            args=[
+                admin.id,
+                str(checklist_id),
+                base64.b64encode(file_content).decode("ascii"),
+                request.file_name,
+                request.column_mapping.model_dump(),
+                request.checklist_title,
+                request.checklist_description,
+            ]
+        )
+        return BulkChecklistTaskResponse(
+            task_id=str(task.id),
+            status="pending",
+            detail="Bulk checklist replace task queued.",
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to queue bulk replace task: {str(e)}"
         )
 
 

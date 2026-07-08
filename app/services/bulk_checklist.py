@@ -1,9 +1,13 @@
 """Service for bulk checklist creation from parsed files."""
+import re
 import uuid
 from typing import Optional
-from sqlalchemy import select
+from uuid import UUID
+
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
+from app.models.assessment import Assessment
 from app.models.checklist import (
     Checklist,
     ChecklistQuestion,
@@ -16,8 +20,7 @@ from app.models.checklist import (
     ChecklistTranslation,
     SeverityLevel,
 )
-import re
-import uuid
+from app.models.payment import Payment
 from app.models.reference import Language
 from app.models.user import User
 from app.schemas.bulk_checklist import (
@@ -268,6 +271,359 @@ def verify_mapping(
     )
 
 
+def _populate_checklist_from_rows(
+    db: Session,
+    *,
+    checklist: Checklist,
+    language: Language,
+    headers: list,
+    rows: list,
+    column_mapping: ColumnMapping,
+) -> tuple[int, int, int, list[str], int]:
+    """Create sections and questions from parsed rows. Returns counts and warnings."""
+    # Track created items and sections
+
+    # Helper for answer options with fixed labels
+    def build_answer_options(row):
+        answer_options = []
+        # Fixed labels as requested: Yes=4pts, Maybe=3pts, Sure=2pts, No=1pts
+        fixed_labels = {4: "Yes", 3: "Maybe", 2: "Sure", 1: "No"}
+
+        # Column keys in score-descending order (score 4 -> score 1)
+        col_keys = [
+            column_mapping.guidance_score_4_col,
+            column_mapping.guidance_score_3_col,
+            column_mapping.guidance_score_2_col,
+            column_mapping.guidance_score_1_col,
+        ]
+
+        # Position should be 1..4 (top-to-bottom in UI). Scores remain 4..1.
+        scores = [4, 3, 2, 1]
+        for idx, (score, col_key) in enumerate(zip(scores, col_keys)):
+            guidance_title = get_column_value(row, col_key, headers) if col_key else None
+            label = sanitize_text(guidance_title) if guidance_title else fixed_labels.get(score, f"Score {score}")
+            answer_options.append({
+                "position": idx + 1,
+                "label": label,
+                "score": score,
+                "description": None,
+            })
+        return answer_options
+
+    # ...existing code...
+    sections_map = {}  # section_name -> section_id
+    questions_map = {}  # section_id -> {parent_q_id -> question_id} (section-aware mapping)
+    sections_created = 0
+    questions_created = 0
+    sub_questions_created = 0
+    warnings = []
+    skipped_rows = 0
+    
+    # Process rows
+    for row_idx, row in enumerate(rows):
+        row_number = row.get('_row_number', row_idx + 2)
+        
+        try:
+            # Extract fields
+            section_name = get_column_value(row, column_mapping.section_name_col, headers) or ""
+            raw_question_id = get_column_value(row, column_mapping.question_id_col, headers) or ""
+            child_q_id = get_column_value(row, column_mapping.child_question_col, headers)
+            grandchild_q_id = get_column_value(row, column_mapping.grandchild_question_col, headers)
+            legal_req = get_column_value(row, column_mapping.legal_requirement_col, headers) or ""
+            question_text = get_column_value(row, column_mapping.question_text_col, headers) or ""
+            severity_text = get_column_value(row, column_mapping.severity_col, headers)
+            explanation = get_column_value(row, column_mapping.explanation_col, headers)
+            expected_impl = get_column_value(row, column_mapping.expected_implementation_col, headers)
+            source_ref = get_column_value(row, column_mapping.source_ref_col, headers)
+            
+            # Parse hierarchical question ID from single column
+            parent_q_id = ""
+            if raw_question_id:
+                # Check if it's a sub-question like "a)", "b)", "c)"
+                import re
+                if re.match(r'^[a-z]\)$', raw_question_id.strip()):
+                    # This is a sub-question, we need to find the parent
+                    # Look backwards in processed rows to find the last parent question
+                    child_q_id = raw_question_id.strip()
+                    # We'll find the parent later
+                else:
+                    # This is a parent question
+                    parent_q_id = raw_question_id.strip()
+                    child_q_id = None
+            
+            # Skip header rows (rows that have section name but no actual content)
+            if section_name and not legal_req and not question_text and (parent_q_id or child_q_id):
+                # This looks like a header row, skip it
+                skipped_rows += 1
+                warnings.append(f"Row {row_number}: Skipped - header row")
+                continue
+            
+            # Validate required fields - allow hierarchical questions
+            if not section_name or not legal_req or not question_text:
+                skipped_rows += 1
+                warnings.append(f"Row {row_number}: Skipped - missing required fields")
+                continue
+            
+            # For hierarchical questions, if we have child_q_id but no parent_q_id,
+            # find the most recent parent question in the same section
+            if not parent_q_id and child_q_id:
+                # Look backwards to find the last parent question in this section
+                found_parent = False
+                for prev_row_idx in range(row_idx - 1, -1, -1):
+                    prev_row = rows[prev_row_idx]
+                    prev_section = get_column_value(prev_row, column_mapping.section_name_col, headers) or ""
+                    prev_raw_q_id = get_column_value(prev_row, column_mapping.question_id_col, headers) or ""
+                    prev_legal_req = get_column_value(prev_row, column_mapping.legal_requirement_col, headers) or ""
+                    prev_question_text = get_column_value(prev_row, column_mapping.question_text_col, headers) or ""
+                    
+                    # Skip header rows and rows without actual content
+                    if prev_section and not prev_legal_req and not prev_question_text and (prev_raw_q_id or get_column_value(prev_row, column_mapping.child_question_col, headers)):
+                        continue
+                    
+                    if prev_section == section_name and prev_raw_q_id:
+                        # Check if previous row was a parent question (not a sub-question)
+                        import re
+                        if not re.match(r'^[a-z]\)$', prev_raw_q_id.strip()):
+                            parent_q_id = prev_raw_q_id.strip()
+                            found_parent = True
+                            break
+                
+                if not found_parent:
+                    skipped_rows += 1
+                    warnings.append(f"Row {row_number}: Skipped - could not find parent question for sub-question {child_q_id}")
+                    continue
+            elif not parent_q_id:
+                skipped_rows += 1
+                warnings.append(f"Row {row_number}: Skipped - missing parent question ID")
+                continue
+            
+            # Normalize severity
+            severity = _normalize_severity(severity_text) or SeverityLevel.low
+            
+            # Create or get section
+            if section_name not in sections_map:
+                display_order = len(sections_map) + 1
+                section = ChecklistSection(
+                    checklist_id=checklist.id,
+                    section_code=f"SEC-{display_order}",
+                    source_ref=source_ref,
+                    display_order=display_order,
+                )
+                db.add(section)
+                db.flush()
+                db.add(ChecklistSectionTranslation(
+                    section_id=section.id,
+                    language_id=language.id,
+                    title=sanitize_text(section_name) or section_name,
+                ))
+                sections_map[section_name] = section.id
+                sections_created += 1
+            section_id = sections_map[section_name]
+
+            # Initialize section-specific questions map if not exists
+            if section_id not in questions_map:
+                questions_map[section_id] = {}
+
+            # Build answer options for this row
+            answer_options = build_answer_options(row)
+
+            # Create parent question if this is a new parent ID
+            parent_question_id = None
+            if parent_q_id not in questions_map[section_id]:
+                parent_question = ChecklistQuestion(
+                    checklist_id=checklist.id,
+                    section_id=section_id,
+                    parent_question_id=None,
+                    question_code=parent_q_id,
+                    audit_type="compliance",
+                    points=1,
+                    answer_logic="answer_only",
+                    severity=severity,
+                    report_domain=None,
+                    report_chapter=None,
+                    illustrative_image_id=None,
+                    note_for_user=None,
+                    note_enabled=True,
+                    evidence_enabled=True,
+                    display_order=len([q for q in db.scalars(
+                        select(ChecklistQuestion).where(
+                            ChecklistQuestion.section_id == section_id
+                        )
+                    ).all()]) + 1,
+                    is_active=True,
+                )
+                db.add(parent_question)
+                db.flush()
+                db.add(ChecklistQuestionTranslation(
+                    question_id=parent_question.id,
+                    language_id=language.id,
+                    question_text=question_text,
+                    legal_requirement_title="",  # Empty title as requested
+                    legal_requirement_description=legal_req,  # Store text in description
+                    explanation=explanation,
+                    expected_implementation=sanitize_html(expected_impl),
+                ))
+                # Add answer options for parent question
+                for opt in answer_options:
+                    db.add(ChecklistQuestionAnswerOption(
+                        question_id=parent_question.id,
+                        position=opt["position"],
+                        label=opt["label"],
+                        score=opt["score"],
+                        description=opt["description"],
+                    ))
+                questions_map[section_id][parent_q_id] = parent_question.id
+                questions_created += 1
+            else:
+                parent_question_id = questions_map[section_id][parent_q_id]
+
+            # Create child question if specified
+            if child_q_id:
+                child_key = f"{parent_q_id}|{child_q_id}"
+                if child_key not in questions_map[section_id]:
+                    child_question = ChecklistQuestion(
+                        checklist_id=checklist.id,
+                        section_id=section_id,
+                        parent_question_id=questions_map[section_id][parent_q_id],
+                        question_code=child_q_id,  # Back to simple: "a)", "b)", "c)"
+                        audit_type="compliance",
+                        points=1,
+                        answer_logic="answer_only",
+                        severity=severity,
+                        report_domain=None,
+                        report_chapter=None,
+                        illustrative_image_id=None,
+                        note_for_user=None,
+                        note_enabled=True,
+                        evidence_enabled=True,
+                        display_order=len([q for q in db.scalars(
+                            select(ChecklistQuestion).where(
+                                ChecklistQuestion.section_id == section_id
+                            )
+                        ).all()]) + 1,
+                        is_active=True,
+                    )
+                    db.add(child_question)
+                    db.flush()
+                    db.add(ChecklistQuestionTranslation(
+                        question_id=child_question.id,
+                        language_id=language.id,
+                        question_text=question_text,
+                        legal_requirement_title="",  # Empty title as requested
+                        legal_requirement_description=legal_req,  # Store text in description
+                        explanation=explanation,
+                        expected_implementation=sanitize_html(expected_impl),
+                    ))
+                    # Add answer options for child question
+                    for opt in answer_options:
+                        db.add(ChecklistQuestionAnswerOption(
+                            question_id=child_question.id,
+                            position=opt["position"],
+                            label=opt["label"],
+                            score=opt["score"],
+                            description=opt["description"],
+                        ))
+                    questions_map[section_id][child_key] = child_question.id
+                    sub_questions_created += 1
+
+            # Create grandchild question if specified
+            if grandchild_q_id and child_q_id:
+                grandchild_key = f"{parent_q_id}|{child_q_id}|{grandchild_q_id}"
+                if grandchild_key not in questions_map[section_id]:
+                    child_parent_id = questions_map[section_id].get(f"{parent_q_id}|{child_q_id}")
+                    if child_parent_id:
+                        grandchild_question = ChecklistQuestion(
+                            checklist_id=checklist.id,
+                            section_id=section_id,
+                            parent_question_id=child_parent_id,
+                            question_code=grandchild_q_id,  # Back to simple: "i)", "ii)", etc.
+                            audit_type="compliance",
+                            points=1,
+                            answer_logic="answer_only",
+                            severity=severity,
+                            report_domain=None,
+                            report_chapter=None,
+                            illustrative_image_id=None,
+                            note_for_user=None,
+                            note_enabled=True,
+                            evidence_enabled=True,
+                            display_order=len([q for q in db.scalars(
+                                select(ChecklistQuestion).where(
+                                    ChecklistQuestion.section_id == section_id
+                                )
+                            ).all()]) + 1,
+                            is_active=True,
+                        )
+                        db.add(grandchild_question)
+                        db.flush()
+                        db.add(ChecklistQuestionTranslation(
+                            question_id=grandchild_question.id,
+                            language_id=language.id,
+                            question_text=question_text,
+                            legal_requirement_title="",  # Empty title as requested
+                            legal_requirement_description=legal_req,  # Store text in description
+                            explanation=explanation,
+                            expected_implementation=sanitize_html(expected_impl),
+                        ))
+                        # Add answer options for grandchild question
+                        for opt in answer_options:
+                            db.add(ChecklistQuestionAnswerOption(
+                                question_id=grandchild_question.id,
+                                position=opt["position"],
+                                label=opt["label"],
+                                score=opt["score"],
+                                description=opt["description"],
+                            ))
+                        questions_map[section_id][grandchild_key] = grandchild_question.id
+                        sub_questions_created += 1
+            
+        except Exception as e:
+            skipped_rows += 1
+            warnings.append(f"Row {row_number}: {str(e)}")
+            continue
+    
+    return sections_created, questions_created, sub_questions_created, warnings, skipped_rows
+
+
+def _assert_checklist_replaceable(db: Session, checklist: Checklist) -> None:
+    """Raise BulkImportError if checklist structure cannot safely be replaced."""
+    if checklist.status != ChecklistStatus.draft:
+        raise BulkImportError(
+            f"Only draft checklists can be replaced from a file (current status: {checklist.status})."
+        )
+
+    assessment_count = db.scalar(
+        select(func.count(Assessment.id)).where(Assessment.checklist_id == checklist.id)
+    ) or 0
+    if assessment_count > 0:
+        raise BulkImportError(
+            f"Cannot replace checklist with {assessment_count} associated assessment(s). "
+            "Create a new checklist instead."
+        )
+
+    payment_count = db.scalar(
+        select(func.count(Payment.id)).where(Payment.checklist_id == checklist.id)
+    ) or 0
+    if payment_count > 0:
+        raise BulkImportError(
+            f"Cannot replace checklist with {payment_count} associated payment(s). "
+            "Create a new checklist instead."
+        )
+
+
+def _clear_checklist_structure(db: Session, checklist_id: UUID) -> None:
+    """Delete all sections and questions for a checklist (cascade removes translations/options)."""
+    # Break self-referential parent links before bulk delete.
+    db.execute(
+        update(ChecklistQuestion)
+        .where(ChecklistQuestion.checklist_id == checklist_id)
+        .values(parent_question_id=None)
+    )
+    db.execute(delete(ChecklistQuestion).where(ChecklistQuestion.checklist_id == checklist_id))
+    db.execute(delete(ChecklistSection).where(ChecklistSection.checklist_id == checklist_id))
+    db.flush()
+
+
 def create_checklist_from_file(
     db: Session,
     actor: User | int,
@@ -336,307 +692,17 @@ def create_checklist_from_file(
             title=checklist_title,
             description=checklist_description or "",
         ))
-        
-        # Track created items and sections
 
-        # Helper for answer options with fixed labels
-        def build_answer_options(row):
-            answer_options = []
-            # Fixed labels as requested: Yes=4pts, Maybe=3pts, Sure=2pts, No=1pts
-            fixed_labels = {4: "Yes", 3: "Maybe", 2: "Sure", 1: "No"}
-
-            # Column keys in score-descending order (score 4 -> score 1)
-            col_keys = [
-                column_mapping.guidance_score_4_col,
-                column_mapping.guidance_score_3_col,
-                column_mapping.guidance_score_2_col,
-                column_mapping.guidance_score_1_col,
-            ]
-
-            # Position should be 1..4 (top-to-bottom in UI). Scores remain 4..1.
-            scores = [4, 3, 2, 1]
-            for idx, (score, col_key) in enumerate(zip(scores, col_keys)):
-                guidance_title = get_column_value(row, col_key, headers) if col_key else None
-                label = sanitize_text(guidance_title) if guidance_title else fixed_labels.get(score, f"Score {score}")
-                answer_options.append({
-                    "position": idx + 1,
-                    "label": label,
-                    "score": score,
-                    "description": None,
-                })
-            return answer_options
-
-        # ...existing code...
-        sections_map = {}  # section_name -> section_id
-        questions_map = {}  # section_id -> {parent_q_id -> question_id} (section-aware mapping)
-        sections_created = 0
-        questions_created = 0
-        sub_questions_created = 0
-        warnings = []
-        skipped_rows = 0
-        
-        # Process rows
-        for row_idx, row in enumerate(rows):
-            row_number = row.get('_row_number', row_idx + 2)
-            
-            try:
-                # Extract fields
-                section_name = get_column_value(row, column_mapping.section_name_col, headers) or ""
-                raw_question_id = get_column_value(row, column_mapping.question_id_col, headers) or ""
-                child_q_id = get_column_value(row, column_mapping.child_question_col, headers)
-                grandchild_q_id = get_column_value(row, column_mapping.grandchild_question_col, headers)
-                legal_req = get_column_value(row, column_mapping.legal_requirement_col, headers) or ""
-                question_text = get_column_value(row, column_mapping.question_text_col, headers) or ""
-                severity_text = get_column_value(row, column_mapping.severity_col, headers)
-                explanation = get_column_value(row, column_mapping.explanation_col, headers)
-                expected_impl = get_column_value(row, column_mapping.expected_implementation_col, headers)
-                source_ref = get_column_value(row, column_mapping.source_ref_col, headers)
-                
-                # Parse hierarchical question ID from single column
-                parent_q_id = ""
-                if raw_question_id:
-                    # Check if it's a sub-question like "a)", "b)", "c)"
-                    import re
-                    if re.match(r'^[a-z]\)$', raw_question_id.strip()):
-                        # This is a sub-question, we need to find the parent
-                        # Look backwards in processed rows to find the last parent question
-                        child_q_id = raw_question_id.strip()
-                        # We'll find the parent later
-                    else:
-                        # This is a parent question
-                        parent_q_id = raw_question_id.strip()
-                        child_q_id = None
-                
-                # Skip header rows (rows that have section name but no actual content)
-                if section_name and not legal_req and not question_text and (parent_q_id or child_q_id):
-                    # This looks like a header row, skip it
-                    skipped_rows += 1
-                    warnings.append(f"Row {row_number}: Skipped - header row")
-                    continue
-                
-                # Validate required fields - allow hierarchical questions
-                if not section_name or not legal_req or not question_text:
-                    skipped_rows += 1
-                    warnings.append(f"Row {row_number}: Skipped - missing required fields")
-                    continue
-                
-                # For hierarchical questions, if we have child_q_id but no parent_q_id,
-                # find the most recent parent question in the same section
-                if not parent_q_id and child_q_id:
-                    # Look backwards to find the last parent question in this section
-                    found_parent = False
-                    for prev_row_idx in range(row_idx - 1, -1, -1):
-                        prev_row = rows[prev_row_idx]
-                        prev_section = get_column_value(prev_row, column_mapping.section_name_col, headers) or ""
-                        prev_raw_q_id = get_column_value(prev_row, column_mapping.question_id_col, headers) or ""
-                        prev_legal_req = get_column_value(prev_row, column_mapping.legal_requirement_col, headers) or ""
-                        prev_question_text = get_column_value(prev_row, column_mapping.question_text_col, headers) or ""
-                        
-                        # Skip header rows and rows without actual content
-                        if prev_section and not prev_legal_req and not prev_question_text and (prev_raw_q_id or get_column_value(prev_row, column_mapping.child_question_col, headers)):
-                            continue
-                        
-                        if prev_section == section_name and prev_raw_q_id:
-                            # Check if previous row was a parent question (not a sub-question)
-                            import re
-                            if not re.match(r'^[a-z]\)$', prev_raw_q_id.strip()):
-                                parent_q_id = prev_raw_q_id.strip()
-                                found_parent = True
-                                break
-                    
-                    if not found_parent:
-                        skipped_rows += 1
-                        warnings.append(f"Row {row_number}: Skipped - could not find parent question for sub-question {child_q_id}")
-                        continue
-                elif not parent_q_id:
-                    skipped_rows += 1
-                    warnings.append(f"Row {row_number}: Skipped - missing parent question ID")
-                    continue
-                
-                # Normalize severity
-                severity = _normalize_severity(severity_text) or SeverityLevel.low
-                
-                # Create or get section
-                if section_name not in sections_map:
-                    display_order = len(sections_map) + 1
-                    section = ChecklistSection(
-                        checklist_id=checklist.id,
-                        section_code=f"SEC-{display_order}",
-                        source_ref=source_ref,
-                        display_order=display_order,
-                    )
-                    db.add(section)
-                    db.flush()
-                    db.add(ChecklistSectionTranslation(
-                        section_id=section.id,
-                        language_id=language.id,
-                        title=sanitize_text(section_name) or section_name,
-                    ))
-                    sections_map[section_name] = section.id
-                    sections_created += 1
-                section_id = sections_map[section_name]
-
-                # Initialize section-specific questions map if not exists
-                if section_id not in questions_map:
-                    questions_map[section_id] = {}
-
-                # Build answer options for this row
-                answer_options = build_answer_options(row)
-
-                # Create parent question if this is a new parent ID
-                parent_question_id = None
-                if parent_q_id not in questions_map[section_id]:
-                    parent_question = ChecklistQuestion(
-                        checklist_id=checklist.id,
-                        section_id=section_id,
-                        parent_question_id=None,
-                        question_code=parent_q_id,
-                        audit_type="compliance",
-                        points=1,
-                        answer_logic="answer_only",
-                        severity=severity,
-                        report_domain=None,
-                        report_chapter=None,
-                        illustrative_image_id=None,
-                        note_for_user=None,
-                        note_enabled=True,
-                        evidence_enabled=True,
-                        display_order=len([q for q in db.scalars(
-                            select(ChecklistQuestion).where(
-                                ChecklistQuestion.section_id == section_id
-                            )
-                        ).all()]) + 1,
-                        is_active=True,
-                    )
-                    db.add(parent_question)
-                    db.flush()
-                    db.add(ChecklistQuestionTranslation(
-                        question_id=parent_question.id,
-                        language_id=language.id,
-                        question_text=question_text,
-                        legal_requirement_title="",  # Empty title as requested
-                        legal_requirement_description=legal_req,  # Store text in description
-                        explanation=explanation,
-                        expected_implementation=sanitize_html(expected_impl),
-                    ))
-                    # Add answer options for parent question
-                    for opt in answer_options:
-                        db.add(ChecklistQuestionAnswerOption(
-                            question_id=parent_question.id,
-                            position=opt["position"],
-                            label=opt["label"],
-                            score=opt["score"],
-                            description=opt["description"],
-                        ))
-                    questions_map[section_id][parent_q_id] = parent_question.id
-                    questions_created += 1
-                else:
-                    parent_question_id = questions_map[section_id][parent_q_id]
-
-                # Create child question if specified
-                if child_q_id:
-                    child_key = f"{parent_q_id}|{child_q_id}"
-                    if child_key not in questions_map[section_id]:
-                        child_question = ChecklistQuestion(
-                            checklist_id=checklist.id,
-                            section_id=section_id,
-                            parent_question_id=questions_map[section_id][parent_q_id],
-                            question_code=child_q_id,  # Back to simple: "a)", "b)", "c)"
-                            audit_type="compliance",
-                            points=1,
-                            answer_logic="answer_only",
-                            severity=severity,
-                            report_domain=None,
-                            report_chapter=None,
-                            illustrative_image_id=None,
-                            note_for_user=None,
-                            note_enabled=True,
-                            evidence_enabled=True,
-                            display_order=len([q for q in db.scalars(
-                                select(ChecklistQuestion).where(
-                                    ChecklistQuestion.section_id == section_id
-                                )
-                            ).all()]) + 1,
-                            is_active=True,
-                        )
-                        db.add(child_question)
-                        db.flush()
-                        db.add(ChecklistQuestionTranslation(
-                            question_id=child_question.id,
-                            language_id=language.id,
-                            question_text=question_text,
-                            legal_requirement_title="",  # Empty title as requested
-                            legal_requirement_description=legal_req,  # Store text in description
-                            explanation=explanation,
-                            expected_implementation=sanitize_html(expected_impl),
-                        ))
-                        # Add answer options for child question
-                        for opt in answer_options:
-                            db.add(ChecklistQuestionAnswerOption(
-                                question_id=child_question.id,
-                                position=opt["position"],
-                                label=opt["label"],
-                                score=opt["score"],
-                                description=opt["description"],
-                            ))
-                        questions_map[section_id][child_key] = child_question.id
-                        sub_questions_created += 1
-
-                # Create grandchild question if specified
-                if grandchild_q_id and child_q_id:
-                    grandchild_key = f"{parent_q_id}|{child_q_id}|{grandchild_q_id}"
-                    if grandchild_key not in questions_map[section_id]:
-                        child_parent_id = questions_map[section_id].get(f"{parent_q_id}|{child_q_id}")
-                        if child_parent_id:
-                            grandchild_question = ChecklistQuestion(
-                                checklist_id=checklist.id,
-                                section_id=section_id,
-                                parent_question_id=child_parent_id,
-                                question_code=grandchild_q_id,  # Back to simple: "i)", "ii)", etc.
-                                audit_type="compliance",
-                                points=1,
-                                answer_logic="answer_only",
-                                severity=severity,
-                                report_domain=None,
-                                report_chapter=None,
-                                illustrative_image_id=None,
-                                note_for_user=None,
-                                note_enabled=True,
-                                evidence_enabled=True,
-                                display_order=len([q for q in db.scalars(
-                                    select(ChecklistQuestion).where(
-                                        ChecklistQuestion.section_id == section_id
-                                    )
-                                ).all()]) + 1,
-                                is_active=True,
-                            )
-                            db.add(grandchild_question)
-                            db.flush()
-                            db.add(ChecklistQuestionTranslation(
-                                question_id=grandchild_question.id,
-                                language_id=language.id,
-                                question_text=question_text,
-                                legal_requirement_title="",  # Empty title as requested
-                                legal_requirement_description=legal_req,  # Store text in description
-                                explanation=explanation,
-                                expected_implementation=sanitize_html(expected_impl),
-                            ))
-                            # Add answer options for grandchild question
-                            for opt in answer_options:
-                                db.add(ChecklistQuestionAnswerOption(
-                                    question_id=grandchild_question.id,
-                                    position=opt["position"],
-                                    label=opt["label"],
-                                    score=opt["score"],
-                                    description=opt["description"],
-                                ))
-                            questions_map[section_id][grandchild_key] = grandchild_question.id
-                            sub_questions_created += 1
-                
-            except Exception as e:
-                skipped_rows += 1
-                warnings.append(f"Row {row_number}: {str(e)}")
-                continue
+        sections_created, questions_created, sub_questions_created, warnings, skipped_rows = (
+            _populate_checklist_from_rows(
+                db,
+                checklist=checklist,
+                language=language,
+                headers=headers,
+                rows=rows,
+                column_mapping=column_mapping,
+            )
+        )
         
         db.commit()
         db.refresh(checklist)
@@ -707,4 +773,211 @@ def create_checklist_from_file(
             warnings=[str(e)],
             status="failed",
             message=f"Failed to create checklist: {str(e)}",
+        )
+
+def replace_checklist_from_file(
+    db: Session,
+    actor: User | int,
+    checklist_id: UUID | str,
+    file_content: bytes | str,
+    file_name: str,
+    column_mapping: ColumnMapping,
+    checklist_title: Optional[str] = None,
+    checklist_description: Optional[str] = None,
+) -> BulkChecklistCreateResponse:
+    """
+    Replace sections/questions of an existing draft checklist from an Excel/CSV file.
+
+    Keeps the same checklist_id, Stripe product, and catalog product. Blocked when the
+    checklist is published/archived or has assessments/payments.
+    """
+    checklist = db.get(Checklist, checklist_id)
+    title_for_response = checklist_title or ""
+
+    if checklist is None:
+        return BulkChecklistCreateResponse(
+            checklist_id=None,
+            checklist_title=title_for_response or str(checklist_id),
+            sections_created=0,
+            questions_created=0,
+            sub_questions_created=0,
+            total_rows_processed=0,
+            warnings=[f"Checklist not found: {checklist_id}"],
+            status="failed",
+            message=f"Checklist not found: {checklist_id}",
+        )
+
+    # Prefer existing title if caller did not override
+    existing_translation = db.scalar(
+        select(ChecklistTranslation).where(ChecklistTranslation.checklist_id == checklist.id)
+    )
+    if not title_for_response and existing_translation:
+        title_for_response = existing_translation.title or ""
+
+    try:
+        _assert_checklist_replaceable(db, checklist)
+    except BulkImportError as e:
+        return BulkChecklistCreateResponse(
+            checklist_id=checklist.id,
+            checklist_title=title_for_response,
+            sections_created=0,
+            questions_created=0,
+            sub_questions_created=0,
+            total_rows_processed=0,
+            warnings=[str(e)],
+            status="failed",
+            message=str(e),
+        )
+
+    try:
+        headers, rows = parse_file(file_content, file_name)
+    except FileParseError as e:
+        return BulkChecklistCreateResponse(
+            checklist_id=checklist.id,
+            checklist_title=title_for_response,
+            sections_created=0,
+            questions_created=0,
+            sub_questions_created=0,
+            total_rows_processed=0,
+            warnings=[f"File parsing failed: {str(e)}"],
+            status="failed",
+            message=f"Failed to parse file: {str(e)}",
+        )
+
+    if not rows:
+        return BulkChecklistCreateResponse(
+            checklist_id=checklist.id,
+            checklist_title=title_for_response,
+            sections_created=0,
+            questions_created=0,
+            sub_questions_created=0,
+            total_rows_processed=0,
+            warnings=["File contains no data rows"],
+            status="failed",
+            message="File contains no data rows",
+        )
+
+    try:
+        actor_id = actor.id if hasattr(actor, "id") else actor
+        language = _get_or_create_language(db)
+
+        # Snapshot before clear for audit
+        before_sections = db.scalar(
+            select(func.count(ChecklistSection.id)).where(ChecklistSection.checklist_id == checklist.id)
+        ) or 0
+        before_questions = db.scalar(
+            select(func.count(ChecklistQuestion.id)).where(ChecklistQuestion.checklist_id == checklist.id)
+        ) or 0
+
+        _clear_checklist_structure(db, checklist.id)
+
+        # Update optional metadata on primary translation
+        if checklist_title or checklist_description is not None:
+            translation = db.scalar(
+                select(ChecklistTranslation).where(
+                    ChecklistTranslation.checklist_id == checklist.id,
+                    ChecklistTranslation.language_id == language.id,
+                )
+            )
+            if translation is None:
+                translation = ChecklistTranslation(
+                    checklist_id=checklist.id,
+                    language_id=language.id,
+                    title=checklist_title or title_for_response or "Checklist",
+                    description=checklist_description or "",
+                )
+                db.add(translation)
+            else:
+                if checklist_title:
+                    translation.title = checklist_title
+                    title_for_response = checklist_title
+                if checklist_description is not None:
+                    translation.description = checklist_description
+                db.add(translation)
+            if checklist_title and checklist.checklist_type:
+                checklist.checklist_type.name = checklist_title
+                if checklist_description is not None:
+                    checklist.checklist_type.description = checklist_description
+
+        sections_created, questions_created, sub_questions_created, warnings, skipped_rows = (
+            _populate_checklist_from_rows(
+                db,
+                checklist=checklist,
+                language=language,
+                headers=headers,
+                rows=rows,
+                column_mapping=column_mapping,
+            )
+        )
+
+        checklist.updated_by = actor_id
+        checklist.increment_version()
+        db.add(checklist)
+        db.commit()
+        db.refresh(checklist)
+
+        if not title_for_response:
+            refreshed_tr = db.scalar(
+                select(ChecklistTranslation).where(ChecklistTranslation.checklist_id == checklist.id)
+            )
+            title_for_response = (refreshed_tr.title if refreshed_tr else "") or str(checklist.id)
+
+        try:
+            AuditLogger.log_checklist_action(
+                db=db,
+                actor_user_id=actor_id,
+                action="checklist_version_update",
+                target_id=checklist.id,
+                before_json={
+                    "sections": before_sections,
+                    "questions": before_questions,
+                },
+                after_json={
+                    "title": title_for_response,
+                    "sections_created": sections_created,
+                    "questions_created": questions_created,
+                    "sub_questions_created": sub_questions_created,
+                    "file_name": file_name,
+                    "version": checklist.version,
+                },
+                changes_summary=(
+                    f"Replaced checklist structure from file: {title_for_response} "
+                    f"({sections_created} sections, {questions_created + sub_questions_created} questions)"
+                ),
+            )
+        except Exception as e:
+            print(f"Error creating audit log for checklist replace {checklist.id}: {e}")
+
+        status = "success"
+        message = (
+            f"Replaced checklist with {sections_created} sections and "
+            f"{questions_created + sub_questions_created} questions"
+        )
+        if warnings:
+            status = "success_with_warnings"
+            message += f" ({skipped_rows} rows skipped with warnings)"
+
+        return BulkChecklistCreateResponse(
+            checklist_id=checklist.id,
+            checklist_title=title_for_response,
+            sections_created=sections_created,
+            questions_created=questions_created,
+            sub_questions_created=sub_questions_created,
+            total_rows_processed=len(rows),
+            warnings=warnings,
+            status=status,
+            message=message,
+        )
+    except Exception as e:
+        db.rollback()
+        return BulkChecklistCreateResponse(
+            checklist_id=checklist.id,
+            checklist_title=title_for_response,
+            sections_created=0,
+            questions_created=0,
+            sub_questions_created=0,
+            total_rows_processed=len(rows) if rows else 0,
+            warnings=[str(e)],
+            status="failed",
+            message=f"Failed to replace checklist: {str(e)}",
         )

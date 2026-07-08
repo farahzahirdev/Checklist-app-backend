@@ -309,6 +309,26 @@ class TestBulkChecklistTaskSchemas:
         assert response.task_id == "1234"
         assert response.status == "pending"
 
+    def test_replace_request_schema(self):
+        from app.schemas.bulk_checklist import BulkChecklistReplaceRequest
+
+        mapping = ColumnMapping(
+            section_name_col="Section",
+            question_id_col="Question ID",
+            legal_requirement_col="Legal Requirement",
+            question_text_col="Question Text",
+            severity_col="Severity",
+        )
+        request = BulkChecklistReplaceRequest(
+            file_content="base64data",
+            file_name="fix.xlsx",
+            column_mapping=mapping,
+            checklist_title="Updated title",
+        )
+        assert request.file_name == "fix.xlsx"
+        assert request.checklist_title == "Updated title"
+        assert request.column_mapping.section_name_col == "Section"
+
     def test_task_status_response_schema_with_result(self):
         result = BulkChecklistCreateResponse(
             checklist_id=uuid4(),
