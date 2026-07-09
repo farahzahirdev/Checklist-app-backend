@@ -214,6 +214,45 @@ def _pricing_for_product(db: Session, product: Product) -> ProductPricingInfo | 
     )
 
 
+def _is_document_media(media: Media) -> bool:
+    return str(media.media_type) == MediaType.document.value
+
+
+def _sync_product_documentation_files(db: Session, product: Product, documentation_files: list) -> None:
+    new_media_ids: list[uuid.UUID] = []
+    for doc in documentation_files:
+        media_id = _extract_uuid_from_url(doc.url)
+        if media_id is None:
+            continue
+        media_exists = db.scalar(select(Media.id).where(Media.id == media_id))
+        if media_exists:
+            new_media_ids.append(media_id)
+
+    existing_pms = {pm.media_id: pm for pm in product.media_files}
+    pms_to_keep: list[ProductMedia] = []
+
+    for index, media_id in enumerate(new_media_ids):
+        if media_id in existing_pms:
+            pm = existing_pms[media_id]
+            pm.display_order = index
+            pms_to_keep.append(pm)
+        else:
+            new_pm = ProductMedia(
+                product_id=product.id,
+                media_id=media_id,
+                display_order=index,
+            )
+            db.add(new_pm)
+            pms_to_keep.append(new_pm)
+
+    for pm in list(product.media_files):
+        if pm not in pms_to_keep:
+            db.delete(pm)
+
+    product.media_files = pms_to_keep
+    db.flush()
+
+
 def _build_documentation_files(db: Session, product: Product) -> list[ProductDocumentationFile]:
     """Build documentation files list from product media relationships."""
     if not product.media_files:
@@ -222,7 +261,7 @@ def _build_documentation_files(db: Session, product: Product) -> list[ProductDoc
     documentation_files = []
     for product_media in sorted(product.media_files, key=lambda pm: pm.display_order):
         media = product_media.media
-        if media and media.media_type == MediaType.document:
+        if media and _is_document_media(media):
             # Determine file type from mime type
             file_type = "docx" if "docx" in media.mime_type.lower() else "pdf"
             
@@ -327,7 +366,9 @@ def list_admin_products(
         query = query.where(search_filter)
         count_query = count_query.where(search_filter)
 
-    products = db.execute(query.order_by(Product.display_order.asc(), Product.created_at.desc()).offset(skip).limit(limit)).unique().scalars().all()
+    products = db.execute(
+        query.order_by(Product.updated_at.desc(), Product.created_at.desc()).offset(skip).limit(limit)
+    ).unique().scalars().all()
     total = db.scalar(count_query) or 0
     return total, [to_admin_product_response(db, product) for product in products]
 
@@ -460,19 +501,8 @@ def create_product(db: Session, *, payload, actor_id: uuid.UUID | None = None) -
     db.add(product)
     db.flush()
 
-    if getattr(payload, "documentation_files", None) is not None:
-        for index, doc in enumerate(payload.documentation_files):
-            media_id = _extract_uuid_from_url(doc.url)
-            if media_id:
-                media_exists = db.scalar(select(Media.id).where(Media.id == media_id))
-                if media_exists:
-                    new_pm = ProductMedia(
-                        product_id=product.id,
-                        media_id=media_id,
-                        display_order=index,
-                    )
-                    db.add(new_pm)
-        db.flush()
+    if payload.documentation_files is not None:
+        _sync_product_documentation_files(db, product, payload.documentation_files)
 
     return product
 
@@ -526,40 +556,8 @@ def update_product(db: Session, product: Product, *, payload) -> Product:
     if "cta_label" in provided_fields:
         product.cta_label = payload.cta_label
 
-    if getattr(payload, "documentation_files", None) is not None:
-        new_media_ids = []
-        for doc in payload.documentation_files:
-            media_id = _extract_uuid_from_url(doc.url)
-            if media_id:
-                new_media_ids.append(media_id)
-
-        existing_pms = {pm.media_id: pm for pm in product.media_files}
-        pms_to_keep = []
-
-        for index, media_id in enumerate(new_media_ids):
-            media_exists = db.scalar(select(Media.id).where(Media.id == media_id))
-            if not media_exists:
-                continue
-
-            if media_id in existing_pms:
-                pm = existing_pms[media_id]
-                pm.display_order = index
-                pms_to_keep.append(pm)
-            else:
-                new_pm = ProductMedia(
-                    product_id=product.id,
-                    media_id=media_id,
-                    display_order=index,
-                )
-                db.add(new_pm)
-                pms_to_keep.append(new_pm)
-
-        for pm in list(product.media_files):
-            if pm not in pms_to_keep:
-                db.delete(pm)
-
-        product.media_files = pms_to_keep
-        db.flush()
+    if "documentation_files" in provided_fields and payload.documentation_files is not None:
+        _sync_product_documentation_files(db, product, payload.documentation_files)
 
     return product
 
@@ -601,7 +599,12 @@ def list_public_catalog(db: Session) -> PublicProductCatalogResponse:
     ).all()
     products = db.scalars(
         select(Product)
-        .options(joinedload(Product.category), joinedload(Product.checklist), joinedload(Product.checklist_type))
+        .options(
+            joinedload(Product.category),
+            joinedload(Product.checklist),
+            joinedload(Product.checklist_type),
+            joinedload(Product.media_files).joinedload(ProductMedia.media),
+        )
         .where(Product.status.in_([ProductStatus.published.value, ProductStatus.coming_soon.value]))
         .order_by(Product.display_order.asc(), Product.created_at.asc())
     ).all()

@@ -1,4 +1,5 @@
 from app.models.checklist import ChecklistStatus
+from app.models.media import Media, MediaType, MalwareScanStatus
 
 
 API_PREFIX = "/api/api/v1"
@@ -132,6 +133,80 @@ def test_admin_create_update_get_documentation_product_with_checklist_type(clien
     )
     assert clear_response.status_code == 200
     assert clear_response.json()["short_description"] is None
+
+
+def test_admin_product_documentation_files_external_url_and_cta(client, db, admin_token, admin_user):
+    media = Media(
+        filename="doc.pdf",
+        original_filename="policy.pdf",
+        mime_type="application/pdf",
+        file_size_bytes=1024,
+        file_path="uploads/media/doc.pdf",
+        media_type=MediaType.document,
+        sha256="abc123",
+        scan_status=MalwareScanStatus.clean,
+        encryption_status="unencrypted",
+        uploaded_by=admin_user.id,
+    )
+    db.add(media)
+    db.commit()
+    db.refresh(media)
+
+    create_response = client.post(
+        f"{API_PREFIX}/admin/products",
+        headers=_admin_headers(admin_token),
+        json={
+            "category_code": "documentation",
+            "name": "Policy Pack",
+            "product_kind": "documentation",
+            "status": "published",
+            "external_url": "https://example.com/buy",
+            "cta_label": "Purchase now",
+            "documentation_files": [
+                {
+                    "url": f"/media/{media.id}/direct",
+                    "filename": "policy.pdf",
+                    "file_type": "pdf",
+                }
+            ],
+        },
+    )
+    assert create_response.status_code == 201
+    created = create_response.json()
+    assert created["external_url"] == "https://example.com/buy"
+    assert created["cta_label"] == "Purchase now"
+    assert len(created["documentation_files"]) == 1
+    assert created["documentation_files"][0]["filename"] == "policy.pdf"
+
+    get_response = client.get(
+        f"{API_PREFIX}/admin/products/{created['id']}",
+        headers=_admin_headers(admin_token),
+    )
+    assert get_response.status_code == 200
+    fetched = get_response.json()
+    assert len(fetched["documentation_files"]) == 1
+
+    update_response = client.patch(
+        f"{API_PREFIX}/admin/products/{created['id']}",
+        headers=_admin_headers(admin_token),
+        json={
+            "external_url": "https://example.com/updated",
+            "cta_label": "Buy updated",
+            "documentation_files": [],
+        },
+    )
+    assert update_response.status_code == 200
+    updated = update_response.json()
+    assert updated["external_url"] == "https://example.com/updated"
+    assert updated["cta_label"] == "Buy updated"
+    assert updated["documentation_files"] == []
+
+    public_response = client.get(f"{API_PREFIX}/products/{created['slug']}")
+    assert public_response.status_code == 200
+    public_detail = public_response.json()
+    assert public_detail["external_url"] == "https://example.com/updated"
+    assert public_detail["cta_label"] == "Buy updated"
+    assert public_detail["documentation_files"] == []
 
 
 def test_admin_delete_checklist_product(client, db, admin_token, sample_checklist):

@@ -61,8 +61,23 @@ def upload_media(
     # Get language code for error messages
     lang_code = get_language_code(http_request, db) if http_request else "en"
     
-    # Validate file type
-    if file.content_type not in ALLOWED_MIME_TYPES:
+    # Validate file type (infer from extension when browser omits content_type)
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_MIME_TYPES and file.filename:
+        extension = Path(file.filename).suffix.lower()
+        extension_mime_map = {
+            ".pdf": "application/pdf",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".doc": "application/msword",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".gif": "image/gif",
+            ".webp": "image/webp",
+        }
+        content_type = extension_mime_map.get(extension, content_type)
+
+    if content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="invalid_file_type"
@@ -115,7 +130,7 @@ def upload_media(
         )
     
     # Determine media type
-    if file.content_type.startswith("image/"):
+    if content_type.startswith("image/"):
         media_type = MediaType.image
     else:
         media_type = MediaType.document
@@ -124,7 +139,7 @@ def upload_media(
     media = Media(
         filename=unique_filename,
         original_filename=file.filename or "unknown",
-        mime_type=file.content_type,
+        mime_type=content_type,
         file_size_bytes=file_size,
         file_path=s3_key,  # Store S3 key instead of local path
         media_type=media_type,
