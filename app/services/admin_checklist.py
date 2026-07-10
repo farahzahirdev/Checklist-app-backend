@@ -138,7 +138,11 @@ def _to_checklist_response(checklist: Checklist, db: Session) -> AdminChecklistR
     if not checklist_type:
         from app.models.checklist import ChecklistType
         checklist_type = db.query(ChecklistType).filter_by(id=checklist.checklist_type_id).first()
-    decree = (translation.description if translation and translation.description else (checklist_type.description if checklist_type else title))
+    decree = (
+        translation.description
+        if translation and translation.description
+        else (checklist_type.description if checklist_type and checklist_type.description else title)
+    )
     
     # Get Stripe information
     stripe_info = AdminStripeInfo()
