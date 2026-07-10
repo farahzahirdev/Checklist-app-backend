@@ -336,6 +336,18 @@ def to_public_product_response(db: Session, product: Product) -> ProductBaseResp
     )
 
 
+def sync_all_checklist_products(db: Session) -> list[AdminProductResponse]:
+    """Create or update product catalog entries for every checklist."""
+    ensure_default_product_categories(db)
+    checklists = db.scalars(select(Checklist)).all()
+    products: list[AdminProductResponse] = []
+    for checklist in checklists:
+        product = sync_checklist_product(db, checklist=checklist)
+        products.append(to_admin_product_response(db, product))
+    db.flush()
+    return products
+
+
 def list_admin_products(
     db: Session,
     *,
@@ -597,7 +609,7 @@ def list_public_catalog(db: Session) -> PublicProductCatalogResponse:
         .where(ProductCategory.is_active == True)  # noqa: E712
         .order_by(ProductCategory.display_order.asc(), ProductCategory.name.asc())
     ).all()
-    products = db.scalars(
+    products = db.execute(
         select(Product)
         .options(
             joinedload(Product.category),
@@ -607,7 +619,7 @@ def list_public_catalog(db: Session) -> PublicProductCatalogResponse:
         )
         .where(Product.status.in_([ProductStatus.published.value, ProductStatus.coming_soon.value]))
         .order_by(Product.display_order.asc(), Product.created_at.asc())
-    ).all()
+    ).unique().scalars().all()
 
     grouped: list[ProductCategoryWithProductsResponse] = []
     total = 0

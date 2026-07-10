@@ -27,6 +27,7 @@ from app.services.product_catalog import (
     list_product_categories,
     remove_product,
     remove_checklist_product,
+    sync_all_checklist_products,
     to_admin_product_response,
     update_product,
 )
@@ -110,6 +111,16 @@ def admin_update_product_category(
         updated_at=category.updated_at,
         product_count=count,
     )
+
+
+@router.post("/sync-checklists", response_model=AdminProductListResponse)
+def admin_sync_checklist_products(
+    _admin=Depends(require_admin_only()),
+    db: Session = Depends(get_db),
+) -> AdminProductListResponse:
+    products = sync_all_checklist_products(db)
+    db.commit()
+    return {"total": len(products), "products": products, "skip": 0, "limit": len(products)}
 
 
 @router.get("", response_model=AdminProductListResponse)
