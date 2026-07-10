@@ -227,3 +227,86 @@ def test_admin_delete_checklist_product(client, db, admin_token, sample_checklis
 
     checklist_product_ids = [p["checklist"]["checklist_id"] for p in products if p["checklist"]]
     assert str(sample_checklist.id) not in checklist_product_ids
+
+
+def test_admin_update_product_kind_links_checklist(client, db, admin_token):
+    create_response = client.post(
+        f"{API_PREFIX}/admin/products",
+        headers=_admin_headers(admin_token),
+        json={
+            "category_code": "documentation",
+            "name": "Kind Switch Doc",
+            "product_kind": "documentation",
+            "status": "published",
+            "short_description": "Starts as documentation",
+        },
+    )
+    assert create_response.status_code == 201
+    created = create_response.json()
+    assert created["checklist"] is None
+
+    to_checklist_response = client.patch(
+        f"{API_PREFIX}/admin/products/{created['id']}",
+        headers=_admin_headers(admin_token),
+        json={"product_kind": "checklist", "category_code": "checklist"},
+    )
+    assert to_checklist_response.status_code == 200
+    checklist_product = to_checklist_response.json()
+    assert checklist_product["product_kind"] == "checklist"
+    assert checklist_product["checklist"] is not None
+    assert checklist_product["checklist"]["checklist_id"] is not None
+
+    catalog_response = client.get(f"{API_PREFIX}/products")
+    assert catalog_response.status_code == 200
+    checklist_products = [
+        p
+        for group in catalog_response.json()["categories"]
+        for p in group["products"]
+        if p["product_kind"] == "checklist"
+    ]
+    assert any(p["id"] == checklist_product["id"] for p in checklist_products)
+
+    to_documentation_response = client.patch(
+        f"{API_PREFIX}/admin/products/{created['id']}",
+        headers=_admin_headers(admin_token),
+        json={"product_kind": "documentation", "category_code": "documentation"},
+    )
+    assert to_documentation_response.status_code == 200
+    documentation_product = to_documentation_response.json()
+    assert documentation_product["product_kind"] == "documentation"
+    assert documentation_product["checklist"] is None
+
+
+def test_admin_update_existing_checklist_product_without_link_auto_creates_checklist(
+    client, db, admin_token
+):
+    from app.models.product_catalog import Product
+
+    create_response = client.post(
+        f"{API_PREFIX}/admin/products",
+        headers=_admin_headers(admin_token),
+        json={
+            "category_code": "checklist",
+            "name": "Orphan Checklist Product",
+            "product_kind": "checklist",
+            "status": "published",
+            "short_description": "Will lose checklist link in DB",
+        },
+    )
+    assert create_response.status_code == 201
+    created = create_response.json()
+
+    product = db.get(Product, created["id"])
+    assert product is not None
+    product.checklist_id = None
+    db.commit()
+
+    update_response = client.patch(
+        f"{API_PREFIX}/admin/products/{created['id']}",
+        headers=_admin_headers(admin_token),
+        json={"short_description": "Re-linked on save"},
+    )
+    assert update_response.status_code == 200
+    updated = update_response.json()
+    assert updated["checklist"] is not None
+    assert updated["checklist"]["checklist_id"] is not None

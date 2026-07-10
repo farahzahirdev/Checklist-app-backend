@@ -183,7 +183,7 @@ def admin_update_product(
     product = get_product_by_id(db, product_id)
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="product_not_found")
-    update_product(db, product, payload=payload)
+    update_product(db, product, payload=payload, actor_id=_admin.id)
     db.commit()
     # Re-fetch a fresh copy so all relationships reflect the committed state.
     fresh = get_product_by_id(db, product_id)

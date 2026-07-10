@@ -148,6 +148,7 @@ def sync_checklist_product(db: Session, *, checklist: Checklist) -> Product:
     product.checklist_id = checklist.id
     product.checklist_type_id = checklist.checklist_type_id
     product.product_kind = ProductKind.checklist.value
+    product.status = status
     if not product.slug:
         product.slug = _ensure_unique_slug(db, base_slug, exclude_product_id=product.id)
     return product
@@ -457,6 +458,29 @@ def _auto_create_checklist_for_product(
     return checklist
 
 
+def _sync_product_checklist_link(
+    db: Session,
+    product: Product,
+    *,
+    actor_id: uuid.UUID | None = None,
+) -> None:
+    """Keep checklist_id aligned with product_kind when admins change product type."""
+    if product.product_kind == ProductKind.checklist.value:
+        if product.checklist_id is None and actor_id is not None:
+            auto_checklist = _auto_create_checklist_for_product(
+                db,
+                name=product.name,
+                description=product.short_description or product.description,
+                actor_id=actor_id,
+            )
+            product.checklist_id = auto_checklist.id
+            product.checklist_type_id = auto_checklist.checklist_type_id
+        return
+
+    if product.product_kind in {ProductKind.documentation.value, ProductKind.module.value}:
+        product.checklist_id = None
+
+
 def create_product(db: Session, *, payload, actor_id: uuid.UUID | None = None) -> Product:
     category = _resolve_category(db, payload.category_code)
     if category is None:
@@ -519,7 +543,7 @@ def create_product(db: Session, *, payload, actor_id: uuid.UUID | None = None) -
     return product
 
 
-def update_product(db: Session, product: Product, *, payload) -> Product:
+def update_product(db: Session, product: Product, *, payload, actor_id: uuid.UUID | None = None) -> Product:
     provided_fields = payload.model_fields_set
 
     if payload.category_code is not None:
@@ -570,6 +594,13 @@ def update_product(db: Session, product: Product, *, payload) -> Product:
 
     if "documentation_files" in provided_fields and payload.documentation_files is not None:
         _sync_product_documentation_files(db, product, payload.documentation_files)
+
+    if payload.product_kind is not None or product.product_kind in {
+        ProductKind.checklist.value,
+        ProductKind.documentation.value,
+        ProductKind.module.value,
+    }:
+        _sync_product_checklist_link(db, product, actor_id=actor_id)
 
     return product
 
