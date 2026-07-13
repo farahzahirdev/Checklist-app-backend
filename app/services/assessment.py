@@ -711,17 +711,37 @@ def _to_assessment_question_response(
         evidence_query.order_by(AssessmentEvidenceFile.uploaded_at.desc())
     ).all()
 
+    legal_title = (translation.legal_requirement_title or "").strip() if translation else ""
+    legal_description = (translation.legal_requirement_description or "").strip() if translation else ""
+    question_text = (translation.question_text or "").strip() if translation else ""
+    paragraph_title = (translation.paragraph_title or "").strip() if translation else ""
+
+    # Prefer dedicated legal fields from the admin editor / Excel "Legal Requirement" column.
+    # Do not use question_text here — that is the customer-facing paragraph/question text.
+    legal_requirement = legal_description or legal_title or ""
+    if legal_requirement:
+        legal_requirement = sanitize_html(legal_requirement)
+
+    # Heading: dedicated paragraph title, or Excel question text when it is not just a copy
+    # of the legal requirement title (admin currently stores legal title in question_text).
+    question_title = paragraph_title or None
+    if not question_title and question_text:
+        if question_text != legal_title:
+            question_title = question_text
+        elif legal_description and question_text != legal_description:
+            question_title = question_text
+
     return AssessmentQuestionResponse(
         id=question.id,
         checklist_id=question.checklist_id,
         section_id=question.section_id,
         parent_question_id=question.parent_question_id,
         question_id=question.question_code,
-        question_title=translation.paragraph_title if translation else None,
+        question_title=question_title,
         security_level=question.severity or SeverityLevel.low,
         audit_type=question.audit_type if question.audit_type else None,
         answer_logic=question.answer_logic,
-        legal_requirement=translation.question_text if translation else "",
+        legal_requirement=legal_requirement,
         explanation=translation.explanation if translation and translation.explanation else "",
         expected_implementation=sanitize_html(translation.expected_implementation) if translation and translation.expected_implementation else "",
         how_it_works=translation.how_it_works if translation and translation.how_it_works else None,
