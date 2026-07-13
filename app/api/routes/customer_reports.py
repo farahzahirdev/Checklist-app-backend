@@ -205,13 +205,13 @@ def download_customer_report_pdf(
     if resolved_company_id is not None and assessment.company_id != resolved_company_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     
-    # Only allow download of published reports
-    if report.status != ReportStatus.published:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Report is not yet available for download"
-        )
-    
+    from app.services.report import assert_customer_report_downloadable
+
+    report_row = db.get(Report, report_id)
+    if report_row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
+    assert_customer_report_downloadable(report=report_row, assessment=assessment, lang_code=lang_code)
+
     # Generate PDF (will be implemented in the next step)
     from app.services.pdf_generator import generate_report_pdf
     pdf_content = generate_report_pdf(db, report_id=report_id, company_id=resolved_company_id, lang_code=lang_code)

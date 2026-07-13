@@ -201,6 +201,46 @@ def _get_report(db: Session, report_id: UUID, lang_code: str = "en") -> Report:
     return report
 
 
+def _normalize_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def is_assessment_download_expired(assessment: Assessment, *, now: datetime | None = None) -> bool:
+    """True when the checklist access window has ended (or data was purged)."""
+    current = _normalize_utc(now or _now())
+    if assessment.purged_at is not None:
+        return True
+    if assessment.status == AssessmentStatus.expired:
+        return True
+    return _normalize_utc(assessment.expires_at) <= current
+
+
+def assert_customer_report_downloadable(
+    *,
+    report: Report,
+    assessment: Assessment,
+    lang_code: str = "en",
+) -> None:
+    """Raise 403 when the customer must not download this report PDF."""
+    if report.final_deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=translate("report_not_available", lang_code),
+        )
+    if report.status != ReportStatus.published:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=translate("report_not_available_for_download", lang_code),
+        )
+    if is_assessment_download_expired(assessment):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=translate("report_download_expired", lang_code),
+        )
+
+
 def _create_review_event(db: Session, *, report_id: UUID, actor_user_id: UUID, event_type: ReportEventType, note: str | None) -> None:
     db.add(ReportReviewEvent(report_id=report_id, actor_user_id=actor_user_id, event_type=event_type, event_note=note))
 
@@ -684,11 +724,7 @@ def get_report_pdf_password(
     if assessment is None or assessment.user_id != requesting_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("report_not_found", lang_code))
 
-    if report.status != ReportStatus.published:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=translate("report_not_available_for_download", lang_code),
-        )
+    assert_customer_report_downloadable(report=report, assessment=assessment, lang_code=lang_code)
 
     if not report.final_pdf_password_encrypted:
         return ReportPdfPasswordResponse(has_pdf_password=False, pdf_password=None)
@@ -970,6 +1006,8 @@ def get_customer_report_data(db: Session, *, report_id: UUID, company_id: UUID |
         generated_at=report.created_at,
         approved_at=report.approved_at,
         published_at=report.final_pdf_published_at,
+        assessment_expires_at=assessment.expires_at,
+        is_download_expired=is_assessment_download_expired(assessment),
     )
    
 

@@ -198,3 +198,5 @@ class CustomerReportDataResponse(BaseModel):
     generated_at: datetime
     approved_at: datetime | None = None
     published_at: datetime | None = None
+    assessment_expires_at: datetime | None = None
+    is_download_expired: bool = False
