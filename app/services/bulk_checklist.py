@@ -283,11 +283,12 @@ def _populate_checklist_from_rows(
     """Create sections and questions from parsed rows. Returns counts and warnings."""
     # Track created items and sections
 
-    # Helper for answer options with fixed labels
+    # Helper for answer options with fixed short labels.
+    # Guidance columns become descriptions, never free-text answer labels.
     def build_answer_options(row):
         answer_options = []
-        # Fixed labels as requested: Yes=4pts, Maybe=3pts, Sure=2pts, No=1pts
-        fixed_labels = {4: "Yes", 3: "Maybe", 2: "Sure", 1: "No"}
+        fixed_labels = {4: "Yes", 3: "Partially", 2: "No", 1: "Don't know"}
+        fixed_choice_codes = {4: "YES", 3: "PARTIAL", 2: "NO", 1: "DONT_KNOW"}
 
         # Column keys in score-descending order (score 4 -> score 1)
         col_keys = [
@@ -301,12 +302,13 @@ def _populate_checklist_from_rows(
         scores = [4, 3, 2, 1]
         for idx, (score, col_key) in enumerate(zip(scores, col_keys)):
             guidance_title = get_column_value(row, col_key, headers) if col_key else None
-            label = sanitize_text(guidance_title) if guidance_title else fixed_labels.get(score, f"Score {score}")
+            description = sanitize_text(guidance_title) if guidance_title else None
             answer_options.append({
                 "position": idx + 1,
-                "label": label,
+                "label": fixed_labels.get(score, f"Score {score}"),
                 "score": score,
-                "description": None,
+                "choice_code": fixed_choice_codes.get(score),
+                "description": description,
             })
         return answer_options
 
@@ -470,6 +472,7 @@ def _populate_checklist_from_rows(
                         position=opt["position"],
                         label=opt["label"],
                         score=opt["score"],
+                        choice_code=opt.get("choice_code"),
                         description=opt["description"],
                     ))
                 questions_map[section_id][parent_q_id] = parent_question.id
@@ -521,6 +524,7 @@ def _populate_checklist_from_rows(
                             position=opt["position"],
                             label=opt["label"],
                             score=opt["score"],
+                            choice_code=opt.get("choice_code"),
                             description=opt["description"],
                         ))
                     questions_map[section_id][child_key] = child_question.id
@@ -572,6 +576,7 @@ def _populate_checklist_from_rows(
                                 position=opt["position"],
                                 label=opt["label"],
                                 score=opt["score"],
+                                choice_code=opt.get("choice_code"),
                                 description=opt["description"],
                             ))
                         questions_map[section_id][grandchild_key] = grandchild_question.id

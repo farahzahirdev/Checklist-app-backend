@@ -552,6 +552,41 @@ _DEFAULT_ANSWER_LABELS: dict[int, str] = {
     1: "Don't know",
 }
 
+_ALLOWED_ANSWER_LABELS = {
+    "yes",
+    "partially",
+    "partial",
+    "no",
+    "don't know",
+    "dont know",
+    "i don't know",
+    "ano",
+    "částečně",
+    "castecne",
+    "ne",
+    "nevím",
+    "nevim",
+    # legacy template labels
+    "maybe",
+    "sure",
+    "možná",
+    "mozna",
+    "jistě",
+    "jiste",
+}
+
+
+def _canonical_answer_label(score: int, raw_label: str | None = None) -> str:
+    """Always expose the short choice name; never pass through free-text guidance as the label."""
+    return _DEFAULT_ANSWER_LABELS.get(score, "Yes")
+
+
+def _is_short_answer_label(raw_label: str | None) -> bool:
+    if not raw_label:
+        return False
+    normalized = " ".join(raw_label.strip().lower().split())
+    return normalized in _ALLOWED_ANSWER_LABELS
+
 
 def _guidance_for_score(translation: ChecklistQuestionTranslation | None, score: int) -> str | None:
     if translation is None:
@@ -601,12 +636,21 @@ def _answer_options_for_assessment(
             override = overrides.get(option.position, {})
             override_label = override.get("label")
             override_description = override.get("description")
-            label = (override_label if override_label else None) or option.label
+            raw_label = (override_label if override_label else None) or option.label
+            label = _canonical_answer_label(option.score)
             description = (
                 (override_description if override_description else None)
                 or (option.description.strip() if option.description else None)
                 or _guidance_for_score(translation, option.score)
             )
+            # If description is empty and the stored label was long guidance text, surface it as description.
+            if (
+                not description
+                and isinstance(raw_label, str)
+                and raw_label.strip()
+                and not _is_short_answer_label(raw_label)
+            ):
+                description = raw_label.strip()
             responses.append(
                 AssessmentAnswerOptionResponse(
                     position=option.position,
@@ -622,7 +666,7 @@ def _answer_options_for_assessment(
     synthesized: list[AssessmentAnswerOptionResponse] = []
     for position, score in enumerate([4, 3, 2, 1], start=1):
         override = overrides.get(position, {})
-        label = override.get("label") or _DEFAULT_ANSWER_LABELS[score]
+        label = _canonical_answer_label(score)
         description = override.get("description") or _guidance_for_score(translation, score)
         synthesized.append(
             AssessmentAnswerOptionResponse(
