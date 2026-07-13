@@ -7,7 +7,11 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 from app.services.admin_checklist import _latest_section_translation
-from app.services.assessment import _checklist_translation_for_language, _section_translation_for_language
+from app.services.assessment import (
+    _checklist_translation_for_language,
+    _question_translation_for_language,
+    _section_translation_for_language,
+)
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import selectinload
@@ -17,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.models.assessment import AnswerChoice, Assessment, AssessmentAnswer, AssessmentStatus, PriorityLevel
 from app.models.assessment_review import AssessmentReview, AnswerReview, SuggestionType, ReviewStatus, ReviewHistory
-from app.models.checklist import ChecklistQuestion, ChecklistQuestionTranslation, ChecklistSection
+from app.models.checklist import ChecklistQuestion, ChecklistSection
 from app.models.report import (
     Report,
     ReportEventType,
@@ -121,17 +125,10 @@ def _report_company(report: Report, db: Session) -> Company | None:
     return None
 
 
-def _question_content(db: Session, question_id: UUID) -> tuple[str, str | None]:
-    translation = db.scalar(
-        select(ChecklistQuestionTranslation)
-        .where(ChecklistQuestionTranslation.question_id == question_id)
-        .order_by(desc(ChecklistQuestionTranslation.created_at))
-        .limit(1)
-    )
+def _question_content(db: Session, question_id: UUID, lang_code: str | None = None) -> tuple[str, str | None]:
+    translation = _question_translation_for_language(db, question_id, lang_code)
     if translation is None:
         return "", None
-    # Only use recommendation_template for recommendations, not expected_implementation
-    # Expected implementation should remain as checklist guidance only
     recommendation = translation.recommendation_template
     if recommendation:
         recommendation = sanitize_html(recommendation)
@@ -300,7 +297,7 @@ def generate_draft_report(db: Session, *, assessment_id: UUID, actor: User, lang
             question = db.get(ChecklistQuestion, answer.question_id)
             if question is None:
                 continue
-            finding_text, recommendation_text = _question_content(db, answer.question_id)
+            finding_text, recommendation_text = _question_content(db, answer.question_id, lang_code)
             db.add(
                 ReportFinding(
                     report_id=report.id,
@@ -1070,7 +1067,7 @@ def _calculate_section_scores(db: Session, assessment: Assessment, lang_code: st
         for question in questions:
             max_score += 4  # Maximum score per question is 4 (Yes answer)
             answer = answer_map.get(question.id)
-            question_translation = _latest_question_translation(db, question.id)
+            question_translation = _question_translation_for_language(db, question.id, lang_code)
             question_title = question_translation.question_text if question_translation else question.question_code
             if answer and answer.answer_score is not None:
                 total_score += int(answer.answer_score)
@@ -1237,15 +1234,6 @@ def _calculate_question_distribution(db: Session, assessment: Assessment) -> tup
     return question_distribution, total_questions, answered_questions
 
 
-def _latest_question_translation(db: Session, question_id: UUID):
-    return db.scalar(
-        select(ChecklistQuestionTranslation)
-        .where(ChecklistQuestionTranslation.question_id == question_id)
-        .order_by(desc(ChecklistQuestionTranslation.created_at))
-        .limit(1)
-    )
-
-
 def _calculate_chapter_data(db: Session, assessment: Assessment, lang_code: str = "en") -> list[dict]:
     """Calculate chapter overview data"""
     from app.models.checklist import ChecklistQuestion
@@ -1341,21 +1329,28 @@ def _get_customer_findings(db: Session, report_id: UUID, lang_code: str = "en") 
             section = db.get(ChecklistSection, question.section_id)
             if section:
                 section_code = section.section_code
-                # Get section translation
                 translation = _section_translation_for_language(db, section.id, lang_code)
                 section_title = sanitize_text(translation.title) if translation else section.section_code
+
+        question_translation = _question_translation_for_language(db, finding.question_id, lang_code)
+        question_text = (
+            sanitize_text(question_translation.question_text)
+            if question_translation and question_translation.question_text
+            else finding.finding_text
+        )
         
-        # Use section_code as domain, fallback to section_title, then to "General"
-        # This ensures we display the actual checklist section/domain (e.g., § 3, § 4, § 5)
         domain = section_code or section_title or "General"
         
-        # Handle case where recommendation is same as finding text
-        recommendation = sanitize_html(finding.recommendation_text) if finding.recommendation_text else None
-        if not recommendation or recommendation == sanitize_html(finding.finding_text):
+        recommendation = None
+        if question_translation and question_translation.recommendation_template:
+            recommendation = sanitize_html(question_translation.recommendation_template)
+        elif finding.recommendation_text:
+            recommendation = sanitize_html(finding.recommendation_text)
+        if not recommendation or recommendation == sanitize_html(question_text):
             recommendation = "Review and improve this control implementation"
         
         customer_findings.append({
-            "question_text": finding.finding_text,
+            "question_text": question_text,
             "answer": "No" if finding.priority == PriorityLevel.high else "Don't Know",
             "priority": finding.priority.value,
             "report_domain": domain,
@@ -1377,7 +1372,6 @@ def _get_section_summaries_for_customer(db: Session, report_id: UUID, lang_code:
     
     customer_summaries = []
     for summary in summaries:
-        # Get section information
         section = db.get(ChecklistSection, summary.section_id)
         section_code = section.section_code if section else "General"
         section_title = None
