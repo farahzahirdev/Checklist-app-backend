@@ -182,7 +182,12 @@ class CustomerReportDataResponse(BaseModel):
     domain_data: list[dict] = Field(default_factory=list, description="List of {domain, title, score, max_score, percentage, question_count}")
     
     # Findings (nonconformities/weak points)
-    findings: list[dict] = Field(description="List of {question_text, answer, priority, recommendation}")
+    findings: list[dict] = Field(
+        description=(
+            "List of findings with question_text, expected_implementation, "
+            "answer (Level N – text), finding_text, priority, recommendation"
+        )
+    )
     
     # Admin summaries
     section_summaries: list[dict] = Field(description="Admin-written section summaries with recommendations")

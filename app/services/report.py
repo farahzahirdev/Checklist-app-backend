@@ -8,7 +8,9 @@ from uuid import UUID
 
 from app.services.admin_checklist import _latest_section_translation
 from app.services.assessment import (
+    _answer_options_for_assessment,
     _checklist_translation_for_language,
+    _guidance_for_score,
     _question_translation_for_language,
     _section_translation_for_language,
 )
@@ -133,6 +135,55 @@ def _question_content(db: Session, question_id: UUID, lang_code: str | None = No
     if recommendation:
         recommendation = sanitize_html(recommendation)
     return translation.question_text, recommendation
+
+
+def _plain_text(value: str | None) -> str:
+    if not value:
+        return ""
+    return (sanitize_text(value) or "").strip()
+
+
+def _selected_answer_display(
+    db: Session,
+    *,
+    question_id: UUID,
+    answer_id: UUID,
+    lang_code: str = "en",
+) -> tuple[int | None, str]:
+    """Return (level/score, 'Level N – answer text') for the client's selected option."""
+    answer = db.get(AssessmentAnswer, answer_id)
+    if answer is None:
+        return None, ""
+
+    score: int | None = None
+    if answer.answer_score is not None:
+        score = int(answer.answer_score)
+    elif answer.answer_option_code_id is not None:
+        score = int(answer.answer_option_code_id)
+
+    if score is None or score < 1 or score > 4:
+        return None, ""
+
+    question = db.scalar(
+        select(ChecklistQuestion)
+        .where(ChecklistQuestion.id == question_id)
+        .options(selectinload(ChecklistQuestion.answer_options))
+    )
+    translation = _question_translation_for_language(db, question_id, lang_code)
+
+    answer_text = ""
+    if question is not None:
+        options = _answer_options_for_assessment(question, translation)
+        match = next((opt for opt in options if opt.score == score), None)
+        if match and match.description:
+            answer_text = _plain_text(match.description)
+
+    if not answer_text:
+        answer_text = _plain_text(_guidance_for_score(translation, score))
+
+    if answer_text:
+        return score, f"Level {score} – {answer_text}"
+    return score, f"Level {score}"
 
 
 def _serialize_report(db: Session, report: Report, lang_code: str = "en") -> ReportResponse:
@@ -1312,16 +1363,19 @@ def _calculate_chapter_data(db: Session, assessment: Assessment, lang_code: str 
 
 
 def _get_customer_findings(db: Session, report_id: UUID, lang_code: str = "en") -> list[dict]:
-    """Get findings for customer report"""
+    """Get findings for customer report.
+
+    Primary summary text is Expected Implementation (checklist column).
+    Answer is the client's selected option as \"Level N – <answer text>\".
+    """
     findings = db.scalars(
         select(ReportFinding)
         .where(ReportFinding.report_id == report_id)
         .order_by(desc(ReportFinding.priority))
     ).all()
-    
+
     customer_findings = []
     for finding in findings:
-        # Get question to fetch section information
         question = db.get(ChecklistQuestion, finding.question_id)
         section_code = None
         section_title = None
@@ -1338,27 +1392,48 @@ def _get_customer_findings(db: Session, report_id: UUID, lang_code: str = "en") 
             if question_translation and question_translation.question_text
             else finding.finding_text
         )
-        
+
+        expected_implementation = (
+            sanitize_html(question_translation.expected_implementation)
+            if question_translation and question_translation.expected_implementation
+            else ""
+        )
+        expected_implementation_plain = _plain_text(expected_implementation) or question_text
+
+        answer_level, answer_display = _selected_answer_display(
+            db,
+            question_id=finding.question_id,
+            answer_id=finding.answer_id,
+            lang_code=lang_code,
+        )
+
         domain = section_code or section_title or "General"
-        
+
         recommendation = None
         if question_translation and question_translation.recommendation_template:
             recommendation = sanitize_html(question_translation.recommendation_template)
         elif finding.recommendation_text:
             recommendation = sanitize_html(finding.recommendation_text)
-        if not recommendation or recommendation == sanitize_html(question_text):
+        # Prefer Expected Implementation as the actionable recommendation shown to customers.
+        if expected_implementation:
+            recommendation = expected_implementation
+        elif not recommendation or recommendation == sanitize_html(question_text):
             recommendation = "Review and improve this control implementation"
-        
+
         customer_findings.append({
             "question_text": question_text,
-            "answer": "No" if finding.priority == PriorityLevel.high else "Don't Know",
+            "legal_requirement": question_text,
+            "expected_implementation": expected_implementation_plain,
+            "answer": answer_display or ("No" if finding.priority == PriorityLevel.high else "Don't Know"),
+            "answer_level": answer_level,
+            "finding_text": answer_display,
             "priority": finding.priority.value,
             "report_domain": domain,
             "section_code": section_code,
             "section_title": section_title,
-            "recommendation": recommendation
+            "recommendation": recommendation,
         })
-    
+
     return customer_findings
 
 

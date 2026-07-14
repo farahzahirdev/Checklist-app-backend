@@ -1020,10 +1020,14 @@
             <tbody>
                 {% for finding in section_findings %}
                 <tr>
-                    <td style="font-weight:500; color:var(--slate-700);">{{ finding.question_text }}</td>
+                    <td style="font-weight:500; color:var(--slate-700);">
+                        {{ finding.expected_implementation or finding.question_text }}
+                    </td>
                     <td style="color:var(--slate-600);">
                         {% if finding.finding_text %}
                         {{ finding.finding_text }}
+                        {% elif finding.answer %}
+                        {{ finding.answer }}
                         {% elif finding.priority == 'high' %}
                         Klient odpověděl Ne – požadovaná kontrola není implementována.
                         {% elif finding.priority == 'medium' %}
