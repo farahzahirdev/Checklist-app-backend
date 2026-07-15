@@ -143,6 +143,24 @@ def _plain_text(value: str | None) -> str:
     return (sanitize_text(value) or "").strip()
 
 
+_STUB_ANSWER_TEXT_RE = re.compile(
+    r"^(answer|option|choice)\s*\d+$|"
+    r"^control is (fully|partially|confidently|not) "
+    r"(implemented|implemented or uncertain)\.?$|"
+    r"^kontrola (je plně implementována|je částečně implementována nebo je nejistá|"
+    r"je spolehlivě implementována|není implementována)\.?$",
+    re.IGNORECASE,
+)
+
+
+def _is_stub_answer_text(text: str | None) -> bool:
+    """True for placeholders / short templates that should yield to guidance text."""
+    if not text or not text.strip():
+        return True
+    normalized = " ".join(text.strip().split())
+    return bool(_STUB_ANSWER_TEXT_RE.match(normalized))
+
+
 def _selected_answer_display(
     db: Session,
     *,
@@ -171,15 +189,23 @@ def _selected_answer_display(
     )
     translation = _question_translation_for_language(db, question_id, lang_code)
 
-    answer_text = ""
+    option_text = ""
     if question is not None:
         options = _answer_options_for_assessment(question, translation)
         match = next((opt for opt in options if opt.score == score), None)
         if match and match.description:
-            answer_text = _plain_text(match.description)
+            option_text = _plain_text(match.description) or ""
 
-    if not answer_text:
-        answer_text = _plain_text(_guidance_for_score(translation, score))
+    guidance_text = _plain_text(_guidance_for_score(translation, score) or "") or ""
+
+    # Prefer the selected option's full narrative; fall back to guidance when
+    # the option description is only a short stub (e.g. "Answer 3").
+    if option_text and not _is_stub_answer_text(option_text):
+        answer_text = option_text
+    elif guidance_text:
+        answer_text = guidance_text
+    else:
+        answer_text = option_text
 
     if answer_text:
         return score, f"Level {score} – {answer_text}"

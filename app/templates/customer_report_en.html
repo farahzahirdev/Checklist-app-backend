@@ -1025,15 +1025,15 @@
                     </td>
                     <td style="color:var(--slate-600);">
                         {% if finding.finding_text %}
-                        {{ finding.finding_text }}
+                        • {{ finding.finding_text }}
                         {% elif finding.answer %}
-                        {{ finding.answer }}
+                        • {{ finding.answer }}
                         {% elif finding.priority == 'high' %}
-                        Client answered No – required control is not implemented.
+                        • Client answered No – required control is not implemented.
                         {% elif finding.priority == 'medium' %}
-                        Client answered Partially – implementation exists but is incomplete or inconsistently documented.
+                        • Client answered Partially – implementation exists but is incomplete or inconsistently documented.
                         {% else %}
-                        Client answered – evidence or ownership is unclear.
+                        • Client answered – evidence or ownership is unclear.
                         {% endif %}
                     </td>
                     <td style="text-align:center;">

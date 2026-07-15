@@ -1025,15 +1025,15 @@
                     </td>
                     <td style="color:var(--slate-600);">
                         {% if finding.finding_text %}
-                        {{ finding.finding_text }}
+                        • {{ finding.finding_text }}
                         {% elif finding.answer %}
-                        {{ finding.answer }}
+                        • {{ finding.answer }}
                         {% elif finding.priority == 'high' %}
-                        Klient odpověděl Ne – požadovaná kontrola není implementována.
+                        • Klient odpověděl Ne – požadovaná kontrola není implementována.
                         {% elif finding.priority == 'medium' %}
-                        Klient odpověděl Částečně – implementace existuje, ale je neúplná nebo nekonzistentně zdokumentovaná.
+                        • Klient odpověděl Částečně – implementace existuje, ale je neúplná nebo nekonzistentně zdokumentovaná.
                         {% else %}
-                        Klient odpověděl – důkazy nebo vlastnictví jsou nejasné.
+                        • Klient odpověděl – důkazy nebo vlastnictví jsou nejasné.
                         {% endif %}
                     </td>
                     <td style="text-align:center;">
