@@ -22,6 +22,29 @@ from app.utils.i18n import get_language_code
 router = APIRouter(prefix="/customer/reports", tags=["customer-reports"])
 
 
+def _assert_customer_report_company_access(
+    db: Session,
+    *,
+    current_user: User,
+    resolved_company_id: UUID | None,
+) -> None:
+    if not user_has_company_access(db, user=current_user, company_id=resolved_company_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only customers can access their reports")
+
+
+def _assessment_visible_to_customer(
+    assessment: Assessment | None,
+    *,
+    current_user: User,
+    resolved_company_id: UUID | None,
+) -> bool:
+    if assessment is None:
+        return False
+    if resolved_company_id is not None:
+        return assessment.company_id == resolved_company_id
+    return assessment.user_id == current_user.id
+
+
 @router.get(
     "/my-reports",
     response_model=PaginatedCustomerReportsResponse,
@@ -46,15 +69,15 @@ def list_customer_reports(
     
     lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
-    if not user_has_company_access(db, user=current_user, company_id=resolved_company_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only customers can access their reports")
+    _assert_customer_report_company_access(db, current_user=current_user, resolved_company_id=resolved_company_id)
     
     base_filters = [
-        Assessment.user_id == current_user.id,
         Report.status.in_([ReportStatus.approved, ReportStatus.published]),
     ]
     if resolved_company_id is not None:
         base_filters.append(Assessment.company_id == resolved_company_id)
+    else:
+        base_filters.append(Assessment.user_id == current_user.id)
 
     sort_col = {
         "final_pdf_published_at": Report.final_pdf_published_at,
@@ -100,15 +123,15 @@ def get_customer_report_by_assessment(
     
     lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
+    _assert_customer_report_company_access(db, current_user=current_user, resolved_company_id=resolved_company_id)
     
     # Verify the assessment belongs to the customer
     assessment = db.get(Assessment, assessment_id)
-    if assessment is None or assessment.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assessment not found"
-        )
-    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+    if not _assessment_visible_to_customer(
+        assessment,
+        current_user=current_user,
+        resolved_company_id=resolved_company_id,
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
     
     # Get the report
@@ -145,6 +168,7 @@ def get_customer_report(
     
     lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
+    _assert_customer_report_company_access(db, current_user=current_user, resolved_company_id=resolved_company_id)
     
     # Get the report
     from app.services.report import get_report
@@ -152,12 +176,11 @@ def get_customer_report(
     
     # Verify the report belongs to the customer's assessment
     assessment = db.get(Assessment, report.assessment_id)
-    if assessment is None or assessment.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Report not found"
-        )
-    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+    if not _assessment_visible_to_customer(
+        assessment,
+        current_user=current_user,
+        resolved_company_id=resolved_company_id,
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     
     # Only allow access to approved or published reports
@@ -190,6 +213,7 @@ def download_customer_report_pdf(
     
     lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
+    _assert_customer_report_company_access(db, current_user=current_user, resolved_company_id=resolved_company_id)
     
     # Get the report
     from app.services.report import get_report
@@ -197,12 +221,11 @@ def download_customer_report_pdf(
     
     # Verify the report belongs to the customer's assessment
     assessment = db.get(Assessment, report.assessment_id)
-    if assessment is None or assessment.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Report not found"
-        )
-    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+    if not _assessment_visible_to_customer(
+        assessment,
+        current_user=current_user,
+        resolved_company_id=resolved_company_id,
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     
     from app.services.report import assert_customer_report_downloadable
@@ -247,6 +270,7 @@ def get_customer_report_data_endpoint(
     
     lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
+    _assert_customer_report_company_access(db, current_user=current_user, resolved_company_id=resolved_company_id)
     
     # Get the report
     from app.services.report import get_report
@@ -254,12 +278,11 @@ def get_customer_report_data_endpoint(
     
     # Verify the report belongs to the customer's assessment
     assessment = db.get(Assessment, report.assessment_id)
-    if assessment is None or assessment.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Report not found"
-        )
-    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+    if not _assessment_visible_to_customer(
+        assessment,
+        current_user=current_user,
+        resolved_company_id=resolved_company_id,
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     
     # Only allow access to approved or published reports
@@ -292,17 +315,26 @@ def get_customer_report_pdf_password(
 
     lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
+    _assert_customer_report_company_access(db, current_user=current_user, resolved_company_id=resolved_company_id)
 
     from app.services.report import get_report
 
     report = get_report(db, report_id=report_id, lang_code=lang_code)
     assessment = db.get(Assessment, report.assessment_id)
-    if assessment is None or assessment.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
-    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+    if not _assessment_visible_to_customer(
+        assessment,
+        current_user=current_user,
+        resolved_company_id=resolved_company_id,
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
 
-    return get_report_pdf_password(db, report_id=report_id, requesting_user=current_user, lang_code=lang_code)
+    return get_report_pdf_password(
+        db,
+        report_id=report_id,
+        requesting_user=current_user,
+        requesting_company_id=resolved_company_id,
+        lang_code=lang_code,
+    )
 
 
 @router.get(
@@ -325,6 +357,7 @@ def preview_customer_report_html(
     
     lang_code = get_language_code(request, db, current_user)
     resolved_company_id = resolve_company_id(current_user, None)
+    _assert_customer_report_company_access(db, current_user=current_user, resolved_company_id=resolved_company_id)
     
     # Get the report
     from app.services.report import get_report
@@ -332,12 +365,11 @@ def preview_customer_report_html(
     
     # Verify the report belongs to the customer's assessment
     assessment = db.get(Assessment, report.assessment_id)
-    if assessment is None or assessment.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Report not found"
-        )
-    if resolved_company_id is not None and assessment.company_id != resolved_company_id:
+    if not _assessment_visible_to_customer(
+        assessment,
+        current_user=current_user,
+        resolved_company_id=resolved_company_id,
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report not found")
     
     # Only allow access to approved or published reports

@@ -791,11 +791,17 @@ def get_report_pdf_password(
     *,
     report_id: UUID,
     requesting_user: User,
+    requesting_company_id: UUID | None = None,
     lang_code: str = "en",
 ) -> ReportPdfPasswordResponse:
     report = _get_report(db, report_id, lang_code)
     assessment = db.get(Assessment, report.assessment_id)
-    if assessment is None or assessment.user_id != requesting_user.id:
+    if assessment is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("report_not_found", lang_code))
+    if requesting_company_id is not None:
+        if assessment.company_id != requesting_company_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("report_not_found", lang_code))
+    elif assessment.user_id != requesting_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=translate("report_not_found", lang_code))
 
     assert_customer_report_downloadable(report=report, assessment=assessment, lang_code=lang_code)
