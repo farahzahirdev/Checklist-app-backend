@@ -111,6 +111,26 @@ def _get_mfa_record(db: Session, user_id: UUID) -> MfaTotp | None:
     return db.scalar(select(MfaTotp).where(MfaTotp.user_id == user_id))
 
 
+def _mfa_flags(db: Session, user: User) -> tuple[bool, bool]:
+    mfa_record = _get_mfa_record(db, user.id)
+    mfa_enabled = bool(mfa_record and mfa_record.is_verified)
+    return bool(user.mfa_required), mfa_enabled
+
+
+def issue_session_auth_response(db: Session, *, user: User) -> AuthResponse:
+    """Issue a fresh bearer token so active users keep their session during normal use."""
+    settings = get_settings()
+    auth_ttl = get_runtime_int(db, "auth_token_ttl_minutes", settings.auth_token_ttl_minutes)
+    token = create_access_token(user_id=str(user.id), role=str(user.role), ttl_minutes=auth_ttl)
+    mfa_required, mfa_enabled = _mfa_flags(db, user)
+    return AuthResponse(
+        user=serialize_user(user, db),
+        access_token=token,
+        mfa_required=mfa_required,
+        mfa_enabled=mfa_enabled,
+    )
+
+
 def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 

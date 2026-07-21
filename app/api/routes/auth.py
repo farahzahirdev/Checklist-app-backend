@@ -25,6 +25,7 @@ from app.services.auth import (
     confirm_mfa_enrollment,
     issue_forgot_password_reset,
     issue_email_verification_request,
+    issue_session_auth_response,
     register_user,
     reset_password_with_token,
     serialize_user,
@@ -222,7 +223,22 @@ def verify_login_mfa_challenge(request: MfaChallengeVerifyRequest, http_request:
 )
 def me(http_request: Request, db: Session = Depends(get_db), current_user=Depends(get_current_user)) -> AuthResponse:
     db.refresh(current_user)
-    return AuthResponse(user=serialize_user(current_user, db), mfa_enabled=bool(current_user.mfa_totp and current_user.mfa_totp.is_verified))
+    return issue_session_auth_response(db, user=current_user)
+
+
+@router.post(
+    "/refresh",
+    response_model=AuthResponse,
+    summary="Refresh Session",
+    description="Validates the current bearer token and returns a renewed access token for active sessions.",
+)
+def refresh_session(
+    http_request: Request,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> AuthResponse:
+    db.refresh(current_user)
+    return issue_session_auth_response(db, user=current_user)
 
 
 @router.post(
