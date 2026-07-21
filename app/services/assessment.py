@@ -92,6 +92,53 @@ def _serialize_assessment(assessment: Assessment, *, is_new: bool) -> Assessment
     )
 
 
+def _purchase_slots_exhausted(
+    db: Session,
+    *,
+    user_id: UUID,
+    checklist_id: UUID,
+    company_id: UUID | None = None,
+) -> bool:
+    """True when every succeeded payment for this checklist already has a used audit slot."""
+    consuming_statuses = ACCESS_WINDOW_CONSUMING_STATUSES
+    if hasattr(db, "payments") and hasattr(db, "assessments"):
+        payments = [
+            item
+            for item in db.payments
+            if item.user_id == user_id
+            and item.checklist_id == checklist_id
+            and item.status == PaymentStatus.succeeded
+            and (company_id is None or item.company_id == company_id)
+        ]
+        used_runs = [
+            item
+            for item in db.assessments
+            if item.user_id == user_id
+            and item.checklist_id == checklist_id
+            and item.status in consuming_statuses
+            and (company_id is None or item.company_id == company_id)
+        ]
+        return len(payments) > 0 and len(used_runs) >= len(payments)
+
+    payment_conditions = [
+        Payment.user_id == user_id,
+        Payment.checklist_id == checklist_id,
+        Payment.status == PaymentStatus.succeeded,
+    ]
+    used_run_conditions = [
+        Assessment.user_id == user_id,
+        Assessment.checklist_id == checklist_id,
+        Assessment.status.in_(consuming_statuses),
+    ]
+    if company_id is not None:
+        payment_conditions.append(Payment.company_id == company_id)
+        used_run_conditions.append(Assessment.company_id == company_id)
+
+    payment_count = db.scalar(select(func.count(Payment.id)).where(*payment_conditions)) or 0
+    used_run_count = db.scalar(select(func.count(Assessment.id)).where(*used_run_conditions)) or 0
+    return payment_count > 0 and used_run_count >= payment_count
+
+
 def _latest_succeeded_payment(db: Session, *, user_id: UUID, checklist_id: UUID, company_id: UUID | None = None) -> Payment | None:
     query = select(Payment).where(
         Payment.user_id == user_id,
@@ -319,6 +366,17 @@ def start_assessment(
 
         if not user_has_company_access(db, user=user, company_id=company_id):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=translate("forbidden", lang_code))
+
+        if _purchase_slots_exhausted(
+            db,
+            user_id=user.id,
+            checklist_id=checklist_id,
+            company_id=company_id,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=translate("assessment_already_submitted_with_this_payment", lang_code),
+            )
 
         access_window = _active_access_window(
             db,

@@ -282,7 +282,7 @@ def _normalize_utc(value: datetime) -> datetime:
 
 
 def is_assessment_download_expired(assessment: Assessment, *, now: datetime | None = None) -> bool:
-    """True when the checklist access window has ended (or data was purged)."""
+    """True when the access window has ended — applies to all statuses including completed."""
     current = _normalize_utc(now or _now())
     if assessment.purged_at is not None:
         return True

@@ -30,6 +30,7 @@ from app.models.payment import Payment, PaymentStatus
 from app.models.report import Report, ReportStatus
 from app.models.access_window import AccessWindow
 from app.models.reference import Language
+from app.services.assessment import _purchase_slots_exhausted
 from app.schemas.customer_assessments import (
     AssessmentSummary,
     AssessmentDetail,
@@ -861,6 +862,9 @@ def _get_available_checklists(db: Session, user_id: UUID, lang_code: str) -> lis
 
     available = []
     for checklist, checklist_type, translation, language in purchased_checklists_query:
+        if _purchase_slots_exhausted(db, user_id=user_id, checklist_id=checklist.id):
+            continue
+
         title = translation.title if translation else f"Checklist v{checklist.version}"
 
         # Only show startable slots when there is an active access window with no assessment on it yet.

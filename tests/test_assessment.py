@@ -249,6 +249,115 @@ def test_start_assessment_blocks_restart_after_closed_report() -> None:
     assert exc.value.detail == "You have already submitted an assessment with this payment. Please make a new payment to start another assessment."
 
 
+def test_start_assessment_blocks_restart_when_completed_missing_access_window_link() -> None:
+    """Completed assessments without access_window_id must not leave the purchase slot reusable."""
+    db = FakeSession()
+    now = datetime.now(timezone.utc)
+    user = User(id=uuid4(), email="u@example.com", password_hash="x", role=UserRole.customer, is_active=True)
+    checklist = Checklist(
+        id=uuid4(),
+        checklist_type_id=uuid4(),
+        version=1,
+        status=ChecklistStatus.published,
+        created_by=user.id,
+        updated_by=user.id,
+    )
+    payment = Payment(
+        id=uuid4(),
+        user_id=user.id,
+        checklist_id=checklist.id,
+        stripe_payment_intent_id="pi_orphan",
+        amount_cents=4900,
+        currency="USD",
+        status=PaymentStatus.succeeded,
+        paid_at=now - timedelta(days=2),
+    )
+    access_window = AccessWindow(
+        id=uuid4(),
+        user_id=user.id,
+        payment_id=payment.id,
+        checklist_id=checklist.id,
+        activated_at=now - timedelta(days=2),
+        expires_at=now + timedelta(days=5),
+    )
+    completed_assessment = Assessment(
+        id=uuid4(),
+        user_id=user.id,
+        checklist_id=checklist.id,
+        access_window_id=None,
+        started_at=now - timedelta(days=2),
+        submitted_at=now - timedelta(days=1),
+        status=AssessmentStatus.submitted,
+        expires_at=now + timedelta(days=5),
+        completion_percent=100,
+    )
+    db.add(user)
+    db.add(checklist)
+    db.add(payment)
+    db.add(access_window)
+    db.add(completed_assessment)
+
+    with pytest.raises(HTTPException) as exc:
+        start_assessment(db, user=user, checklist_id=checklist.id)
+
+    assert exc.value.status_code == 403
+    assert exc.value.detail == "You have already submitted an assessment with this payment. Please make a new payment to start another assessment."
+
+
+def test_start_assessment_blocks_restart_after_expired_assessment() -> None:
+    db = FakeSession()
+    now = datetime.now(timezone.utc)
+    user = User(id=uuid4(), email="u@example.com", password_hash="x", role=UserRole.customer, is_active=True)
+    checklist = Checklist(
+        id=uuid4(),
+        checklist_type_id=uuid4(),
+        version=1,
+        status=ChecklistStatus.published,
+        created_by=user.id,
+        updated_by=user.id,
+    )
+    payment = Payment(
+        id=uuid4(),
+        user_id=user.id,
+        checklist_id=checklist.id,
+        stripe_payment_intent_id="pi_expired",
+        amount_cents=4900,
+        currency="USD",
+        status=PaymentStatus.succeeded,
+        paid_at=now - timedelta(days=10),
+    )
+    access_window = AccessWindow(
+        id=uuid4(),
+        user_id=user.id,
+        payment_id=payment.id,
+        checklist_id=checklist.id,
+        activated_at=now - timedelta(days=10),
+        expires_at=now + timedelta(days=5),
+    )
+    expired_assessment = Assessment(
+        id=uuid4(),
+        user_id=user.id,
+        checklist_id=checklist.id,
+        access_window_id=None,
+        started_at=now - timedelta(days=9),
+        submitted_at=None,
+        status=AssessmentStatus.expired,
+        expires_at=now - timedelta(days=2),
+        completion_percent=42,
+    )
+    db.add(user)
+    db.add(checklist)
+    db.add(payment)
+    db.add(access_window)
+    db.add(expired_assessment)
+
+    with pytest.raises(HTTPException) as exc:
+        start_assessment(db, user=user, checklist_id=checklist.id)
+
+    assert exc.value.status_code == 403
+    assert exc.value.detail == "You have already submitted an assessment with this payment. Please make a new payment to start another assessment."
+
+
 def test_start_assessment_requires_payment_for_same_checklist() -> None:
     db = FakeSession()
     now = datetime.now(timezone.utc)
