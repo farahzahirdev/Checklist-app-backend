@@ -592,6 +592,7 @@ def list_reports(
             joinedload(Report.assessment).joinedload(Assessment.checklist).joinedload(Checklist.translations),
             joinedload(Report.company),
         )
+        .filter(Report.final_deleted_at.is_(None))
     )
 
     if status:
@@ -623,7 +624,7 @@ def list_reports(
     else:
         query = query.order_by(_sort_col.desc().nulls_last())
 
-    count_query = db.query(func.count(Report.id))
+    count_query = db.query(func.count(Report.id)).filter(Report.final_deleted_at.is_(None))
     if status:
         try:
             count_query = count_query.filter(Report.status == ReportStatus(status))
@@ -664,6 +665,9 @@ def list_reports(
     
     report_items = []
     for report in reports:
+        assessment = report.assessment
+        if assessment is None:
+            continue
         # Get reviewer name (with caching)
         reviewer_name = None
         if report.reviewed_by:
@@ -672,10 +676,9 @@ def list_reports(
                 reviewer_cache[report.reviewed_by] = reviewer.email if reviewer else None
             reviewer_name = reviewer_cache[report.reviewed_by]
         
-        # Get checklist title in the requested language (fallback: default, then latest)
         checklist_title = None
-        if report.assessment.checklist:
-            translation = _checklist_translation_for_language(db, report.assessment.checklist.id, lang_code)
+        if assessment.checklist:
+            translation = _checklist_translation_for_language(db, assessment.checklist.id, lang_code)
             if translation and translation.title:
                 checklist_title = translation.title
         
@@ -690,10 +693,10 @@ def list_reports(
             "company_size": report.company.size if report.company else None,
             "company_region": report.company.region if report.company else None,
             "company_country": report.company.country if report.company else None,
-            "customer_email": report.assessment.user.email if report.assessment.user else None,
-            "customer_name": report.assessment.user.email if report.assessment.user else None,
+            "customer_email": assessment.user.email if assessment.user else None,
+            "customer_name": assessment.user.email if assessment.user else None,
             "checklist_title": checklist_title,
-            "checklist_version": report.assessment.checklist.version if report.assessment.checklist else None,
+            "checklist_version": assessment.checklist.version if assessment.checklist else None,
             "status": report.status,
             "draft_generated_at": report.draft_generated_at.isoformat() if report.draft_generated_at else None,
             "reviewed_at": report.reviewed_at.isoformat() if report.reviewed_at else None,

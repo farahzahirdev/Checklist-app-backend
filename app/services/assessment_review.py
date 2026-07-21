@@ -52,13 +52,71 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _assert_assessment_review_unlocked(db: Session, assessment_id: UUID) -> None:
+def _assert_assessment_review_unlocked(
+    db: Session,
+    assessment_id: UUID,
+    *,
+    allow_when_completing: bool = False,
+) -> None:
     """Prevent mutations after final report has been published."""
     report_status = db.scalar(select(Report.status).where(Report.assessment_id == assessment_id))
-    if report_status == ReportStatus.published:
+    if report_status == ReportStatus.published and not allow_when_completing:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Assessment review is locked because the report has already been published.",
+        )
+
+
+def _advance_report_after_assessment_review_completion(
+    db: Session,
+    *,
+    assessment_id: UUID,
+    reviewer_id: UUID,
+    lang_code: str = "en",
+) -> None:
+    """Ensure a draft exists and move it into report review when assessment review completes."""
+    import logging
+
+    from app.models.user import User as UserModel
+    from app.schemas.report import ReviewActionRequest
+    from app.services.report import generate_draft_report, start_review
+
+    logger = logging.getLogger(__name__)
+    reviewer_user = db.get(UserModel, reviewer_id)
+    if reviewer_user is None:
+        return
+
+    report = db.scalar(select(Report).where(Report.assessment_id == assessment_id))
+    if report is None:
+        try:
+            generate_draft_report(
+                db,
+                assessment_id=assessment_id,
+                actor=reviewer_user,
+                lang_code=lang_code,
+            )
+        except Exception as exc:
+            logger.error(
+                "Failed to generate draft report after assessment review completion for %s: %s",
+                assessment_id,
+                exc,
+                exc_info=True,
+            )
+            return
+        report = db.scalar(select(Report).where(Report.assessment_id == assessment_id))
+
+    if report is None or report.status != ReportStatus.draft_generated:
+        return
+
+    try:
+        payload = ReviewActionRequest(note="Assessment review completed; starting report review")
+        start_review(db, report_id=report.id, actor=reviewer_user, payload=payload, lang_code=lang_code)
+    except Exception as exc:
+        logger.error(
+            "Failed to start report review after assessment review completion for %s: %s",
+            assessment_id,
+            exc,
+            exc_info=True,
         )
 
 
@@ -609,8 +667,22 @@ def update_assessment_review(
     lang_code: str = "en",
 ) -> AssessmentReviewResponse:
     """Update overall assessment review."""
-    _assert_assessment_review_unlocked(db, assessment_id)
-    
+    update_data = review_data.dict(exclude_unset=True)
+    completing = update_data.get("status") == ReviewStatus.COMPLETED
+
+    review = db.scalar(select(AssessmentReview).where(AssessmentReview.assessment_id == assessment_id))
+    if completing and review is not None and review.status == ReviewStatus.COMPLETED:
+        _advance_report_after_assessment_review_completion(
+            db,
+            assessment_id=assessment_id,
+            reviewer_id=reviewer_id,
+            lang_code=lang_code,
+        )
+        db.refresh(review)
+        return AssessmentReviewResponse.model_validate(review, from_attributes=True)
+
+    _assert_assessment_review_unlocked(db, assessment_id, allow_when_completing=completing)
+
     review = get_or_create_assessment_review(db, assessment_id, reviewer_id)
     
     # Store previous values for history
@@ -626,7 +698,6 @@ def update_assessment_review(
     }
     
     # Update fields
-    update_data = review_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(review, field, value)
     
@@ -660,47 +731,33 @@ def update_assessment_review(
         after_data={"assessment_id": str(assessment_id), "status": str(review.status)},
     )
     
-    # If the assessment review was completed, start the report review flow for the generated draft
-    try:
-        if update_data.get("status") == ReviewStatus.COMPLETED:
-            # Find any report for this assessment and mark it under review by this reviewer
-            from sqlalchemy import select
-            from app.models.report import Report
-            from app.models.user import User as UserModel
-            from app.schemas.report import ReviewActionRequest
-            from app.services.report import start_review
-
-            report = db.scalar(select(Report).where(Report.assessment_id == assessment_id))
-            reviewer_user = db.get(UserModel, reviewer_id)
-            if report and reviewer_user:
-                payload = ReviewActionRequest(note="Assessment review completed; starting report review")
-                start_review(db, report_id=report.id, actor=reviewer_user, payload=payload)
-            
-            # Send notification
-            assessment = db.get(Assessment, assessment_id)
-            if assessment:
-                try:
-                    event = NotificationEvent(
-                        event_type=NotificationEventType.ASSESSMENT_REVIEW_COMPLETED,
-                        user_id=assessment.user_id,
-                        actor_id=reviewer_id,
-                        assessment_id=assessment.id,
-                        lang_code=lang_code,
-                    )
-                    notification_service = NotificationService(db)
-                    notification_service.notify(event)
-                except Exception as e:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.error(f"Failed to send assessment_review_completed notification: {e}", exc_info=True)
-    except Exception:
-        # Do not fail the review update if report start fails; log could be added here.
-        db.rollback()
-        pass
+    if completing:
+        _advance_report_after_assessment_review_completion(
+            db,
+            assessment_id=assessment_id,
+            reviewer_id=reviewer_id,
+            lang_code=lang_code,
+        )
+        assessment = db.get(Assessment, assessment_id)
+        if assessment:
+            try:
+                event = NotificationEvent(
+                    event_type=NotificationEventType.ASSESSMENT_REVIEW_COMPLETED,
+                    user_id=assessment.user_id,
+                    actor_id=reviewer_id,
+                    assessment_id=assessment.id,
+                    lang_code=lang_code,
+                )
+                notification_service = NotificationService(db)
+                notification_service.notify(event)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to send assessment_review_completed notification: {e}", exc_info=True)
 
     db.refresh(review)
 
-    return AssessmentReviewResponse.from_orm(review)
+    return AssessmentReviewResponse.model_validate(review, from_attributes=True)
 
 
 def create_bulk_answer_reviews(
